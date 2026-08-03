@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>周计划 · 专注森林周流</title>
+<style>
+  :root{
+    --bg:#101614;
+    --bg-rail:#0C110F;
+    --bg-panel:#141B17;
+    --bg-hover:rgba(237,234,226,.045);
+    --text:#EDEAE2;
+    --text-2:#B9C0B4;
+    --text-3:#8B968B;
+    --text-4:#5C685E;
+    --accent:#7FB069;
+    --accent-hi:#96C982;
+    --accent-ink:#0E1710;
+    --accent-soft:rgba(127,176,105,.10);
+    --accent-line:rgba(127,176,105,.34);
+    --accent-glow:rgba(127,176,105,.38);
+    --line:rgba(237,234,226,.08);
+    --line-strong:rgba(237,234,226,.17);
+    --warn:#C9856B;
+    --font-ui:"Segoe UI Variable Text","Segoe UI",system-ui,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    --font-mono:"Cascadia Mono","Cascadia Code",Consolas,"JetBrains Mono",monospace;
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:
+      radial-gradient(1100px 560px at 18% -12%, rgba(127,176,105,.055), transparent 62%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--font-ui);
+    font-size:14px;
+    line-height:1.65;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  button{font-family:inherit; color:inherit;}
+  .mono{font-family:var(--font-mono);}
+
+  *{scrollbar-width:thin; scrollbar-color:rgba(237,234,226,.14) transparent;}
+  ::-webkit-scrollbar{width:9px; height:9px;}
+  ::-webkit-scrollbar-thumb{background:rgba(237,234,226,.13); border-radius:8px; border:2px solid transparent; background-clip:content-box;}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(237,234,226,.26); border:2px solid transparent; background-clip:content-box;}
+  ::-webkit-scrollbar-track{background:transparent;}
+
+  /* ---------- App shell ---------- */
+  .app{
+    display:grid;
+    grid-template-columns:300px minmax(0,1fr) 240px;
+    grid-template-rows:58px 1fr;
+    grid-template-areas:
+      "topbar topbar topbar"
+      "rail forest lane";
+    height:100vh;
+    box-shadow:inset 0 0 0 1px rgba(237,234,226,.03);
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    grid-area:topbar;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 24px;
+    border-bottom:1px solid var(--line);
+    background:rgba(13,18,16,.85);
+    z-index:5;
+  }
+  .brand{display:flex; align-items:center; gap:11px;}
+  .brand-glyph{color:var(--accent); display:inline-flex;}
+  .brand-glyph svg{width:21px; height:21px; display:block;}
+  .brand-name{font-size:16px; font-weight:650; letter-spacing:1.5px; color:var(--text);}
+  .brand-dot{width:3px; height:3px; border-radius:50%; background:var(--accent);}
+  .brand-tag{font-size:12px; letter-spacing:2.5px; color:var(--text-3);}
+  .top-right{display:flex; align-items:center; gap:12px;}
+  .today{font-size:12px; color:var(--text-4);}
+  .today-sep{width:1px; height:12px; background:var(--line-strong);}
+  .now-week{font-size:11.5px; letter-spacing:.6px; color:var(--text-3);}
+
+  /* ---------- Left rail : tree trunks ---------- */
+  .rail{
+    grid-area:rail;
+    background:linear-gradient(180deg, var(--bg-rail), var(--bg));
+    border-right:1px solid var(--line);
+    padding:16px 14px 14px;
+    display:flex;
+    flex-direction:column;
+    overflow-y:auto;
+  }
+  .rail-label{
+    font-size:11px;
+    letter-spacing:2.5px;
+    color:var(--text-4);
+    padding:0 6px 10px;
+  }
+  .rail-list{display:flex; flex-direction:column; gap:12px;}
+
+  .trunk{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    width:100%;
+    text-align:left;
+    background:transparent;
+    border:1px solid transparent;
+    border-radius:14px;
+    padding:14px 14px;
+    cursor:pointer;
+    font:inherit;
+    color:var(--text);
+    transition:background .15s, border-color .15s, box-shadow .2s;
+  }
+  .trunk:hover{background:var(--bg-hover);}
+  .trunk.active{
+    background:linear-gradient(135deg, rgba(127,176,105,.15), rgba(127,176,105,.04));
+    border-color:var(--accent-line);
+    box-shadow:0 0 0 1px rgba(127,176,105,.12), 0 10px 30px -14px var(--accent-glow);
+  }
+  .trunk-glyph{width:26px; height:44px; flex:none; color:#33413A; transition:color .2s, filter .2s;}
+  .trunk-glyph svg{width:26px; height:44px; display:block;}
+  .trunk.active .trunk-glyph{color:var(--accent); filter:drop-shadow(0 0 7px rgba(127,176,105,.5));}
+  .trunk-body{display:flex; flex-direction:column; gap:5px; min-width:0;}
+  .trunk-line1{display:flex; align-items:center; gap:10px; min-width:0;}
+  .w-id{
+    font-family:var(--font-mono);
+    font-size:12px;
+    letter-spacing:.5px;
+    color:var(--text);
+    white-space:nowrap;
+  }
+  .trunk.active .w-id{color:#F5F3EA;}
+  .w-range{font-size:11.5px; color:var(--text-4); white-space:nowrap; line-height:1.6;}
+  .badge-now{
+    flex:none;
+    font-size:10px;
+    font-weight:600;
+    letter-spacing:1px;
+    color:var(--accent-ink);
+    background:var(--accent);
+    border-radius:99px;
+    padding:3px 9px;
+  }
+
+  .rail-actions{margin-top:22px; display:flex; flex-direction:column; gap:12px;}
+  .btn{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    border-radius:11px;
+    padding:10px 14px;
+    font-size:13px;
+    font-weight:500;
+    cursor:pointer;
+    border:1px solid transparent;
+    transition:background .15s, color .15s, border-color .15s, box-shadow .15s, transform .15s;
+    user-select:none;
+  }
+  .btn svg{width:15px; height:15px; flex:none;}
+  .btn.primary{
+    background:var(--accent);
+    color:var(--accent-ink);
+    font-weight:600;
+    justify-content:center;
+  }
+  .btn.primary:hover{
+    background:var(--accent-hi);
+    box-shadow:0 8px 26px -10px var(--accent-glow);
+    transform:translateY(-1px);
+  }
+  .btn.ghost{
+    background:rgba(237,234,226,.04);
+    color:var(--text-2);
+    border-color:var(--line);
+    justify-content:flex-start;
+  }
+  .btn.ghost:hover{
+    color:var(--text);
+    background:rgba(237,234,226,.07);
+    border-color:var(--line-strong);
+  }
+  .btn.wide{width:100%;}
+  .btn.sm{padding:6px 10px; font-size:12px; border-radius:9px;}
+  .count{margin-left:auto; font-family:var(--font-mono); font-size:11px; color:var(--text-4);}
+
+  .soil{
+    margin-top:auto;
+    padding:16px 6px 2px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:3px;
+    border-top:1px dashed var(--line-strong);
+    color:var(--text-4);
+  }
+  .soil-grass{color:#3D4B41; display:inline-flex; margin-bottom:2px;}
+  .soil-grass svg{width:120px; height:12px; display:block;}
+  .soil-note{font-size:10.5px; letter-spacing:1.5px;}
+
+  /* ---------- Main : task forest ---------- */
+  .forest{
+    grid-area:forest;
+    position:relative;
+    overflow-y:auto;
+    padding:24px 28px 52px;
+  }
+  .week-head{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;}
+  .wid{
+    font-family:var(--font-mono);
+    font-size:23px;
+    font-weight:500;
+    letter-spacing:1.5px;
+    color:var(--text);
+  }
+  .wrange{font-size:13px; color:var(--text-3);}
+  .chip{
+    font-size:11px;
+    padding:3px 11px;
+    border-radius:99px;
+    border:1px solid;
+    letter-spacing:1px;
+  }
+  .chip.active{color:var(--accent-hi); border-color:var(--accent-line); background:var(--accent-soft);}
+  .chip.future{color:var(--text-3); border-color:var(--line-strong);}
+  .chip.past{color:var(--text-4); border-color:var(--line);}
+  .forest-meta{
+    margin-top:9px;
+    font-size:12px;
+    letter-spacing:.5px;
+    color:var(--text-4);
+  }
+
+  .tree{margin-top:22px; animation:rise .25s ease;}
+  @keyframes rise{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;}}
+
+  .tree-node{position:relative;}
+  .tree-node.closed>.tree-children{display:none;}
+
+  .tree-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:9px 12px;
+    border-radius:11px;
+    cursor:pointer;
+    transition:background .15s, box-shadow .15s;
+    position:relative;
+  }
+  .tree-row:hover{background:var(--accent-soft);}
+  .tree-node.flash>.tree-row{
+    background:rgba(127,176,105,.17);
+    box-shadow:0 0 0 1px var(--accent-line), 0 0 28px -8px var(--accent-glow);
+  }
+  .node-glyph{width:17px; height:17px; flex:none;}
+  .node-glyph svg{width:17px; height:17px; display:block;}
+  .gi-leaf{color:var(--accent); filter:drop-shadow(0 0 5px rgba(127,176,105,.35));}
+  .gi-branch{color:#A9B4A1;}
+  .tree-row.closed .gi-leaf{color:#4A574E; filter:none;}
+  .tree-row.closed .gi-branch{color:#4A574E;}
+  .tree-row.top .node-glyph{width:19px; height:19px;}
+  .tree-row.top .node-glyph svg{width:19px; height:19px;}
+  .node-title{font-size:14px; color:var(--text); line-height:1.5;}
+  .tree-row.top .node-title{font-size:15px; font-weight:600;}
+  .tree-row.closed .node-title{
+    color:var(--text-4);
+    text-decoration:line-through;
+    text-decoration-color:rgba(237,234,226,.32);
+  }
+  .tag{
+    font-size:10px;
+    padding:2px 8px;
+    border-radius:99px;
+    border:1px solid var(--accent-line);
+    color:var(--accent-hi);
+    background:var(--accent-soft);
+    letter-spacing:1px;
+    flex:none;
+    margin-left:2px;
+  }
+  .row-spacer{flex:1;}
+  .add-btn{
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    font-size:11.5px;
+    color:var(--text-3);
+    background:transparent;
+    border:1px solid transparent;
+    border-radius:8px;
+    padding:4px 9px;
+    cursor:pointer;
+    opacity:0;
+    transition:opacity .15s, color .15s, border-color .15s, background .15s;
+  }
+  .tree-row:hover .add-btn{opacity:1;}
+  .add-btn:hover{color:var(--accent-hi); background:rgba(127,176,105,.1); border-color:var(--accent-line);}
+  .add-btn svg{width:12px; height:12px;}
+  .tree-row.closed .add-btn{display:none;}
+
+  .tree-children{
+    position:relative;
+    padding-left:30px;
+    --connector:rgba(237,234,226,.30);
+  }
+  .tree-children.dormant{--connector:rgba(237,234,226,.12);}
+  svg.connector{
+    position:absolute;
+    left:0;
+    top:0;
+    color:var(--connector);
+    pointer-events:none;
+    overflow:visible;
+  }
+  svg.connector circle.bud{fill:var(--accent); opacity:.95;}
+  svg.connector circle.bud.dim{fill:rgba(237,234,226,.24);}
+
+  .add-inline{display:flex; align-items:center; gap:8px; padding:6px 12px 6px 0;}
+  .add-inline .node-glyph{color:#4A574E; filter:none;}
+  .add-inline input{
+    flex:1;
+    min-width:0;
+    background:rgba(237,234,226,.05);
+    border:1px dashed var(--line-strong);
+    border-radius:9px;
+    padding:7px 11px;
+    color:var(--text);
+    font-family:inherit;
+    font-size:13px;
+    outline:none;
+  }
+  .add-inline input:focus{
+    border-color:var(--accent);
+    border-style:solid;
+    background:rgba(127,176,105,.06);
+  }
+  .add-inline .ok-btn,
+  .add-inline .no-btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:26px;
+    height:26px;
+    border-radius:8px;
+    border:1px solid var(--line-strong);
+    background:rgba(237,234,226,.05);
+    color:var(--text-2);
+    cursor:pointer;
+    padding:0;
+  }
+  .add-inline .ok-btn:hover{color:var(--accent-ink); background:var(--accent); border-color:var(--accent);}
+  .add-inline .no-btn:hover{color:var(--text); background:rgba(237,234,226,.1); border-color:var(--line-strong);}
+  .add-inline svg{width:13px; height:13px;}
+
+  .empty-forest{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+    padding:70px 0;
+  }
+  .empty-forest .empty-glyph{color:#2C3A31;}
+  .empty-forest .empty-glyph svg{width:74px; height:74px; display:block;}
+  .empty-forest p{font-size:14px; color:var(--text-3);}
+  .empty-forest .empty-sub{font-size:12px; color:var(--text-4);}
+
+  /* ---------- Right lane : current actions ---------- */
+  .lane{
+    grid-area:lane;
+    background:var(--bg-panel);
+    border-left:1px solid var(--line);
+    padding:22px 16px;
+    overflow-y:auto;
+  }
+  .lane-head{display:flex; gap:11px; align-items:center;}
+  .lane-glyph{color:var(--accent); display:inline-flex;}
+  .lane-glyph svg{width:20px; height:20px; display:block;}
+  .lane-head h2{font-size:15px; font-weight:650; letter-spacing:.5px; color:var(--text);}
+  .lane-sub{font-size:11px; color:var(--text-4); margin-top:2px; letter-spacing:.5px;}
+  .lane-list{display:flex; flex-direction:column; gap:10px; margin-top:16px;}
+
+  .leaf-card{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:12px;
+    border:1px solid var(--line);
+    border-radius:14px;
+    background:linear-gradient(160deg, rgba(127,176,105,.08), rgba(127,176,105,.02));
+    cursor:pointer;
+    transition:border-color .15s, transform .15s, box-shadow .15s;
+  }
+  .leaf-card:hover{
+    transform:translateY(-2px);
+    border-color:var(--accent-line);
+    box-shadow:0 14px 32px -16px var(--accent-glow);
+  }
+  .leaf-ic{width:20px; height:20px; color:var(--accent); flex:none; animation:breathe 3.2s ease-in-out infinite;}
+  .leaf-ic svg{width:20px; height:20px; display:block;}
+  @keyframes breathe{
+    0%,100%{opacity:.78; transform:scale(1);}
+    50%{opacity:1; transform:scale(1.07);}
+  }
+  .leaf-body{display:flex; flex-direction:column; gap:3px; min-width:0; flex:1;}
+  .leaf-title{font-size:13px; color:var(--text); line-height:1.45;}
+  .leaf-meta{font-family:var(--font-mono); font-size:9.5px; color:var(--text-4); letter-spacing:.3px;}
+  .pick-btn{
+    flex:none;
+    font-size:11px;
+    font-weight:500;
+    color:var(--accent-hi);
+    background:rgba(127,176,105,.1);
+    border:1px solid var(--accent-line);
+    border-radius:8px;
+    padding:4px 10px;
+    cursor:pointer;
+    transition:background .15s, color .15s;
+  }
+  .pick-btn:hover{background:var(--accent); color:var(--accent-ink);}
+  .lane-empty{display:flex; flex-direction:column; align-items:center; gap:12px; padding:56px 0; color:var(--text-4);}
+  .lane-empty .empty-glyph{color:#2C3A31;}
+  .lane-empty .empty-glyph svg{width:56px; height:56px; display:block;}
+  .lane-empty p{font-size:12px; line-height:1.9; text-align:center;}
+
+  /* ---------- Modals ---------- */
+  .modal-backdrop{
+    position:fixed;
+    inset:0;
+    z-index:60;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:rgba(5,8,7,.62);
+    backdrop-filter:blur(6px);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .18s;
+  }
+  .modal-backdrop.open{opacity:1; pointer-events:auto;}
+  .modal{
+    width:470px;
+    max-width:94vw;
+    background:linear-gradient(180deg, #1B241F, #151C18);
+    border:1px solid var(--line-strong);
+    border-radius:18px;
+    padding:26px 26px 22px;
+    box-shadow:0 34px 90px -24px rgba(0,0,0,.75);
+    transform:translateY(8px) scale(.98);
+    transition:transform .18s;
+    position:relative;
+    color:var(--text);
+  }
+  .modal-backdrop.open .modal{transform:none;}
+  .modal-wide{width:760px; max-width:94vw;}
+  .modal-close{
+    position:absolute;
+    top:14px;
+    right:14px;
+    width:30px;
+    height:30px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:9px;
+    border:1px solid transparent;
+    background:transparent;
+    color:var(--text-3);
+    cursor:pointer;
+  }
+  .modal-close:hover{color:var(--text); background:rgba(237,234,226,.07); border-color:var(--line);}
+  .modal-close svg{width:14px; height:14px;}
+  .modal-title{font-size:18px; font-weight:650; letter-spacing:.5px;}
+  .modal-sub{font-size:12.5px; color:var(--text-3); margin-top:7px; line-height:1.75;}
+  .field{margin-top:20px; display:flex; flex-direction:column; gap:8px;}
+  .field label{font-size:12px; color:var(--text-3); letter-spacing:.5px;}
+  .field input{width:100%;}
+
+  input[type="date"],
+  input[type="text"],
+  select{
+    background:rgba(237,234,226,.05);
+    border:1px solid var(--line-strong);
+    border-radius:9px;
+    padding:9px 11px;
+    color:var(--text);
+    font-family:inherit;
+    font-size:13px;
+    outline:none;
+    color-scheme:dark;
+  }
+  input:focus, select:focus{
+    border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(127,176,105,.13);
+  }
+  .week-preview{margin-top:14px; font-size:13px; color:var(--text-2); min-height:21px;}
+  .week-preview b{font-family:var(--font-mono); font-weight:500; color:var(--accent-hi); letter-spacing:.5px;}
+  .week-error{margin-top:10px; font-size:12.5px; color:var(--warn); min-height:19px;}
+  .modal-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:22px;}
+
+  .filters{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    margin-top:18px;
+    padding:16px;
+    border:1px solid var(--line);
+    border-radius:13px;
+    background:rgba(237,234,226,.02);
+  }
+  .filter-group{display:flex; align-items:center; gap:9px; flex-wrap:wrap;}
+  .f-label{font-size:12px; color:var(--text-3); width:38px; flex:none;}
+  .f-sep{color:var(--text-4); font-size:12px;}
+  .filter-group input[type="date"]{width:150px;}
+  .filter-group input[type="text"]{flex:1; min-width:140px;}
+  .filter-group select{min-width:120px;}
+  .check{display:inline-flex; align-items:center; gap:7px; font-size:12px; color:var(--text-2); cursor:pointer; margin-left:4px;}
+  .check input{accent-color:var(--accent); width:14px; height:14px;}
+
+  .results-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin:16px 2px 10px;
+    font-size:12px;
+    color:var(--text-3);
+  }
+  .results{display:flex; flex-direction:column; gap:8px; max-height:44vh; overflow-y:auto; padding-right:4px;}
+  .result-row{
+    display:flex;
+    align-items:center;
+    gap:11px;
+    padding:11px 13px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    cursor:pointer;
+    background:rgba(237,234,226,.02);
+    transition:background .13s, border-color .13s;
+  }
+  .result-row:hover{background:rgba(127,176,105,.08); border-color:var(--accent-line);}
+  .r-dot{width:8px; height:8px; border-radius:50%; flex:none;}
+  .r-dot.open{background:var(--accent); box-shadow:0 0 6px rgba(127,176,105,.5);}
+  .r-dot.closed{background:#4A574E;}
+  .r-main{flex:1; min-width:0;}
+  .r-title{font-size:13px; color:var(--text); line-height:1.45; display:block;}
+  .r-title.closed{color:var(--text-4); text-decoration:line-through; text-decoration-color:rgba(237,234,226,.3);}
+  .r-path{font-size:11px; color:var(--text-4); display:block; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .r-week{
+    font-family:var(--font-mono);
+    font-size:10px;
+    letter-spacing:.3px;
+    color:var(--text-3);
+    background:rgba(237,234,226,.05);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:2px 8px;
+    flex:none;
+  }
+  .r-carry{flex:none;}
+  .results-empty{padding:40px 0; text-align:center; color:var(--text-4); font-size:13px; line-height:2.1;}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.7 4.4C11.9 5.3 6.9 10 6.2 16.1c-.14 1.1.4 1.9 1.4 1.85 6.7-.35 11.6-5.3 12.1-13.55z" fill="currentColor"/><path d="M7.5 18c1.55-4.4 4.9-7.9 9.1-10.1" stroke="rgba(16,22,20,.55)" stroke-width="1.25" fill="none" stroke-linecap="round"/></svg></span>
+      <span class="brand-name">周计划</span>
+      <span class="brand-dot"></span>
+      <span class="brand-tag">专注森林周流</span>
+    </div>
+    <div class="top-right">
+      <span class="today">2026 年 8 月 3 日 · 周一</span>
+      <span class="today-sep"></span>
+      <span class="now-week mono">20260810-20260816 · 本周</span>
+    </div>
+  </header>
+
+  <aside class="rail">
+    <div class="rail-label">树干 · 最近四周</div>
+    <div id="railList" class="rail-list"></div>
+    <div class="rail-actions">
+      <button id="newWeekBtn" type="button" class="btn primary wide">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.6 4.2c-6.2.6-9.9 4.3-10.4 9.6-.1 1.3.5 2 1.6 1.9 4.7-.25 8-3.8 8.8-11.5z" fill="currentColor"/><path d="M9.8 15.8c1.4-3.5 3.8-6 6.8-7.5" stroke="rgba(16,22,20,.5)" stroke-width="1.2" stroke-linecap="round" fill="none"/><path d="M8.4 13.9c-.7.8-1 2.3-.4 4M9.2 15.5c1.5.5 2.7 1.6 3.5 3.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" fill="none"/></svg>
+        <span>种下新的一周</span>
+      </button>
+      <button id="allWeeksBtn" type="button" class="btn ghost wide">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.6" cy="10.6" r="6.2" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M15.4 15.4l4.6 4.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <span>查看所有周</span>
+        <span class="count" id="weekCount"></span>
+      </button>
+    </div>
+    <div class="soil">
+      <span class="soil-grass"><svg viewBox="0 0 120 12" aria-hidden="true"><path d="M5 11c.3-3.4 1.6-5.6 4.4-7M11 11c.6-2.8 2-4.8 4.6-6.2M19 11c1.4-2.3 1.6-4.6.7-7M28 11c1.9-2.2 5-3.4 8.4-3.8M40 11c2.3-1.4 3-3.4 2.6-5.8" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg></span>
+      <span class="soil-note">已收尾的周沉入土层</span>
+    </div>
+  </aside>
+
+  <main class="forest">
+    <div class="week-head" id="weekHead"></div>
+    <div class="forest-meta" id="forestMeta"></div>
+    <div class="tree" id="tree"></div>
+  </main>
+
+  <aside class="lane">
+    <div class="lane-head">
+      <span class="lane-glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.7 4.4C11.9 5.3 6.9 10 6.2 16.1c-.14 1.1.4 1.9 1.4 1.85 6.7-.35 11.6-5.3 12.1-13.55z" fill="currentColor"/><path d="M7.5 18c1.55-4.4 4.9-7.9 9.1-10.1" stroke="rgba(16,22,20,.55)" stroke-width="1.25" fill="none" stroke-linecap="round"/></svg></span>
+      <div>
+        <h2>当前行动</h2>
+        <p class="lane-sub">可摘取的果子 · <span id="laneCount">0</span></p>
+      </div>
+    </div>
+    <div id="laneList" class="lane-list"></div>
+  </aside>
+</div>
+
+<div id="weekModal" class="modal-backdrop">
+  <div class="modal">
+    <button type="button" class="modal-close" data-close title="关闭"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.2 4.2l7.6 7.6M11.8 4.2l-7.6 7.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+    <h2 class="modal-title">种下新的一周</h2>
+    <p class="modal-sub">选择一周中的任意一天，将以周一为起点，种下一棵新的树干。</p>
+    <div class="field">
+      <label for="weekDate">日期</label>
+      <input type="date" id="weekDate" value="2026-08-17" />
+    </div>
+    <div class="week-preview" id="weekPreview"></div>
+    <div class="week-error" id="weekError"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close>取消</button>
+      <button type="button" id="weekConfirm" class="btn primary">种下</button>
+    </div>
+  </div>
+</div>
+
+<div id="searchModal" class="modal-backdrop">
+  <div class="modal modal-wide">
+    <button type="button" class="modal-close" data-close title="关闭"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.2 4.2l7.6 7.6M11.8 4.2l-7.6 7.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+    <h2 class="modal-title">查看所有周</h2>
+    <p class="modal-sub">跨周检索任务分支，点击结果直接跳转到对应的一周。</p>
+    <div class="filters">
+      <div class="filter-group">
+        <span class="f-label">范围</span>
+        <input type="date" id="fStart" />
+        <span class="f-sep">至</span>
+        <input type="date" id="fEnd" />
+      </div>
+      <div class="filter-group">
+        <span class="f-label">关键词</span>
+        <input type="text" id="fKw" placeholder="任务名或路径…" autocomplete="off" />
+      </div>
+      <div class="filter-group">
+        <span class="f-label">状态</span>
+        <select id="fStatus">
+          <option value="">全部状态</option>
+          <option value="open">未完成</option>
+          <option value="closed">已完成</option>
+        </select>
+        <label class="check"><input type="checkbox" id="fCarry" />仅看带入</label>
+      </div>
+    </div>
+    <div class="results-head">
+      <span id="resultCount"></span>
+      <button id="searchReset" type="button" class="btn ghost sm">重置筛选</button>
+    </div>
+    <div id="searchResults" class="results"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+const NS = 'http://www.w3.org/2000/svg';
+const CURRENT_WEEK_ID = '20260810-20260816';
+const TODAY = new Date(2026, 7, 3); // 2026-08-03
+
+const WEEK_ORDER = [
+  '20260810-20260816',
+  '20260803-20260809',
+  '20260727-20260802',
+  '20260720-20260726'
+];
+
+const DATA = {
+  '20260810-20260816': { tasks: [
+    { id:'w0a', title:'规划下周目标', closed:false, children:[
+      { id:'w0a1', title:'列出季度 OKR', closed:false, children:[] },
+      { id:'w0a2', title:'拆解里程碑节点', closed:false, children:[] }
+    ]},
+    { id:'w0b', title:'准备周报模板', closed:false, children:[] }
+  ]},
+  '20260803-20260809': { tasks: [
+    { id:'n1', title:'准备项目周会', closed:false, children:[
+      { id:'n1a', title:'汇总本周进展', closed:false, children:[] },
+      { id:'n1b', title:'整理待讨论事项', closed:false, children:[] }
+    ]},
+    { id:'n2', title:'学习 Rust', closed:false, carriedOver:true, children:[
+      { id:'n2a', title:'阅读所有权章节', closed:true, children:[] },
+      { id:'n2b', title:'完成 CLI 小练习', closed:false, children:[] }
+    ]},
+    { id:'n3', title:'家庭装修方案', closed:true, children:[
+      { id:'n3a', title:'比价三家施工队', closed:true, children:[] },
+      { id:'n3b', title:'敲定预算上限', closed:true, children:[] }
+    ]}
+  ]},
+  '20260727-20260802': { tasks: [
+    { id:'w1a', title:'完成需求评审', closed:true, children:[
+      { id:'w1a1', title:'整理评审纪要', closed:true, children:[] }
+    ]},
+    { id:'w1b', title:'修复登录态问题', closed:false, children:[
+      { id:'w1b1', title:'排查 token 过期逻辑', closed:true, children:[] },
+      { id:'w1b2', title:'补充回归用例', closed:false, children:[] }
+    ]}
+  ]},
+  '20260720-20260726': { tasks: [
+    { id:'w2a', title:'旧版数据迁移', closed:true, children:[] },
+    { id:'w2b', title:'梳理文档结构', closed:true, children:[
+      { id:'w2b1', title:'归档废弃页面', closed:true, children:[] }
+    ]}
+  ]}
+};
+
+const state = { activeWeekId: '20260803-20260809' };
+
+const ICONS = {
+  leaf: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.7 4.4C11.9 5.3 6.9 10 6.2 16.1c-.14 1.1.4 1.9 1.4 1.85 6.7-.35 11.6-5.3 12.1-13.55z" fill="currentColor"/><path d="M7.5 18c1.55-4.4 4.9-7.9 9.1-10.1" stroke="rgba(16,22,20,.55)" stroke-width="1.25" fill="none" stroke-linecap="round"/></svg>',
+  branch: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.5v7.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M6.6 9c2.5 1.5 4.6 2.8 5.4 4.8M17.4 9c-2.5 1.5-4.6 2.8-5.4 4.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none"/></svg>',
+  plus: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+  check: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.4 8.6l3 3 6.2-7.2" stroke="currentColor" stroke-width="1.9" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  cross: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.2 4.2l7.6 7.6M11.8 4.2l-7.6 7.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+  trunk: '<svg viewBox="0 0 26 46" aria-hidden="true"><path d="M9 2h8v4.4c3.4 1.8 5.4 4.7 5.4 8.1v16.5c0 3.6-2.7 6.4-6.2 6.4h-6.4c-3.5 0-6.2-2.8-6.2-6.4V14.5c0-3.4 2-6.3 5.4-8.1V2z" fill="currentColor"/><path d="M10.6 2.6c-.2 1.6-1.4 2.6-3 2.8M14.8 3c.6 1.2 1.8 1.8 3.2 1.8" stroke="rgba(16,22,20,.28)" stroke-width="1.1" fill="none" stroke-linecap="round"/><path d="M9.5 15h7M9.5 20h7M9.5 25h7M9.5 30h5" stroke="rgba(16,22,20,.3)" stroke-width="1.1" stroke-linecap="round"/><path d="M8.2 37.5c-1.8.7-2.9 2-3 4M17.8 37.5c1.8.7 2.9 2 3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>'
+};
+
+/* ---------- helpers ---------- */
+const el = id => document.getElementById(id);
+const treeEl = el('tree');
+const laneList = el('laneList');
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ---------- date utils ---------- */
+function parseYmd(s){ return new Date(+s.slice(0,4), +s.slice(4,6)-1, +s.slice(6,8)); }
+function pad2(n){ return String(n).padStart(2,'0'); }
+function fmtYmd(d){ return d.getFullYear() + pad2(d.getMonth()+1) + pad2(d.getDate()); }
+function fmtCn(y){ return (+y.slice(4,6)) + '月' + (+y.slice(6,8)) + '日'; }
+function weekRange(id){ return [id.slice(0,8), id.slice(9)]; }
+function fmtRange(id){
+  const [a,b] = weekRange(id);
+  return fmtCn(a) + ' – ' + fmtCn(b);
+}
+function weekStatus(id){
+  const start = parseYmd(id.slice(0,8));
+  const end = parseYmd(id.slice(9));
+  if(TODAY < start) return { label:'待开始', cls:'future' };
+  if(TODAY > end) return { label:'已收尾', cls:'past' };
+  return { label:'进行中', cls:'active' };
+}
+function computeWeekFromId(ymd){
+  const d = parseYmd(ymd);
+  const mon = new Date(d);
+  mon.setDate(d.getDate() - ((d.getDay()+6)%7));
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  return fmtYmd(mon) + '-' + fmtYmd(sun);
+}
+
+/* ---------- tree data helpers ---------- */
+function findInTree(nodes, id){
+  for(const n of nodes){
+    if(n.id === id) return n;
+    if(n.children.length){
+      const r = findInTree(n.children, id);
+      if(r) return r;
+    }
+  }
+  return null;
+}
+function collectActionableLeaves(nodes){
+  const out = [];
+  (function walk(list, ancestorsOpen){
+    list.forEach(n => {
+      const open = ancestorsOpen && !n.closed;
+      if(n.children.length === 0){
+        if(open) out.push(n);
+      } else {
+        walk(n.children, open);
+      }
+    });
+  })(nodes, true);
+  return out;
+}
+function countOpen(nodes){
+  let c = 0;
+  nodes.forEach(n => {
+    if(!n.closed){ c += 1; c += countOpen(n.children); }
+  });
+  return c;
+}
+
+/* ---------- render: rail ---------- */
+function renderRail(){
+  const list = el('railList');
+  list.innerHTML = '';
+  WEEK_ORDER.forEach(id => {
+    const isActive = id === state.activeWeekId;
+    const isCurrent = id === CURRENT_WEEK_ID;
+    const [a, b] = weekRange(id);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'trunk' + (isActive ? ' active' : '');
+    btn.dataset.week = id;
+    btn.innerHTML =
+      '<span class="trunk-glyph">' + ICONS.trunk + '</span>' +
+      '<span class="trunk-body">' +
+        '<span class="trunk-line1">' +
+          '<span class="w-id">' + id + '</span>' +
+          (isCurrent ? '<span class="badge-now">本周</span>' : '') +
+        '</span>' +
+        '<span class="w-range">' + fmtCn(a) + ' – ' + fmtCn(b) + ' · ' + weekStatus(id).label + '</span>' +
+      '</span>';
+    list.appendChild(btn);
+  });
+  el('weekCount').textContent = WEEK_ORDER.length + ' 周';
+}
+
+/* ---------- render: tree node ---------- */
+function nodeEl(node, isTop){
+  const wrap = document.createElement('div');
+  wrap.className = 'tree-node' + (node.closed ? ' closed' : '');
+  wrap.dataset.nodeId = node.id;
+  const hasChildren = node.children.length > 0;
+  const row = document.createElement('div');
+  row.className = 'tree-row' + (node.closed ? ' closed' : '') + (isTop ? ' top' : '');
+  row.dataset.node = node.id;
+  row.innerHTML =
+    '<span class="node-glyph ' + (hasChildren ? 'gi-branch' : 'gi-leaf') + '">' +
+      (hasChildren ? ICONS.branch : ICONS.leaf) +
+    '</span>' +
+    '<span class="node-title">' + escapeHtml(node.title) + '</span>' +
+    (node.carriedOver ? '<span class="tag carry">带入</span>' : '') +
+    '<span class="row-spacer"></span>' +
+    '<button type="button" class="add-btn" data-parent="' + node.id + '" title="添加分支">' +
+      ICONS.plus + '<span>添加分支</span>' +
+    '</button>';
+  wrap.appendChild(row);
+  if(hasChildren){
+    const ch = document.createElement('div');
+    ch.className = 'tree-children';
+    ch.dataset.parent = node.id;
+    node.children.forEach(c => ch.appendChild(nodeEl(c, false)));
+    wrap.appendChild(ch);
+  }
+  return wrap;
+}
+
+function updateMeta(){
+  const week = DATA[state.activeWeekId];
+  const open = week ? countOpen(week.tasks) : 0;
+  const leaves = week ? collectActionableLeaves(week.tasks).length : 0;
+  el('forestMeta').textContent =
+    (week ? week.tasks.length : 0) + ' 棵主树 · ' + open + ' 个未完成 · ' + leaves + ' 个行动叶';
+}
+
+function renderForest(){
+  const week = DATA[state.activeWeekId];
+  const st = weekStatus(state.activeWeekId);
+  el('weekHead').innerHTML =
+    '<h1 class="wid">' + state.activeWeekId + '</h1>' +
+    '<span class="wrange">' + fmtRange(state.activeWeekId) + '</span>' +
+    '<span class="chip ' + st.cls + '">' + st.label + '</span>';
+  treeEl.innerHTML = '';
+  if(week && week.tasks.length){
+    const frag = document.createDocumentFragment();
+    week.tasks.forEach(t => frag.appendChild(nodeEl(t, true)));
+    treeEl.appendChild(frag);
+  } else {
+    treeEl.innerHTML =
+      '<div class="empty-forest">' +
+        '<span class="empty-glyph">' + ICONS.branch + '</span>' +
+        '<p>这一周还没有种下任务</p>' +
+        '<p class="empty-sub">点「种下新的一周」或为已有任务添加分支</p>' +
+      '</div>';
+  }
+  treeEl.style.animation = 'none';
+  void treeEl.offsetWidth;
+  treeEl.style.animation = '';
+  updateMeta();
+  drawAllConnectors();
+}
+
+/* ---------- organic connectors ---------- */
+function drawAllConnectors(){
+  treeEl.querySelectorAll('.tree-children').forEach(drawConnector);
+}
+
+function drawConnector(container){
+  container.querySelectorAll('svg.connector').forEach(s => s.remove());
+  if(container.offsetParent === null) return;
+  const nodes = Array.prototype.slice.call(container.querySelectorAll(':scope > .tree-node'));
+  const inline = container.querySelector(':scope > .add-inline');
+  if(!nodes.length && !inline) return;
+
+  const cRect = container.getBoundingClientRect();
+  const h = Math.max(container.scrollHeight, 12);
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('class', 'connector');
+  svg.style.width = '30px';
+  svg.style.height = h + 'px';
+  svg.classList.toggle('dormant', container.parentElement.classList.contains('closed'));
+
+  const spine = document.createElementNS(NS, 'path');
+  spine.setAttribute('d', 'M13 0 V' + Math.max(h - 6, 8));
+  spine.setAttribute('stroke', 'currentColor');
+  spine.setAttribute('stroke-width', '1.6');
+  spine.setAttribute('stroke-linecap', 'round');
+  spine.setAttribute('fill', 'none');
+  spine.setAttribute('opacity', '0.45');
+  svg.appendChild(spine);
+
+  const rows = [];
+  nodes.forEach(n => rows.push({ el: n.querySelector(':scope > .tree-row'), node: n }));
+  if(inline) rows.push({ el: inline, node: null });
+
+  rows.forEach(r => {
+    if(!r.el) return;
+    const rect = r.el.getBoundingClientRect();
+    const y = rect.top - cRect.top + rect.height / 2;
+    const curve = document.createElementNS(NS, 'path');
+    curve.setAttribute('d', 'M13 ' + y + ' C 13 ' + (y + 7) + ', 27 ' + (y - 4) + ', 30 ' + y);
+    curve.setAttribute('stroke', 'currentColor');
+    curve.setAttribute('stroke-width', '1.4');
+    curve.setAttribute('stroke-linecap', 'round');
+    curve.setAttribute('fill', 'none');
+    if(r.node){
+      const closed = r.node.classList.contains('closed');
+      curve.setAttribute('opacity', closed ? '0.35' : '0.8');
+      const bud = document.createElementNS(NS, 'circle');
+      bud.setAttribute('cx', '13');
+      bud.setAttribute('cy', y);
+      bud.setAttribute('r', '2.2');
+      bud.setAttribute('class', 'bud' + (closed ? ' dim' : ''));
+      svg.appendChild(bud);
+    } else {
+      curve.setAttribute('opacity', '0.6');
+    }
+    svg.appendChild(curve);
+  });
+
+  container.prepend(svg);
+}
+
+/* ---------- render: lane ---------- */
+function renderLane(){
+  const week = DATA[state.activeWeekId];
+  const leaves = week ? collectActionableLeaves(week.tasks) : [];
+  laneList.innerHTML = '';
+  if(!leaves.length){
+    laneList.innerHTML =
+      '<div class="lane-empty">' +
+        '<span class="empty-glyph">' + ICONS.leaf + '</span>' +
+        '<p>这一周还没有<br/>可摘取的果子</p>' +
+      '</div>';
+    el('laneCount').textContent = '0';
+    return;
+  }
+  leaves.forEach(n => {
+    const card = document.createElement('div');
+    card.className = 'leaf-card';
+    card.dataset.node = n.id;
+    card.innerHTML =
+      '<span class="leaf-ic">' + ICONS.leaf + '</span>' +
+      '<span class="leaf-body">' +
+        '<span class="leaf-title">' + escapeHtml(n.title) + '</span>' +
+        '<span class="leaf-meta">' + state.activeWeekId + ' · 行动叶</span>' +
+      '</span>' +
+      '<button type="button" class="pick-btn" title="标记完成">摘取</button>';
+    laneList.appendChild(card);
+  });
+  el('laneCount').textContent = String(leaves.length);
+}
+
+/* ---------- app actions ---------- */
+function setActiveWeek(id){
+  state.activeWeekId = id;
+  renderRail();
+  renderForest();
+  renderLane();
+}
+
+function toggleNode(id){
+  const week = DATA[state.activeWeekId];
+  if(!week) return;
+  const node = findInTree(week.tasks, id);
+  if(!node) return;
+  node.closed = !node.closed;
+  const row = treeEl.querySelector('[data-node="' + id + '"]');
+  if(row){
+    row.closest('.tree-node').classList.toggle('closed', node.closed);
+    row.classList.toggle('closed', node.closed);
+  }
+  drawAllConnectors();
+  renderLane();
+  updateMeta();
+}
+
+function refreshNode(nodeId){
+  const rowEl = treeEl.querySelector('[data-node="' + nodeId + '"]');
+  if(!rowEl) return;
+  const host = rowEl.closest('.tree-node');
+  const dataNode = findInTree(DATA[state.activeWeekId].tasks, nodeId);
+  if(!dataNode) return;
+  const fresh = nodeEl(dataNode, host.classList.contains('top') ? true : false);
+  host.replaceWith(fresh);
+  drawAllConnectors();
+}
+
+function showAddRow(parentId){
+  const rowEl = treeEl.querySelector('[data-node="' + parentId + '"]');
+  if(!rowEl) return;
+  const host = rowEl.closest('.tree-node');
+  let ch = host.querySelector(':scope > .tree-children');
+  if(!ch){
+    ch = document.createElement('div');
+    ch.className = 'tree-children';
+    ch.dataset.parent = parentId;
+    host.appendChild(ch);
+  }
+  if(ch.querySelector(':scope > .add-inline')) return;
+  const row = document.createElement('div');
+  row.className = 'add-inline';
+  row.innerHTML =
+    '<span class="node-glyph gi-leaf">' + ICONS.leaf + '</span>' +
+    '<input type="text" maxlength="40" placeholder="输入新分支，回车确认…" autocomplete="off"/>' +
+    '<button type="button" class="ok-btn" title="确认">' + ICONS.check + '</button>' +
+    '<button type="button" class="no-btn" title="取消">' + ICONS.cross + '</button>';
+  ch.appendChild(row);
+  row.querySelectorAll('.ok-btn, .no-btn').forEach(b => {
+    b.addEventListener('mousedown', e => e.preventDefault());
+  });
+  const input = row.querySelector('input');
+  input.addEventListener('keydown', e => {
+    if(e.key === 'Enter'){
+      e.preventDefault();
+      commitAddRow(row, parentId);
+    } else if(e.key === 'Escape'){
+      row.dataset.done = '1';
+      row.remove();
+      if(!ch.children.length) ch.remove();
+      drawAllConnectors();
+    }
+  });
+  input.addEventListener('blur', () => {
+    if(row.isConnected) commitAddRow(row, parentId);
+  });
+  input.focus();
+  drawAllConnectors();
+}
+
+function commitAddRow(row, parentId){
+  if(row.dataset.done) return;
+  row.dataset.done = '1';
+  const input = row.querySelector('input');
+  const title = input ? input.value.trim() : '';
+  const ch = row.parentElement;
+  if(!title){
+    row.remove();
+    if(ch && !ch.children.length) ch.remove();
+    drawAllConnectors();
+    return;
+  }
+  const parentNode = findInTree(DATA[state.activeWeekId].tasks, parentId);
+  if(!parentNode){
+    row.remove();
+    return;
+  }
+  parentNode.children.push({ id:'x' + Date.now().toString(36), title:title, closed:false, children:[] });
+  refreshNode(parentId);
+  renderLane();
+  updateMeta();
+}
+
+function goToTask(weekId, nodeId){
+  state.activeWeekId = weekId;
+  renderRail();
+  renderForest();
+  const data = DATA[weekId];
+  const row = treeEl.querySelector('[data-node="' + nodeId + '"]');
+  if(row){
+    let host = row.closest('.tree-node');
+    let cursor = host.parentElement;
+    while(cursor){
+      if(cursor.classList && cursor.classList.contains('tree-node')){
+        if(cursor.classList.contains('closed')){
+          const dn = data ? findInTree(data.tasks, cursor.dataset.nodeId) : null;
+          if(dn) dn.closed = false;
+          cursor.classList.remove('closed');
+          const ancestorRow = cursor.querySelector(':scope > .tree-row');
+          if(ancestorRow) ancestorRow.classList.remove('closed');
+        }
+      }
+      cursor = cursor.parentElement;
+    }
+    drawAllConnectors();
+    renderLane();
+    updateMeta();
+    host.scrollIntoView({ behavior:'smooth', block:'center' });
+    host.classList.add('flash');
+    setTimeout(() => host.classList.remove('flash'), 2000);
+  }
+}
+
+/* ---------- week modal ---------- */
+function openModal(id){
+  document.getElementById(id).classList.add('open');
+}
+function closeModals(){
+  document.querySelectorAll('.modal-backdrop.open').forEach(m => m.classList.remove('open'));
+}
+
+function updateWeekPreview(){
+  const v = el('weekDate').value;
+  const prev = el('weekPreview');
+  const err = el('weekError');
+  if(!v){
+    prev.innerHTML = '请选择日期。';
+    err.textContent = '';
+    return;
+  }
+  const id = computeWeekFromId(v.replace(/-/g, ''));
+  const [a, b] = weekRange(id);
+  if(DATA[id]){
+    prev.innerHTML = '';
+    err.textContent = '这一周已经种下啦，换一周试试。';
+  } else {
+    err.textContent = '';
+    prev.innerHTML = '新的一周：<b>' + id + '</b> · ' + fmtCn(a) + '（周一）至 ' + fmtCn(b) + '（周日）';
+  }
+}
+
+function createWeek(){
+  const v = el('weekDate').value;
+  if(!v) return;
+  const id = computeWeekFromId(v.replace(/-/g, ''));
+  if(DATA[id]){
+    updateWeekPreview();
+    return;
+  }
+  DATA[id] = { tasks: [] };
+  WEEK_ORDER.unshift(id);
+  closeModals();
+  renderRail();
+  setActiveWeek(id);
+}
+
+/* ---------- search overlay ---------- */
+function flattenWeeks(){
+  const out = [];
+  WEEK_ORDER.forEach(wid => {
+    const week = DATA[wid];
+    if(!week) return;
+    (function push(nodes, path){
+      nodes.forEach(n => {
+        const nextPath = path.concat(n);
+        const carry = n.carriedOver || path.some(p => p.carriedOver);
+        out.push({ week:wid, node:n, path:nextPath.map(p => p.title).join(' / '), carry:carry });
+        if(n.children.length) push(n.children, nextPath);
+      });
+    })(week.tasks, []);
+  });
+  return out;
+}
+
+function runSearch(){
+  const kw = el('fKw').value.trim().toLowerCase();
+  const st = el('fStatus').value;
+  const carry = el('fCarry').checked;
+  const fStartVal = el('fStart').value;
+  const fEndVal = el('fEnd').value;
+  const fStart = fStartVal ? parseYmd(fStartVal.replace(/-/g, '')) : null;
+  const fEnd = fEndVal ? parseYmd(fEndVal.replace(/-/g, '')) : null;
+
+  const items = flattenWeeks().filter(it => {
+    const [a, b] = weekRange(it.week);
+    const wStart = parseYmd(a);
+    const wEnd = parseYmd(b);
+    if(fStart && wEnd < fStart) return false;
+    if(fEnd && wStart > fEnd) return false;
+    if(kw && !it.node.title.toLowerCase().includes(kw) && !it.path.toLowerCase().includes(kw)) return false;
+    if(st === 'open' && it.node.closed) return false;
+    if(st === 'closed' && !it.node.closed) return false;
+    if(carry && !it.carry) return false;
+    return true;
+  });
+  renderResults(items);
+}
+
+function renderResults(items){
+  const box = el('searchResults');
+  box.innerHTML = '';
+  el('resultCount').textContent = '找到 ' + items.length + ' 条分支';
+  if(!items.length){
+    box.innerHTML = '<div class="results-empty">没有找到匹配的分支<br/>试试调整筛选条件</div>';
+    return;
+  }
+  items.forEach(it => {
+    const row = document.createElement('div');
+    row.className = 'result-row';
+    row.innerHTML =
+      '<span class="r-dot ' + (it.node.closed ? 'closed' : 'open') + '"></span>' +
+      '<span class="r-main">' +
+        '<span class="r-title' + (it.node.closed ? ' closed' : '') + '">' + escapeHtml(it.node.title) + '</span>' +
+        '<span class="r-path">' + escapeHtml(it.path) + '</span>' +
+      '</span>' +
+      (it.carry ? '<span class="tag r-carry">带入</span>' : '') +
+      '<span class="r-week">' + it.week + '</span>';
+    row.addEventListener('click', () => {
+      closeModals();
+      goToTask(it.week, it.node.id);
+    });
+    box.appendChild(row);
+  });
+}
+
+function resetSearch(){
+  el('fStart').value = '';
+  el('fEnd').value = '';
+  el('fKw').value = '';
+  el('fStatus').value = '';
+  el('fCarry').checked = false;
+  runSearch();
+}
+
+/* ---------- events ---------- */
+el('railList').addEventListener('click', e => {
+  const t = e.target.closest('.trunk');
+  if(t && t.dataset.week !== state.activeWeekId) setActiveWeek(t.dataset.week);
+});
+
+treeEl.addEventListener('click', e => {
+  const add = e.target.closest('.add-btn');
+  if(add){ showAddRow(add.dataset.parent); return; }
+  const ok = e.target.closest('.ok-btn');
+  if(ok){
+    const row = ok.closest('.add-inline');
+    if(row && row.isConnected) commitAddRow(row, row.closest('.tree-children').dataset.parent);
+    return;
+  }
+  const no = e.target.closest('.no-btn');
+  if(no){
+    const row = no.closest('.add-inline');
+    if(row && row.isConnected){
+      row.dataset.done = '1';
+      const ch = row.closest('.tree-children');
+      row.remove();
+      if(ch && !ch.children.length) ch.remove();
+      drawAllConnectors();
+    }
+    return;
+  }
+  const row = e.target.closest('.tree-row');
+  if(row) toggleNode(row.dataset.node);
+});
+
+laneList.addEventListener('click', e => {
+  const pick = e.target.closest('.pick-btn');
+  const card = e.target.closest('.leaf-card');
+  if(!card) return;
+  if(pick){
+    toggleNode(card.dataset.node);
+    return;
+  }
+  goToTask(state.activeWeekId, card.dataset.node);
+});
+
+el('newWeekBtn').addEventListener('click', () => {
+  updateWeekPreview();
+  openModal('weekModal');
+});
+el('weekDate').addEventListener('change', updateWeekPreview);
+el('weekConfirm').addEventListener('click', createWeek);
+
+el('allWeeksBtn').addEventListener('click', () => {
+  runSearch();
+  openModal('searchModal');
+});
+['fStart', 'fEnd', 'fKw', 'fStatus', 'fCarry'].forEach(id => {
+  const c = el(id);
+  c.addEventListener(id === 'fKw' ? 'input' : 'change', runSearch);
+});
+el('searchReset').addEventListener('click', resetSearch);
+
+document.querySelectorAll('.modal-backdrop').forEach(b => {
+  b.addEventListener('click', e => {
+    if(e.target === b) b.classList.remove('open');
+  });
+});
+document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeModals));
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape') closeModals();
+});
+
+/* ---------- init ---------- */
+renderRail();
+renderForest();
+renderLane();
+
+})();
+</script>
+</body>
+</html>

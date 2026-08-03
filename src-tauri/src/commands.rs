@@ -1,0 +1,224 @@
+use std::path::PathBuf;
+
+use rusqlite::Connection;
+use tauri::AppHandle;
+use tauri_plugin_dialog::DialogExt;
+
+use crate::contracts::{
+    AppStatePayload, MigrateResult, ProxyConfig, QueryFilter, QueryTaskRow, UpdateCheckResult,
+    WeekTreePayload,
+};
+use crate::db;
+use crate::domain;
+use crate::queries;
+use crate::storage::{self, StorageConfig};
+use crate::updater;
+
+/// Open the configured database for a command.
+fn open_conn(config: &StorageConfig) -> Result<Connection, String> {
+    db::open_database(std::path::Path::new(&config.data_dir))
+}
+
+fn resolve_storage() -> Result<StorageConfig, String> {
+    let config = storage::load_config()?;
+    storage::ensure_storage(config)
+}
+
+/// Startup payload: storage directory and the ensured current week.
+#[tauri::command]
+pub async fn initialize_app() -> Result<AppStatePayload, String> {
+    let config = resolve_storage()?;
+    let mut conn = open_conn(&config)?;
+    let (week, _) = domain::ensure_current_week(&mut conn)?;
+    Ok(AppStatePayload {
+        storage_dir: config.data_dir,
+        current_week_id: week.id,
+    })
+}
+
+/// List recent weeks (newest first) plus the full list for the query view.
+#[tauri::command]
+pub async fn list_weeks() -> Result<Vec<domain::Week>, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    domain::list_weeks(&conn)
+}
+
+#[tauri::command]
+pub async fn recent_weeks(limit: Option<i64>) -> Result<Vec<domain::Week>, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    let limit = limit.unwrap_or(4).clamp(1, 12);
+    let ids = queries::recent_week_ids(&conn, limit)?;
+    let mut weeks = Vec::new();
+    for id in ids {
+        if let Some(week) = domain::get_week(&conn, &id)? {
+            weeks.push(week);
+        }
+    }
+    Ok(weeks)
+}
+
+/// Full tree (week + tasks) for one week.
+#[tauri::command]
+pub async fn get_week_tree(week_id: String) -> Result<WeekTreePayload, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    let week = domain::get_week(&conn, &week_id)?.ok_or_else(|| "周不存在".to_string())?;
+    let tasks = domain::list_tasks_for_week(&conn, &week_id)?;
+    Ok(WeekTreePayload { week, tasks })
+}
+
+/// Ensure the current week exists and return its tree.
+#[tauri::command]
+pub async fn get_current_week_tree() -> Result<WeekTreePayload, String> {
+    let config = resolve_storage()?;
+    let mut conn = open_conn(&config)?;
+    let (week, _) = domain::ensure_current_week(&mut conn)?;
+    let tasks = domain::list_tasks_for_week(&conn, &week.id)?;
+    Ok(WeekTreePayload { week, tasks })
+}
+
+/// Create a week manually for a Monday start date (`YYYYMMDD`).
+#[tauri::command]
+pub async fn create_week(monday_date: String) -> Result<domain::Week, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    let monday = chrono::NaiveDate::parse_from_str(&monday_date, "%Y%m%d")
+        .map_err(|_| "日期格式应为 YYYYMMDD".to_string())?;
+    domain::create_week_for_monday(&conn, monday)
+}
+
+#[tauri::command]
+pub async fn create_task(
+    week_id: String,
+    title: String,
+    description: Option<String>,
+    parent_id: Option<i64>,
+    priority: Option<i64>,
+) -> Result<domain::Task, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    domain::create_task(
+        &conn,
+        &week_id,
+        domain::CreateTaskInput {
+            title,
+            description: description.unwrap_or_default(),
+            parent_id,
+            priority: priority.unwrap_or(domain::DEFAULT_PRIORITY),
+        },
+    )
+}
+
+#[tauri::command]
+pub async fn update_task(
+    week_id: String,
+    task_id: i64,
+    title: Option<String>,
+    description: Option<String>,
+    priority: Option<i64>,
+) -> Result<domain::Task, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    domain::update_task(
+        &conn,
+        &week_id,
+        task_id,
+        domain::UpdateTaskInput {
+            title,
+            description,
+            priority,
+        },
+    )
+}
+
+#[tauri::command]
+pub async fn close_task(week_id: String, task_id: i64) -> Result<domain::Task, String> {
+    let config = resolve_storage()?;
+    let mut conn = open_conn(&config)?;
+    domain::close_task(&mut conn, &week_id, task_id)
+}
+
+#[tauri::command]
+pub async fn reopen_task(week_id: String, task_id: i64) -> Result<domain::Task, String> {
+    let config = resolve_storage()?;
+    let mut conn = open_conn(&config)?;
+    domain::reopen_task(&mut conn, &week_id, task_id)
+}
+
+/// Move a task to a new parent (re-indent / re-order).
+#[tauri::command]
+pub async fn move_task(
+    week_id: String,
+    task_id: i64,
+    new_parent_id: Option<i64>,
+    new_index: f64,
+) -> Result<(), String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    domain::move_task(&conn, &week_id, task_id, new_parent_id, new_index)
+}
+
+#[tauri::command]
+pub async fn query_all_tasks(filter: QueryFilter) -> Result<Vec<QueryTaskRow>, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    queries::query_tasks(&conn, &filter)
+}
+
+#[tauri::command]
+pub async fn week_summaries() -> Result<Vec<(String, i64, i64)>, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    queries::week_summaries(&conn)
+}
+
+/// Current storage directory.
+#[tauri::command]
+pub async fn get_storage_dir() -> Result<String, String> {
+    let config = resolve_storage()?;
+    Ok(config.data_dir)
+}
+
+/// Pick a new directory via dialog and migrate storage there.
+#[tauri::command]
+pub async fn pick_and_migrate_storage(app: AppHandle) -> Result<MigrateResult, String> {
+    let folder = app
+        .dialog()
+        .file()
+        .blocking_pick_folder();
+    let Some(folder_path) = folder.and_then(|path| path.into_path().ok()) else {
+        return Err("未选择目录".to_string());
+    };
+    migrate_storage_to(folder_path).await
+}
+
+#[tauri::command]
+pub async fn migrate_storage_to(new_data_dir: PathBuf) -> Result<MigrateResult, String> {
+    let config = resolve_storage()?;
+    let migrated = storage::migrate_storage(&config, new_data_dir)?;
+    Ok(MigrateResult {
+        data_dir: migrated.data_dir,
+        message: "数据迁移完成".to_string(),
+    })
+}
+
+#[tauri::command]
+pub async fn check_for_app_update(proxy: Option<ProxyConfig>) -> Result<UpdateCheckResult, String> {
+    updater::check_for_app_update(proxy).await
+}
+
+#[tauri::command]
+pub async fn download_and_install_update(
+    app: AppHandle,
+    download_url: String,
+    proxy: Option<ProxyConfig>,
+) -> Result<String, String> {
+    updater::download_and_install_update(app, download_url, proxy).await
+}
+
+#[tauri::command]
+pub async fn open_release_page() -> Result<(), String> {
+    updater::open_release_page().await
+}

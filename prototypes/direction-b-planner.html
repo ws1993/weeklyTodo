@@ -1,0 +1,1294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>周计划 · 周历策展台</title>
+<link rel="icon" href="data:,">
+<style>
+:root{
+  --paper: #F7F5F0;
+  --paper-elev: #FBF9F4;
+  --ink: #1F2328;
+  --ink-soft: #3A3F45;
+  --gray: #6B7280;
+  --gray-light: #9CA1A7;
+  --gray-faint: #B9B4A8;
+  --line: #E2DDD1;
+  --line-soft: #ECE8DD;
+  --dot: #C7C0B0;
+  --hover: #F0ECE1;
+  --accent: #2E6E62;
+  --error: #A44A3C;
+  --serif: Georgia, "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
+}
+*{ box-sizing: border-box; }
+*{ scrollbar-width: thin; scrollbar-color: #D6D0C2 transparent; }
+html{ color-scheme: light; }
+html, body{ height: 100%; }
+body{
+  margin: 0;
+  font-family: var(--sans);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+::selection{ background: rgba(46,110,98,.18); }
+:focus-visible{ outline: 1px solid var(--accent); outline-offset: 2px; }
+
+::-webkit-scrollbar{ width: 8px; height: 8px; }
+::-webkit-scrollbar-track{ background: transparent; }
+::-webkit-scrollbar-thumb{ background: #D6D0C2; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover{ background: #C4BDA9; }
+
+#app{
+  display: flex;
+  height: 100vh;
+  min-width: 1024px;
+  overflow-x: auto;
+}
+
+/* ---------- left rail ---------- */
+#rail{
+  width: 280px;
+  flex: none;
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.rail-head{ padding: 30px 26px 22px; }
+.app-name{
+  font-family: var(--serif);
+  font-size: 23px;
+  letter-spacing: .08em;
+}
+.app-tag{
+  margin-top: 8px;
+  font-size: 10px;
+  letter-spacing: .34em;
+  color: var(--gray-light);
+}
+.rail-section{
+  padding: 16px 26px 10px;
+  font-size: 10px;
+  letter-spacing: .26em;
+  color: var(--gray-light);
+  border-top: 1px solid var(--line-soft);
+}
+.week-list{
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px 12px 14px;
+  list-style: none;
+}
+.week-item{
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 13px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background .15s ease;
+}
+.week-item:hover{ background: var(--hover); }
+.week-item + .week-item{ border-top: 1px solid var(--line-soft); }
+.week-item.is-active{ background: var(--hover); }
+.w-marker{
+  width: 7px;
+  height: 7px;
+  flex: none;
+  align-self: center;
+}
+.w-marker.is-current{
+  background: var(--accent);
+  border-radius: 50%;
+}
+.week-item.is-active .w-marker:not(.is-current){ background: var(--ink); }
+.w-body{ min-width: 0; }
+.w-range{
+  font-size: 13.5px;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+.week-item.is-current .w-range{ color: var(--accent); }
+.week-item.is-active .w-range{ font-weight: 600; }
+.w-sub{
+  margin-top: 3px;
+  font-size: 10.5px;
+  letter-spacing: .14em;
+  color: var(--gray-light);
+}
+.rail-actions{
+  padding: 16px 20px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.btn-ink{
+  border: none;
+  background: var(--ink);
+  color: var(--paper);
+  font: 500 13px/1 var(--sans);
+  letter-spacing: .1em;
+  padding: 12px 16px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.btn-ink:hover{ background: #0C0F13; }
+.btn-outline{
+  border: 1px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  font: 500 13px/1 var(--sans);
+  letter-spacing: .1em;
+  padding: 11px 16px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.btn-outline:hover{ background: rgba(31,35,40,.05); }
+.rail-foot{
+  padding: 13px 20px 17px;
+  border-top: 1px solid var(--line-soft);
+}
+.foot-label{
+  display: block;
+  font-size: 10px;
+  letter-spacing: .26em;
+  color: var(--gray-light);
+}
+.foot-path{
+  display: block;
+  margin-top: 5px;
+  font-size: 10.5px;
+  color: var(--gray);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.foot-path:hover{ color: var(--ink); text-decoration: underline; }
+
+/* ---------- main column ---------- */
+#main{
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 48px;
+}
+.week-head{ padding: 46px 0 28px; flex: none; }
+.week-meta{
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+.week-year{
+  font-size: 12px;
+  letter-spacing: .32em;
+  color: var(--gray);
+}
+.week-no{
+  font-size: 12px;
+  letter-spacing: .22em;
+  color: var(--gray-light);
+}
+.week-current{
+  font-size: 11px;
+  letter-spacing: .2em;
+  color: var(--accent);
+}
+.week-current::before{
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-right: 9px;
+  vertical-align: 1px;
+}
+.week-range{
+  margin: 16px 0 0;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(46px, 5vw, 62px);
+  line-height: 1.04;
+  letter-spacing: -.01em;
+}
+.week-foot{
+  margin-top: 28px;
+  padding-top: 15px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+.week-id{
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .12em;
+  color: var(--gray-light);
+  cursor: pointer;
+}
+.week-id:hover{ color: var(--ink); }
+.btn-text{
+  border: none;
+  background: transparent;
+  padding: 4px 0;
+  font: 500 13px/1 var(--sans);
+  color: var(--ink);
+  letter-spacing: .08em;
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+}
+.btn-text:hover{ border-bottom-color: currentColor; }
+.btn-text.quiet{ color: var(--gray); font-weight: 400; }
+.btn-text.quiet:hover{ color: var(--ink); }
+
+.tree-wrap{
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 44px;
+}
+.tree, .tree-children{
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.tree{ padding-top: 4px; }
+
+.task-row{
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.task-row:hover{ background: var(--hover); }
+.marker{
+  width: 18px;
+  flex: none;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.dot{
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--gray-faint);
+  border-radius: 50%;
+  flex: none;
+}
+.dot.closed{
+  background: var(--gray-faint);
+  border-color: var(--gray-faint);
+}
+.toggle{
+  border: none;
+  background: transparent;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--gray-faint);
+  padding: 3px 5px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.toggle:hover{ color: var(--ink); }
+.task-text{
+  font-size: 14.5px;
+  line-height: 1.4;
+}
+.task-text.closed{
+  color: #8F949A;
+  text-decoration: line-through;
+  text-decoration-color: var(--gray-faint);
+}
+.tag-carried{
+  font-size: 10.5px;
+  letter-spacing: .2em;
+  color: var(--accent);
+  flex: none;
+}
+.tag-done{
+  font-size: 10.5px;
+  letter-spacing: .2em;
+  color: var(--gray-light);
+  flex: none;
+}
+.task-add{
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--gray-faint);
+  font-size: 14px;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 3px;
+  cursor: pointer;
+  opacity: 0;
+}
+.task-row:hover .task-add,
+.task-add:focus-visible{ opacity: 1; }
+.task-add:hover{ color: var(--ink); background: #E4DED0; }
+
+.tree-children{ position: relative; margin-left: 32px; }
+.tree-children::before{
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 10px;
+  border-left: 1px dotted var(--dot);
+}
+.tree-children > .task-row,
+.tree-children > .edit-row{ padding-left: 16px; }
+.tree-children > .task-row::before,
+.tree-children > .edit-row::before{
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 16px;
+  border-top: 1px dotted var(--dot);
+}
+.tree-children .tree-children{ margin-left: 44px; }
+
+.edit-row{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 4px;
+}
+.edit-row input{
+  flex: 1;
+  border: none;
+  border-bottom: 1px solid var(--ink);
+  background: transparent;
+  font: 400 14.5px var(--sans);
+  color: var(--ink);
+  padding: 4px 2px;
+  outline: none;
+}
+.edit-row input::placeholder{ color: var(--gray-light); }
+
+.empty{ padding: 56px 0 90px; }
+.empty-serif{
+  font-family: var(--serif);
+  font-size: 23px;
+}
+.empty-sub{
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--gray);
+}
+.empty .btn-text{ margin-top: 26px; }
+
+/* ---------- right panel ---------- */
+#side{
+  width: 300px;
+  flex: none;
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.side-head{ padding: 38px 30px 0; }
+.panel-title{
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 400;
+}
+.panel-sub{
+  margin-top: 9px;
+  font-size: 10.5px;
+  letter-spacing: .24em;
+  color: var(--gray-light);
+}
+.panel-list{
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 24px 16px 0;
+  padding: 0 12px;
+  list-style: none;
+}
+.panel-item{
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 13px 6px;
+  border-top: 1px solid var(--line-soft);
+  cursor: pointer;
+  border-radius: 3px;
+}
+.panel-item:last-child{ border-bottom: 1px solid var(--line-soft); }
+.panel-item:hover{ background: var(--hover); }
+.p-num{
+  font-family: var(--serif);
+  font-size: 12px;
+  color: var(--gray-light);
+  width: 24px;
+  flex: none;
+}
+.p-text{ font-size: 14px; line-height: 1.4; }
+.p-text.done{
+  color: #8F949A;
+  text-decoration: line-through;
+  text-decoration-color: var(--gray-faint);
+}
+.panel-empty{
+  padding: 26px 6px;
+  font-family: var(--serif);
+  font-size: 15px;
+  color: var(--gray);
+  border-top: 1px solid var(--line-soft);
+}
+.panel-hint{
+  flex: none;
+  padding: 16px 30px 22px;
+  font-size: 10px;
+  letter-spacing: .2em;
+  color: var(--gray-light);
+}
+
+/* ---------- overlays ---------- */
+.overlay{
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(31,35,40,.36);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+.dialog{
+  width: 430px;
+  max-width: 100%;
+  background: var(--paper-elev);
+  border: 1px solid var(--line);
+  box-shadow: 0 32px 80px -42px rgba(31,35,40,.45);
+  padding: 36px 40px 32px;
+}
+.dialog-title{
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 25px;
+  font-weight: 400;
+}
+.dialog-sub{
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: var(--gray);
+  line-height: 1.7;
+}
+.field{ margin-top: 28px; }
+.field-label{
+  display: block;
+  font-size: 10px;
+  letter-spacing: .26em;
+  color: var(--gray-light);
+  margin-bottom: 8px;
+}
+.field input[type="date"]{
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  font: 400 15px var(--sans);
+  color: var(--ink);
+  padding: 7px 2px;
+  outline: none;
+}
+.field input[type="date"]:focus{ border-bottom-color: var(--ink); }
+.week-preview{ margin-top: 20px; }
+.preview-range{
+  font-family: var(--serif);
+  font-size: 21px;
+}
+.preview-id{
+  margin-top: 6px;
+  font-size: 11px;
+  letter-spacing: .1em;
+  color: var(--gray-light);
+}
+.week-error{
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--error);
+}
+.dialog-actions{
+  margin-top: 30px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.btn-ghost{
+  border: none;
+  background: none;
+  color: var(--gray);
+  font-size: 13px;
+  letter-spacing: .06em;
+  padding: 10px 4px;
+  cursor: pointer;
+}
+.btn-ghost:hover{ color: var(--ink); }
+
+.search-panel{
+  width: min(780px, 100%);
+  max-height: calc(100vh - 80px);
+  background: var(--paper-elev);
+  border: 1px solid var(--line);
+  box-shadow: 0 32px 80px -42px rgba(31,35,40,.45);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.search-head{
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 30px 36px 0;
+}
+.search-title{
+  font-family: var(--serif);
+  font-size: 25px;
+}
+.search-close{
+  border: none;
+  background: none;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--gray);
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.search-close:hover{ color: var(--ink); }
+.search-filters{
+  padding: 20px 36px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.filter-row{
+  display: flex;
+  align-items: flex-end;
+  gap: 26px;
+}
+.filter-row + .filter-row{ margin-top: 16px; }
+.filter{
+  display: block;
+  flex: 1;
+}
+.filter.grow{ flex: 1.6; }
+.filter-label{
+  display: block;
+  font-size: 10px;
+  letter-spacing: .26em;
+  color: var(--gray-light);
+  margin-bottom: 6px;
+}
+.filter input[type="text"],
+.filter input[type="date"],
+.filter select{
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  font: 400 13.5px var(--sans);
+  color: var(--ink);
+  padding: 6px 2px;
+  outline: none;
+}
+.filter input:focus,
+.filter select:focus{ border-bottom-color: var(--ink); }
+.filter select{
+  cursor: pointer;
+}
+.range-controls{
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.range-controls input[type="date"]{ width: 148px; }
+.range-sep{
+  font-size: 12px;
+  color: var(--gray-light);
+}
+.search-results{
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 36px 28px;
+}
+.result-count{
+  padding: 14px 0 4px;
+  font-size: 10.5px;
+  letter-spacing: .24em;
+  color: var(--gray-light);
+}
+.result-week{ margin-top: 18px; }
+.result-week-head{
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 5px 4px;
+  cursor: pointer;
+  font-family: var(--serif);
+  font-size: 15.5px;
+}
+.result-week-head:hover{ text-decoration: underline; }
+.result-week-id{
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .1em;
+  color: var(--gray-light);
+}
+.result-task{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 6px;
+  border-top: 1px solid var(--line-soft);
+  cursor: pointer;
+  border-radius: 3px;
+}
+.result-task:hover{ background: var(--hover); }
+.result-task .p-text{ font-size: 13.5px; }
+.result-task .p-text.done{ font-size: 13.5px; }
+.result-empty-line{
+  padding: 10px 6px 12px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 12.5px;
+  color: var(--gray-light);
+}
+.result-empty{
+  padding: 52px 4px;
+  font-family: var(--serif);
+  font-size: 16px;
+  color: var(--gray);
+}
+
+/* ---------- toast ---------- */
+#toast{
+  position: fixed;
+  left: 50%;
+  bottom: 34px;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 12px;
+  letter-spacing: .08em;
+  padding: 10px 18px;
+  border-radius: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s ease, transform .25s ease;
+  z-index: 100;
+}
+#toast.show{ opacity: 1; transform: translateX(-50%) translateY(0); }
+
+@media (max-width: 960px){
+  #side{ display: none; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="rail">
+    <header class="rail-head">
+      <div class="app-name">周计划</div>
+      <div class="app-tag">周历策展台</div>
+    </header>
+    <div class="rail-section">近期四周</div>
+    <ul class="week-list" id="weekList"></ul>
+    <div class="rail-actions">
+      <button class="btn-ink" id="btnCreateWeek">＋ 创建新的一周</button>
+      <button class="btn-outline" id="btnSearch">检索历史</button>
+    </div>
+    <footer class="rail-foot">
+      <span class="foot-label">数据目录</span>
+      <span class="foot-path" id="copyPath" title="点击复制路径">C:\Users\wangs\AppData\Roaming\zhoujihua\data</span>
+    </footer>
+  </aside>
+
+  <main id="main">
+    <header class="week-head" id="weekHead"></header>
+    <section class="tree-wrap" id="treeWrap"></section>
+  </main>
+
+  <aside id="side">
+    <header class="side-head">
+      <h2 class="panel-title">本周可推进</h2>
+      <div class="panel-sub" id="panelSub"></div>
+    </header>
+    <ul class="panel-list" id="panelList"></ul>
+    <div class="panel-hint">点击条目 · 标记完成</div>
+  </aside>
+</div>
+
+<div id="overlay"></div>
+<div id="toast" role="status"></div>
+
+<script>
+"use strict";
+
+/* ---------- data ---------- */
+const DATA_PATH = "C:\\Users\\wangs\\AppData\\Roaming\\zhoujihua\\data";
+
+const state = {
+  activeId: "20260803-20260809",
+  weeks: [
+    { id: "20260810-20260816", start: "2026-08-10", end: "2026-08-16", current: true, tasks: [] },
+    { id: "20260803-20260809", start: "2026-08-03", end: "2026-08-09", current: false, tasks: [
+      { id: "t1", text: "准备项目周会", status: "open", carried: false, collapsed: false, children: [
+        { id: "t1a", text: "汇总本周进展", status: "open", carried: false, collapsed: false, children: [] },
+        { id: "t1b", text: "整理待讨论事项", status: "open", carried: false, collapsed: false, children: [] }
+      ]},
+      { id: "t2", text: "学习 Rust", status: "open", carried: true, collapsed: false, children: [
+        { id: "t2a", text: "阅读所有权章节", status: "closed", carried: false, collapsed: false, children: [] },
+        { id: "t2b", text: "完成 CLI 小练习", status: "open", carried: false, collapsed: false, children: [] }
+      ]},
+      { id: "t3", text: "家庭装修方案", status: "closed", carried: false, collapsed: false, children: [] }
+    ]},
+    { id: "20260727-20260802", start: "2026-07-27", end: "2026-08-02", current: false, tasks: [] },
+    { id: "20260720-20260726", start: "2026-07-20", end: "2026-07-26", current: false, tasks: [] }
+  ]
+};
+
+/* ---------- helpers ---------- */
+const $ = (sel, root) => (root || document).querySelector(sel);
+
+function pad(n){ return String(n).padStart(2, "0"); }
+function parseDate(s){
+  const parts = s.split("-").map(Number);
+  return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+function toInputDate(d){ return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+function fmtDot(d){ return pad(d.getMonth() + 1) + "." + pad(d.getDate()); }
+function fmtId(d){ return d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()); }
+function isoWeek(d){
+  const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  date.setDate(date.getDate() + 3 - ((date.getDay() + 6) % 7));
+  const week1 = new Date(date.getFullYear(), 0, 4);
+  return 1 + Math.round(((date - week1) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+}
+function uid(){
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+function esc(s){
+  return String(s).replace(/[&<>"']/g, c => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
+}
+
+function weekLabel(w){
+  const s = parseDate(w.start);
+  const e = parseDate(w.end);
+  return { year: s.getFullYear(), range: fmtDot(s) + " — " + fmtDot(e), no: isoWeek(s), id: w.id };
+}
+function activeWeek(){ return state.weeks.find(w => w.id === state.activeId); }
+
+function findTaskAndParent(container, id){
+  for (const t of container){
+    if (t.id === id) return { task: t, parent: container };
+    if (t.children && t.children.length){
+      const r = findTaskAndParent(t.children, id);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+function findTask(week, id){
+  const r = findTaskAndParent(week.tasks, id);
+  return r ? r.task : null;
+}
+function collectTasks(tasks, out){
+  out = out || [];
+  tasks.forEach(t => {
+    out.push(t);
+    if (t.children && t.children.length) collectTasks(t.children, out);
+  });
+  return out;
+}
+function collectOpenLeaves(tasks, out){
+  out = out || [];
+  tasks.forEach(t => {
+    const hasKids = t.children && t.children.length;
+    if (!hasKids && t.status === "open") out.push(t);
+    if (hasKids) collectOpenLeaves(t.children, out);
+  });
+  return out;
+}
+
+/* ---------- toast & copy ---------- */
+let toastTimer;
+function showToast(msg){
+  const toast = $("#toast");
+  toast.textContent = msg;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), 1900);
+}
+function fallbackCopy(text){
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand("copy"); } catch (e) {}
+  ta.remove();
+}
+function copyText(text, msg){
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(() => showToast(msg)).catch(() => { fallbackCopy(text); showToast(msg); });
+  } else {
+    fallbackCopy(text);
+    showToast(msg);
+  }
+}
+
+/* ---------- rendering ---------- */
+const railList = $("#weekList");
+const weekHead = $("#weekHead");
+const treeWrap = $("#treeWrap");
+const panelList = $("#panelList");
+const panelSub = $("#panelSub");
+
+function renderAll(){
+  renderRail();
+  renderHeader();
+  renderTree();
+  renderPanel();
+}
+
+function renderRail(){
+  railList.innerHTML = state.weeks.map(w => {
+    const L = weekLabel(w);
+    const active = w.id === state.activeId;
+    const sub = w.current ? "本周" : (active ? "查看中" : "第 " + L.no + " 周");
+    return '<li class="week-item' + (active ? " is-active" : "") + (w.current ? " is-current" : "") + '" data-id="' + w.id + '">'
+      + '<span class="w-marker' + (w.current ? " is-current" : "") + '"></span>'
+      + '<div class="w-body">'
+      + '<div class="w-range">' + L.range + '</div>'
+      + '<div class="w-sub">' + sub + '</div>'
+      + '</div></li>';
+  }).join("");
+}
+
+function renderHeader(){
+  const w = activeWeek();
+  const L = weekLabel(w);
+  weekHead.innerHTML =
+    '<div class="week-meta">'
+    + '<span class="week-year">' + L.year + '</span>'
+    + '<span class="week-no">第 ' + L.no + ' 周</span>'
+    + (w.current ? '<span class="week-current">本周</span>' : "")
+    + '</div>'
+    + '<h1 class="week-range">' + L.range + '</h1>'
+    + '<div class="week-foot">'
+    + '<span class="week-id" title="点击复制周 ID">' + w.id + '</span>'
+    + '<button class="btn-text" id="btnNewTask">＋ 新建任务</button>'
+    + '</div>';
+}
+
+function taskRowHtml(t, depth){
+  const hasKids = t.children && t.children.length;
+  const closed = t.status === "closed";
+  const marker = hasKids
+    ? '<button class="toggle" data-id="' + t.id + '" title="展开 / 收起">' + (t.collapsed ? "＋" : "−") + '</button>'
+    : '<span class="dot' + (closed ? " closed" : "") + '"></span>';
+  const carried = t.carried ? '<span class="tag-carried">带入</span>' : "";
+  const done = closed && hasKids ? '<span class="tag-done">已完成</span>' : "";
+  const addMode = hasKids ? "child" : "sibling";
+  return '<li class="task-row' + (hasKids ? " task-group" : "") + '" data-id="' + t.id + '">'
+    + '<span class="marker">' + marker + '</span>'
+    + '<span class="task-text' + (closed ? " closed" : "") + '">' + esc(t.text) + '</span>'
+    + carried + done
+    + '<button class="task-add" data-id="' + t.id + '" data-add="' + addMode + '" title="新建任务">＋</button>'
+    + '</li>'
+    + (hasKids && !t.collapsed
+        ? '<ul class="tree-children">' + t.children.map(c => taskRowHtml(c, depth + 1)).join("") + '</ul>'
+        : "");
+}
+
+function renderTree(){
+  const week = activeWeek();
+  if (!week.tasks.length){
+    treeWrap.innerHTML =
+      '<div class="empty">'
+      + '<div class="empty-serif">这一周还空着</div>'
+      + '<div class="empty-sub">写下第一件事，让这一周开始成形。</div>'
+      + '<button class="btn-text" id="emptyNewTask">＋ 新建任务</button>'
+      + '</div>';
+    return;
+  }
+  treeWrap.innerHTML = '<ul class="tree">' + week.tasks.map(t => taskRowHtml(t, 0)).join("") + '</ul>';
+}
+
+function renderPanel(){
+  const week = activeWeek();
+  const leaves = collectOpenLeaves(week.tasks);
+  panelSub.textContent = leaves.length ? "待推进 · " + leaves.length + " 项" : "本周全部完成";
+  panelList.innerHTML = leaves.length
+    ? leaves.map((t, i) =>
+        '<li class="panel-item" data-id="' + t.id + '">'
+        + '<span class="p-num">' + pad(i + 1) + '</span>'
+        + '<span class="p-text">' + esc(t.text) + '</span>'
+        + '</li>').join("")
+    : '<li class="panel-empty">本周没有待推进的任务</li>';
+}
+
+/* ---------- task interactions ---------- */
+function applyStatus(t, status){
+  t.status = status;
+  (t.children || []).forEach(c => applyStatus(c, status));
+}
+function toggleStatus(id){
+  const t = findTask(activeWeek(), id);
+  if (!t) return;
+  applyStatus(t, t.status === "closed" ? "open" : "closed");
+  renderAll();
+}
+function toggleCollapse(id){
+  const t = findTask(activeWeek(), id);
+  if (!t) return;
+  t.collapsed = !t.collapsed;
+  renderAll();
+}
+
+function beginInlineEdit(anchorId, mode){
+  const week = activeWeek();
+  const found = anchorId ? findTaskAndParent(week.tasks, anchorId) : null;
+  const anchor = found ? found.task : null;
+
+  let targetArr, afterTask = null;
+  if (mode === "child" && anchor){
+    anchor.collapsed = false;
+    targetArr = anchor.children;
+  } else if (anchor){
+    targetArr = found.parent;
+    afterTask = anchor;
+  } else {
+    targetArr = week.tasks;
+  }
+
+  const li = document.createElement("li");
+  li.className = "edit-row";
+  li.innerHTML = '<span class="marker"><span class="dot"></span></span><input type="text" maxlength="60" placeholder="输入任务名，回车保存">';
+  const input = li.querySelector("input");
+
+  let tree = treeWrap.querySelector(".tree");
+  if (!tree){
+    tree = document.createElement("ul");
+    tree.className = "tree";
+    treeWrap.appendChild(tree);
+  }
+  const anchorEl = anchorId ? treeWrap.querySelector('[data-id="' + anchorId + '"]') : null;
+  if (anchorEl){
+    if (mode === "child"){
+      // place the edit row inside the group's indented children column
+      let kids = anchorEl.nextElementSibling;
+      if (!kids || !kids.classList.contains("tree-children")){
+        kids = document.createElement("ul");
+        kids.className = "tree-children";
+        anchorEl.insertAdjacentElement("afterend", kids);
+      }
+      kids.insertBefore(li, kids.firstChild);
+    } else {
+      anchorEl.insertAdjacentElement("afterend", li);
+    }
+  } else {
+    tree.appendChild(li);
+  }
+  if (li.scrollIntoView) li.scrollIntoView({ block: "nearest" });
+
+  let done = false;
+  const commit = () => {
+    if (done) return;
+    done = true;
+    const text = input.value.trim();
+    if (text){
+      const t = { id: uid(), text: text, status: "open", carried: false, collapsed: false, children: [] };
+      if (afterTask){
+        const i = targetArr.indexOf(afterTask);
+        if (i >= 0) targetArr.splice(i + 1, 0, t);
+        else targetArr.push(t);
+      } else {
+        targetArr.push(t);
+      }
+    }
+    renderAll();
+  };
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter"){ e.preventDefault(); commit(); }
+    else if (e.key === "Escape"){ e.preventDefault(); done = true; renderAll(); }
+  });
+  input.addEventListener("blur", commit);
+  input.focus();
+}
+
+/* ---------- overlay ---------- */
+const overlay = $("#overlay");
+function closeOverlay(){
+  overlay.innerHTML = "";
+}
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") closeOverlay();
+});
+
+function openCreateModal(){
+  overlay.innerHTML =
+    '<div class="overlay">'
+    + '<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">'
+    + '<h2 class="dialog-title" id="dlgTitle">创建新的一周</h2>'
+    + '<p class="dialog-sub">选择新一周的起始周一，将自动生成整周日期。</p>'
+    + '<div class="field">'
+    + '<label class="field-label" for="mondayInput">周一日期</label>'
+    + '<input id="mondayInput" type="date">'
+    + '</div>'
+    + '<div class="week-preview">'
+    + '<div class="preview-range" id="previewRange">—</div>'
+    + '<div class="preview-id" id="previewId">选择日期后显示完整周 ID</div>'
+    + '</div>'
+    + '<div class="week-error" id="createError" hidden></div>'
+    + '<div class="dialog-actions">'
+    + '<button class="btn-ink" id="btnCreate">创建这一周</button>'
+    + '<button class="btn-ghost" id="btnCancel">取消</button>'
+    + '</div>'
+    + '</div>'
+    + '</div>';
+
+  const input = $("#mondayInput");
+  const previewRange = $("#previewRange");
+  const previewId = $("#previewId");
+  const errBox = $("#createError");
+
+  const snapMonday = date => {
+    const day = (date.getDay() + 6) % 7;
+    const m = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    m.setDate(m.getDate() - day);
+    return m;
+  };
+
+  function updatePreview(date){
+    const s = snapMonday(date);
+    const e = new Date(s.getFullYear(), s.getMonth(), s.getDate() + 6);
+    const range = fmtDot(s) + " — " + fmtDot(e);
+    const id = fmtId(s) + "-" + fmtId(e);
+    previewRange.textContent = range;
+    previewId.textContent = "周一 " + toInputDate(s) + " · " + id;
+    input.dataset.monday = toInputDate(s);
+    const dup = state.weeks.find(w => w.start === toInputDate(s));
+    if (dup){
+      errBox.textContent = "这一周已存在：" + dup.id;
+      errBox.hidden = false;
+      input.dataset.dup = "1";
+    } else {
+      errBox.hidden = true;
+      delete input.dataset.dup;
+    }
+  }
+
+  // default: next Monday
+  const now = new Date();
+  const nextMonday = snapMonday(now);
+  nextMonday.setDate(nextMonday.getDate() + 7);
+  input.value = toInputDate(nextMonday);
+  updatePreview(nextMonday);
+
+  input.addEventListener("change", () => {
+    if (input.value) updatePreview(parseDate(input.value));
+  });
+  $("#btnCreate").addEventListener("click", () => {
+    if (!input.value){
+      errBox.textContent = "请先选择日期";
+      errBox.hidden = false;
+      return;
+    }
+    if (input.dataset.dup) return;
+    const s = parseDate(input.dataset.monday);
+    const e = new Date(s.getFullYear(), s.getMonth(), s.getDate() + 6);
+    const id = fmtId(s) + "-" + fmtId(e);
+    state.weeks.push({ id: id, start: toInputDate(s), end: toInputDate(e), current: false, tasks: [] });
+    state.weeks.sort((a, b) => b.start.localeCompare(a.start));
+    state.activeId = id;
+    closeOverlay();
+    renderAll();
+    showToast("已创建新的一周");
+  });
+  $("#btnCancel").addEventListener("click", closeOverlay);
+  overlay.addEventListener("click", e => { if (e.target === overlay) closeOverlay(); });
+  input.focus();
+}
+
+function openSearch(){
+  overlay.innerHTML =
+    '<div class="overlay">'
+    + '<div class="search-panel" role="dialog" aria-modal="true" aria-labelledby="searchTitle">'
+    + '<div class="search-head">'
+    + '<div class="search-title" id="searchTitle">检索历史</div>'
+    + '<button class="search-close" id="btnCloseSearch" aria-label="关闭">×</button>'
+    + '</div>'
+    + '<div class="search-filters" id="searchFilters">'
+    + '<div class="filter-row">'
+    + '<label class="filter grow"><span class="filter-label">关键词</span><input id="kw" type="text" placeholder="输入任务关键词"></label>'
+    + '<label class="filter"><span class="filter-label">状态</span><select id="st">'
+    + '<option value="">全部</option><option value="open">进行中</option><option value="closed">已完成</option><option value="carried">带入</option>'
+    + '</select></label>'
+    + '<button class="btn-ghost" id="btnReset">重置</button>'
+    + '</div>'
+    + '<div class="filter-row">'
+    + '<label class="filter"><span class="filter-label">周范围</span>'
+    + '<span class="range-controls"><input id="from" type="date"><span class="range-sep">至</span><input id="to" type="date"></span>'
+    + '</label>'
+    + '</div>'
+    + '</div>'
+    + '<div class="search-results" id="searchResults"></div>'
+    + '</div>'
+    + '</div>';
+
+  const results = $("#searchResults");
+  const filters = $("#searchFilters");
+
+  function renderSearchResults(){
+    const kw = $("#kw").value.trim().toLowerCase();
+    const status = $("#st").value;
+    const from = $("#from").value;
+    const to = $("#to").value;
+
+    const inRange = w => {
+      if (from && w.end < from) return false;
+      if (to && w.start > to) return false;
+      return true;
+    };
+    const match = t => {
+      if (kw && t.text.toLowerCase().indexOf(kw) === -1) return false;
+      if (status === "carried") return !!t.carried;
+      if (status && t.status !== status) return false;
+      return true;
+    };
+
+    const weeks = state.weeks.filter(inRange);
+    if (!weeks.length){
+      results.innerHTML = '<div class="result-empty">没有符合条件的周</div>';
+      return;
+    }
+    let total = 0;
+    let html = "";
+    weeks.forEach(w => {
+      const L = weekLabel(w);
+      const matches = collectTasks(w.tasks).filter(match);
+      total += matches.length;
+      html += '<div class="result-week" data-week="' + w.id + '">'
+        + '<div class="result-week-head" data-week="' + w.id + '">'
+        + '<span>' + L.range + '</span><span class="result-week-id">' + w.id + '</span>'
+        + '</div>';
+      if (matches.length){
+        html += matches.map(t => {
+          const closed = t.status === "closed";
+          return '<div class="result-task" data-week="' + w.id + '">'
+            + '<span class="dot' + (closed ? " closed" : "") + '"></span>'
+            + '<span class="p-text' + (closed ? " done" : "") + '">' + esc(t.text) + '</span>'
+            + (t.carried ? '<span class="tag-carried">带入</span>' : "")
+            + (closed ? '<span class="tag-done">已完成</span>' : "")
+            + '</div>';
+        }).join("");
+      } else {
+        html += '<div class="result-empty-line">本周暂无匹配任务</div>';
+      }
+      html += '</div>';
+    });
+    results.innerHTML = '<div class="result-count">共 ' + total + ' 项匹配</div>' + html;
+  }
+
+  filters.addEventListener("input", renderSearchResults);
+  filters.addEventListener("change", renderSearchResults);
+  $("#btnReset").addEventListener("click", () => {
+    $("#kw").value = "";
+    $("#st").value = "";
+    $("#from").value = "";
+    $("#to").value = "";
+    renderSearchResults();
+  });
+  results.addEventListener("click", e => {
+    const item = e.target.closest("[data-week]");
+    if (!item) return;
+    state.activeId = item.dataset.week;
+    closeOverlay();
+    renderAll();
+  });
+  $("#btnCloseSearch").addEventListener("click", closeOverlay);
+  overlay.addEventListener("click", e => { if (e.target === overlay) closeOverlay(); });
+  renderSearchResults();
+  $("#kw").focus();
+}
+
+/* ---------- wiring ---------- */
+railList.addEventListener("click", e => {
+  const item = e.target.closest(".week-item");
+  if (!item) return;
+  state.activeId = item.dataset.id;
+  renderAll();
+});
+
+treeWrap.addEventListener("click", e => {
+  if (e.target.closest("#emptyNewTask")){
+    beginInlineEdit(null, null);
+    return;
+  }
+  const addBtn = e.target.closest(".task-add");
+  if (addBtn){
+    e.stopPropagation();
+    beginInlineEdit(addBtn.dataset.id, addBtn.dataset.add);
+    return;
+  }
+  const tog = e.target.closest(".toggle");
+  if (tog){
+    e.stopPropagation();
+    toggleCollapse(tog.dataset.id);
+    return;
+  }
+  const row = e.target.closest(".task-row");
+  if (row) toggleStatus(row.dataset.id);
+});
+
+panelList.addEventListener("click", e => {
+  const item = e.target.closest(".panel-item");
+  if (item) toggleStatus(item.dataset.id);
+});
+
+weekHead.addEventListener("click", e => {
+  if (e.target.closest("#btnNewTask")){
+    beginInlineEdit(null, null);
+    return;
+  }
+  if (e.target.closest(".week-id")){
+    copyText(activeWeek().id, "已复制周 ID");
+  }
+});
+
+$("#btnCreateWeek").addEventListener("click", openCreateModal);
+$("#btnSearch").addEventListener("click", openSearch);
+$("#copyPath").addEventListener("click", () => copyText(DATA_PATH, "已复制数据目录路径"));
+
+renderAll();
+</script>
+</body>
+</html>
