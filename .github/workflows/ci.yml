@@ -29,6 +29,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.97.1
+          components: rustfmt
       - name: Rust format check
         run: cargo fmt --check --manifest-path src-tauri/Cargo.toml
       - name: Rust tests

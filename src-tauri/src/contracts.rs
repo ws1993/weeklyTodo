@@ -34,6 +34,8 @@ pub struct QueryFilter {
     pub carried_over_only: Option<bool>,
     pub start_week_id: Option<String>,
     pub end_week_id: Option<String>,
+    pub owner_id: Option<i64>,
+    pub tag_id: Option<i64>,
 }
 
 #[derive(Debug, Serialize)]

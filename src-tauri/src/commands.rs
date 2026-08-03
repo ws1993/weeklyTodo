@@ -90,12 +90,16 @@ pub async fn create_week(monday_date: String) -> Result<domain::Week, String> {
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn create_task(
     week_id: String,
     title: String,
     description: Option<String>,
     parent_id: Option<i64>,
     priority: Option<i64>,
+    execution_mode: Option<String>,
+    owner_name: Option<String>,
+    tag_names: Option<Vec<String>>,
 ) -> Result<domain::Task, String> {
     let config = resolve_storage()?;
     let conn = open_conn(&config)?;
@@ -107,17 +111,24 @@ pub async fn create_task(
             description: description.unwrap_or_default(),
             parent_id,
             priority: priority.unwrap_or(domain::DEFAULT_PRIORITY),
+            execution_mode: execution_mode.unwrap_or_else(|| domain::EXECUTION_MODE_SELF.into()),
+            owner_name,
+            tag_names: tag_names.unwrap_or_default(),
         },
     )
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn update_task(
     week_id: String,
     task_id: i64,
     title: Option<String>,
     description: Option<String>,
     priority: Option<i64>,
+    execution_mode: Option<String>,
+    owner_name: Option<String>,
+    tag_names: Option<Vec<String>>,
 ) -> Result<domain::Task, String> {
     let config = resolve_storage()?;
     let conn = open_conn(&config)?;
@@ -129,8 +140,27 @@ pub async fn update_task(
             title,
             description,
             priority,
+            execution_mode,
+            owner_name,
+            tag_names,
         },
     )
+}
+
+/// All known owners for dropdown options.
+#[tauri::command]
+pub async fn list_owners() -> Result<Vec<domain::Owner>, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    domain::list_owners(&conn)
+}
+
+/// All known tags for dropdown options.
+#[tauri::command]
+pub async fn list_tags() -> Result<Vec<domain::Tag>, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    domain::list_tags(&conn)
 }
 
 #[tauri::command]

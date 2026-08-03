@@ -13,10 +13,14 @@ interface QueryViewProps {
 
 export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
   const allWeeks = useAppStore((state) => state.allWeeks);
+  const owners = useAppStore((state) => state.owners);
+  const tags = useAppStore((state) => state.tags);
   const [keyword, setKeyword] = useState('');
   const [weekId, setWeekId] = useState('');
   const [status, setStatus] = useState('');
   const [carriedOnly, setCarriedOnly] = useState(false);
+  const [ownerId, setOwnerId] = useState<number | undefined>();
+  const [tagId, setTagId] = useState<number | undefined>();
   const [results, setResults] = useState<QueryTaskRow[]>([]);
   const [summaries, setSummaries] = useState<WeekSummary[]>([]);
   const [loading, setLoading] = useState(false);
@@ -32,6 +36,8 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
         weekId: weekId || undefined,
         status: status || undefined,
         carriedOverOnly: carriedOnly || undefined,
+        ownerId: ownerId || undefined,
+        tagId: tagId || undefined,
       });
       setResults(rows);
       const summariesData = await weekSummaries();
@@ -39,7 +45,7 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
     } finally {
       setLoading(false);
     }
-  }, [open, keyword, weekId, status, carriedOnly]);
+  }, [open, keyword, weekId, status, carriedOnly, ownerId, tagId]);
 
   useEffect(() => {
     void runQuery();
@@ -86,6 +92,27 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
             </label>
           </div>
           <div className="filter-group">
+            <span className="f-label">负责人</span>
+            <select value={ownerId ?? ''} onChange={(event) => setOwnerId(event.target.value ? Number(event.target.value) : undefined)}>
+              <option value="">全部负责人</option>
+              {owners.map((owner) => (
+                <option key={owner.id} value={owner.id}>
+                  {owner.name}
+                </option>
+              ))}
+            </select>
+            <span className="f-sep">|</span>
+            <span className="f-label">标签</span>
+            <select value={tagId ?? ''} onChange={(event) => setTagId(event.target.value ? Number(event.target.value) : undefined)}>
+              <option value="">全部标签</option>
+              {tags.map((tag) => (
+                <option key={tag.id} value={tag.id}>
+                  {tag.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="filter-group">
             <span className="f-label">关键词</span>
             <input
               type="text"
@@ -127,6 +154,12 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
                   <span className="r-path">{row.path}</span>
                 </span>
                 {row.task.carriedFromTaskId != null && <span className="tag">带入</span>}
+                {row.task.executionMode === 'follow_up' && row.task.ownerName && (
+                  <span className="tag tag-owner">{row.task.ownerName}</span>
+                )}
+                {row.task.tags.slice(0, 3).map((tag) => (
+                  <span key={tag} className="tag tag-label">{tag}</span>
+                ))}
                 <span className="r-week">{row.weekLabel}</span>
               </div>
             ))}

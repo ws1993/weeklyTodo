@@ -114,6 +114,20 @@ export function EditIcon({ size = 14 }: { size?: number }) {
   );
 }
 
+export function SettingsIcon({ size = 14 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M12 3.2v2.6M12 18.2v2.6M3.2 12h2.6M18.2 12h2.6M5.9 5.9l1.8 1.8M16.3 16.3l1.8 1.8M18.1 5.9l-1.8 1.8M7.7 16.3l-1.8 1.8"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
 export function GrassIcon({ width = 120 }: { width?: number }) {
   return (
     <svg width={width} height={12} viewBox="0 0 120 12" fill="none" aria-hidden="true">
@@ -121,6 +135,45 @@ export function GrassIcon({ width = 120 }: { width?: number }) {
         d="M5 11c.3-3.4 1.6-5.6 4.4-7M11 11c.6-2.8 2-4.8 4.6-6.2M19 11c1.4-2.3 1.6-4.6.7-7M28 11c1.9-2.2 5-3.4 8.4-3.8M40 11c2.3-1.4 3-3.4 2.6-5.8"
         stroke="currentColor"
         strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/** 年轮树桩 Logo：同心年轮 = 周期循环，七段金色刻度 = 一周七天，中心嫩芽 = 本周新任务。 */
+export function LogoIcon({ size = 21 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 200 200"
+      fill="none"
+      aria-hidden="true"
+    >
+      <rect width="200" height="200" fill="#1C2720" rx="36" />
+      <circle cx="100" cy="104" r="68" fill="#233028" />
+      <circle cx="100" cy="104" r="68" stroke="#7FB069" strokeWidth="5" opacity=".6" />
+      <circle cx="100" cy="104" r="50" stroke="#7FB069" strokeWidth="3" opacity=".35" />
+      <circle cx="100" cy="104" r="32" stroke="#96C982" strokeWidth="3" opacity=".55" />
+      <circle cx="100" cy="104" r="16" stroke="#96C982" strokeWidth="2" opacity=".4" />
+      <g stroke="#D9A441" strokeWidth="5" strokeLinecap="round">
+        <line x1="100" y1="36" x2="100" y2="48" />
+        <line x1="148" y1="56" x2="141" y2="63" />
+        <line x1="168" y1="104" x2="156" y2="104" />
+        <line x1="148" y1="152" x2="141" y2="145" />
+        <line x1="100" y1="172" x2="100" y2="160" />
+        <line x1="52" y1="152" x2="59" y2="145" />
+        <line x1="32" y1="104" x2="44" y2="104" />
+      </g>
+      <path
+        d="M100 84 C 92 84, 86 90, 86 98 C 86 106, 92 112, 100 112 C 108 112, 114 106, 114 98 C 114 90, 108 84, 100 84 Z"
+        fill="#96C982"
+      />
+      <path
+        d="M100 112 C 96 124, 98 134, 104 140"
+        stroke="#96C982"
+        strokeWidth="5"
         strokeLinecap="round"
       />
     </svg>

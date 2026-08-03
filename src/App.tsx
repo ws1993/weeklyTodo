@@ -8,7 +8,7 @@ import { QueryView } from './components/QueryView';
 import { CreateWeekModal } from './components/CreateWeekModal';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import { UpdateModal } from './features/update/UpdateModal';
-import { LeafIcon } from './components/ForestIcons';
+import { LogoIcon } from './components/ForestIcons';
 import {
   currentWeekId as currentWeekIdOf,
   formatCnRange,
@@ -58,7 +58,7 @@ export function App() {
       <div className="app-shell">
         <header className="topbar">
           <div className="topbar-brand">
-            <span className="brand-glyph"><LeafIcon size={21} /></span>
+            <span className="brand-glyph"><LogoIcon size={21} /></span>
             <span className="topbar-title">周计划</span>
             <span className="brand-dot" />
             <span className="topbar-subtitle">专注森林周流</span>

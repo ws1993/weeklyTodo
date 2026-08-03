@@ -12,6 +12,10 @@ function makeTask(partial: Partial<Task> & { id: number; title: string }): Task 
     sortIndex: 0,
     createdAt: '',
     updatedAt: '',
+    executionMode: 'self',
+    ownerId: null,
+    ownerName: null,
+    tags: [],
     ...partial,
   };
 }

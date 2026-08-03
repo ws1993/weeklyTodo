@@ -8,9 +8,10 @@ pub fn query_tasks(conn: &Connection, filter: &QueryFilter) -> Result<Vec<QueryT
     let mut sql = String::from(
         "SELECT t.id, t.week_id, t.parent_id, t.title, t.description, t.status, t.priority,
                 t.sort_index, t.origin_week_id, t.carried_from_task_id, t.created_at,
-                t.updated_at, t.closed_at,
+                t.updated_at, t.closed_at, t.execution_mode, t.owner_id, o.name,
                 w.id AS week_label
          FROM tasks t JOIN weeks w ON w.id = t.week_id
+         LEFT JOIN owners o ON o.id = t.owner_id
          WHERE 1 = 1",
     );
     let mut values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -44,6 +45,14 @@ pub fn query_tasks(conn: &Connection, filter: &QueryFilter) -> Result<Vec<QueryT
     if filter.carried_over_only.unwrap_or(false) {
         sql.push_str(" AND t.carried_from_task_id IS NOT NULL");
     }
+    if let Some(owner_id) = filter.owner_id {
+        sql.push_str(" AND t.owner_id = ?");
+        values.push(Box::new(owner_id));
+    }
+    if let Some(tag_id) = filter.tag_id {
+        sql.push_str(" AND t.id IN (SELECT task_id FROM task_tags WHERE tag_id = ?)");
+        values.push(Box::new(tag_id));
+    }
     sql.push_str(" ORDER BY w.start_date DESC, t.sort_index, t.id LIMIT 1000");
 
     let params = rusqlite::params_from_iter(values.iter().map(|value| value.as_ref()));
@@ -66,9 +75,13 @@ pub fn query_tasks(conn: &Connection, filter: &QueryFilter) -> Result<Vec<QueryT
                 created_at: row.get(10)?,
                 updated_at: row.get(11)?,
                 closed_at: row.get(12)?,
+                execution_mode: row.get(13)?,
+                owner_id: row.get(14)?,
+                owner_name: row.get(15)?,
+                tags: Vec::new(),
             };
             Ok(QueryTaskRow {
-                week_label: row.get(13)?,
+                week_label: row.get(16)?,
                 week_id: task.week_id.clone(),
                 task,
                 path: String::new(),
@@ -81,6 +94,12 @@ pub fn query_tasks(conn: &Connection, filter: &QueryFilter) -> Result<Vec<QueryT
         let mut item = row.map_err(|error| format!("读取查询结果失败：{error}"))?;
         item.path = build_path(conn, &item.task)?;
         result.push(item);
+    }
+    // Attach tag names to every returned task.
+    let task_ids: Vec<i64> = result.iter().map(|item| item.task.id).collect();
+    let tag_map = crate::domain::load_task_tags(conn, &task_ids)?;
+    for item in result.iter_mut() {
+        item.task.tags = tag_map.get(&item.task.id).cloned().unwrap_or_default();
     }
     Ok(result)
 }
@@ -167,6 +186,9 @@ mod tests {
                 description: String::new(),
                 parent_id: None,
                 priority: 2,
+                execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                tag_names: Vec::new(),
             },
         )
         .unwrap();
@@ -178,6 +200,9 @@ mod tests {
                 description: String::new(),
                 parent_id: None,
                 priority: 2,
+                execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                tag_names: Vec::new(),
             },
         )
         .unwrap();
@@ -204,6 +229,66 @@ mod tests {
         .unwrap();
         assert_eq!(status_result.len(), 1);
         assert_eq!(status_result[0].task.title, "已完成的备份");
+    }
+
+    #[test]
+    fn query_filters_by_owner_and_tag() {
+        let conn = db::open_in_memory();
+        insert_week_helper(&conn, "20260803-20260809", "20260803", "20260809");
+
+        let assigned = create_task(
+            &conn,
+            "20260803-20260809",
+            CreateTaskInput {
+                title: "给小明写周报".into(),
+                description: String::new(),
+                parent_id: None,
+                priority: 2,
+                execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
+                owner_name: Some("小明".into()),
+                tag_names: vec!["高优".into()],
+            },
+        )
+        .unwrap();
+        create_task(
+            &conn,
+            "20260803-20260809",
+            CreateTaskInput {
+                title: "无人认领任务".into(),
+                description: String::new(),
+                parent_id: None,
+                priority: 2,
+                execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                tag_names: Vec::new(),
+            },
+        )
+        .unwrap();
+
+        let owner_id = crate::domain::ensure_owner(&conn, "小明").unwrap();
+        let tag_id = crate::domain::ensure_tag(&conn, "高优").unwrap();
+
+        let by_owner = query_tasks(
+            &conn,
+            &QueryFilter {
+                owner_id: Some(owner_id),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(by_owner.len(), 1);
+        assert_eq!(by_owner[0].task.id, assigned.id);
+
+        let by_tag = query_tasks(
+            &conn,
+            &QueryFilter {
+                tag_id: Some(tag_id),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(by_tag.len(), 1);
+        assert_eq!(by_tag[0].task.tags, vec!["高优".to_string()]);
     }
 
     #[test]

@@ -7,6 +7,17 @@ export interface Week {
 }
 
 export type TaskStatus = 'in_progress' | 'closed';
+export type ExecutionMode = 'self' | 'follow_up';
+
+export interface Owner {
+  id: number;
+  name: string;
+}
+
+export interface Tag {
+  id: number;
+  name: string;
+}
 
 export interface Task {
   id: number;
@@ -22,6 +33,10 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
   closedAt?: string | null;
+  executionMode: ExecutionMode;
+  ownerId?: number | null;
+  ownerName?: string | null;
+  tags: string[];
 }
 
 export interface WeekTreePayload {
@@ -41,6 +56,8 @@ export interface QueryFilter {
   carriedOverOnly?: boolean;
   startWeekId?: string;
   endWeekId?: string;
+  ownerId?: number;
+  tagId?: number;
 }
 
 export interface QueryTaskRow {

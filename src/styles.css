@@ -512,6 +512,52 @@ button {
   color: var(--warn);
   border-color: rgba(201, 133, 107, 0.45);
 }
+.tag-owner {
+  color: #d9c08c;
+  border-color: rgba(217, 192, 140, 0.4);
+  background: rgba(217, 192, 140, 0.1);
+  letter-spacing: 0.3px;
+}
+.tag-label {
+  color: var(--text-2);
+  border-color: var(--line-strong);
+  background: rgba(237, 234, 226, 0.06);
+  letter-spacing: 0.3px;
+}
+.tag-extra {
+  color: var(--text-4);
+  border-color: var(--line);
+  background: transparent;
+  letter-spacing: 0.3px;
+}
+.toggle-node {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  background: transparent;
+  color: var(--bg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.toggle-node:hover {
+  border-color: var(--accent);
+  background: rgba(127, 176, 105, 0.12);
+}
+.toggle-node.done {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.toggle-node svg {
+  width: 10px;
+  height: 10px;
+}
 .row-spacer {
   flex: 1;
 }
@@ -956,6 +1002,48 @@ svg.connector circle.bud.dim {
   border: 1px solid var(--line);
   border-radius: 5px;
   padding: 1px 6px;
+}
+
+/* ---------- Task detail panel ---------- */
+.detail-textarea {
+  background: rgba(237, 234, 226, 0.05);
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  padding: 9px 11px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  resize: vertical;
+  color-scheme: dark;
+  width: 100%;
+}
+.detail-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(127, 176, 105, 0.13);
+}
+.action-spacer {
+  flex: 1;
+}
+.task-detail .modal-body {
+  max-height: 66vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.task-detail .ant-select-selector {
+  background: rgba(237, 234, 226, 0.05) !important;
+  border-color: var(--line-strong) !important;
+  color: var(--text) !important;
+}
+.task-detail .ant-select-selection-placeholder,
+.task-detail .ant-select-selection-search-input {
+  color: var(--text-3) !important;
+}
+.task-detail .ant-select-selection-item {
+  color: var(--text) !important;
+}
+.task-detail .ant-radio-wrapper {
+  color: var(--text-2);
 }
 
 /* ---------- Query / filters ---------- */

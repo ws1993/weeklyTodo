@@ -1,5 +1,12 @@
 import { create } from 'zustand';
-import type { Task, Week, WeekTreePayload } from '../shared/contracts/types';
+import type {
+  ExecutionMode,
+  Owner,
+  Tag,
+  Task,
+  Week,
+  WeekTreePayload,
+} from '../shared/contracts/types';
 import * as bridge from '../api/nativeBridge';
 
 interface AppState {
@@ -8,20 +15,36 @@ interface AppState {
   activeWeekId: string;
   recentWeeks: Week[];
   allWeeks: Week[];
+  owners: Owner[];
+  tags: Tag[];
   tree: WeekTreePayload | null;
   loading: boolean;
   error: string | null;
 
   initialize: () => Promise<void>;
   refreshWeeks: () => Promise<void>;
+  refreshMetadata: () => Promise<void>;
   selectWeek: (weekId: string) => Promise<void>;
   refreshTree: () => Promise<void>;
   addTask: (input: {
     title: string;
     description?: string;
     parentId?: number | null;
+    executionMode?: ExecutionMode;
+    ownerName?: string | null;
+    tagNames?: string[];
   }) => Promise<Task>;
-  editTask: (taskId: number, input: { title?: string; description?: string }) => Promise<void>;
+  editTask: (
+    taskId: number,
+    input: {
+      title?: string;
+      description?: string;
+      priority?: number;
+      executionMode?: ExecutionMode;
+      ownerName?: string | null;
+      tagNames?: string[];
+    },
+  ) => Promise<void>;
   toggleTask: (taskId: number) => Promise<void>;
   moveTask: (taskId: number, newParentId: number | null, newIndex: number) => Promise<void>;
   createWeek: (mondayDate: string) => Promise<Week>;
@@ -33,6 +56,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeWeekId: '',
   recentWeeks: [],
   allWeeks: [],
+  owners: [],
+  tags: [],
   tree: null,
   loading: true,
   error: null,
@@ -54,6 +79,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         loading: false,
       });
       await get().refreshTree();
+      await get().refreshMetadata();
     } catch (error) {
       set({ loading: false, error: String(error) });
     }
@@ -65,6 +91,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       bridge.listWeeks(),
     ]);
     set({ recentWeeks, allWeeks });
+  },
+
+  refreshMetadata: async () => {
+    const [owners, tags] = await Promise.all([bridge.listOwners(), bridge.listTags()]);
+    set({ owners, tags });
   },
 
   selectWeek: async (weekId) => {
@@ -82,22 +113,36 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ tree });
   },
 
-  addTask: async ({ title, description, parentId }) => {
+  addTask: async ({ title, description, parentId, executionMode, ownerName, tagNames }) => {
     const { activeWeekId } = get();
     const task = await bridge.createTask({
       weekId: activeWeekId,
       title,
       description,
       parentId: parentId ?? null,
+      executionMode,
+      ownerName,
+      tagNames,
     });
     await get().refreshTree();
+    await get().refreshMetadata();
     return task;
   },
 
-  editTask: async (taskId, { title, description }) => {
+  editTask: async (taskId, { title, description, priority, executionMode, ownerName, tagNames }) => {
     const { activeWeekId } = get();
-    await bridge.updateTask({ weekId: activeWeekId, taskId, title, description });
+    await bridge.updateTask({
+      weekId: activeWeekId,
+      taskId,
+      title,
+      description,
+      priority,
+      executionMode,
+      ownerName,
+      tagNames,
+    });
     await get().refreshTree();
+    await get().refreshMetadata();
   },
 
   toggleTask: async (taskId) => {

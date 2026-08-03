@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Task } from '../shared/contracts/types';
 import { useAppStore } from '../store/appStore';
-import { BranchIcon, CheckIcon, CrossIcon, EditIcon, LeafIcon, PlusIcon } from './ForestIcons';
+import {
+  BranchIcon,
+  CheckIcon,
+  CrossIcon,
+  EditIcon,
+  LeafIcon,
+  PlusIcon,
+  SettingsIcon,
+} from './ForestIcons';
+import { TaskDetailPanel } from './TaskDetailPanel';
 
 interface TaskTreeProps {
   tasks: Task[];
@@ -11,6 +20,7 @@ export function TaskTree({ tasks }: TaskTreeProps) {
   const addTask = useAppStore((state) => state.addTask);
   const [addingParentId, setAddingParentId] = useState<number | 'root' | null>(null);
   const [draftTitle, setDraftTitle] = useState('');
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   const rootTasks = tasks
     .filter((task) => task.parentId === null)
@@ -47,7 +57,13 @@ export function TaskTree({ tasks }: TaskTreeProps) {
   return (
     <div>
       {rootTasks.map((task) => (
-        <TaskNode key={task.id} task={task} allTasks={tasks} isTop />
+        <TaskNode
+          key={task.id}
+          task={task}
+          allTasks={tasks}
+          isTop
+          onOpenSettings={setSelectedTask}
+        />
       ))}
 
       {addingParentId === null ? (
@@ -96,6 +112,8 @@ export function TaskTree({ tasks }: TaskTreeProps) {
           </button>
         </div>
       )}
+
+      <TaskDetailPanel task={selectedTask} onClose={() => setSelectedTask(null)} />
     </div>
   );
 }
@@ -104,9 +122,10 @@ interface TaskNodeProps {
   task: Task;
   allTasks: Task[];
   isTop?: boolean;
+  onOpenSettings: (task: Task) => void;
 }
 
-function TaskNode({ task, allTasks, isTop = false }: TaskNodeProps) {
+function TaskNode({ task, allTasks, isTop = false, onOpenSettings }: TaskNodeProps) {
   const toggleTask = useAppStore((state) => state.toggleTask);
   const editTask = useAppStore((state) => state.editTask);
   const addTask = useAppStore((state) => state.addTask);
@@ -130,6 +149,9 @@ function TaskNode({ task, allTasks, isTop = false }: TaskNodeProps) {
     setEditing(false);
   };
 
+  const visibleTags = task.tags.slice(0, 3);
+  const extraTagCount = task.tags.length - visibleTags.length;
+
   const commitInline = async () => {
     const title = inlineDraft.trim();
     if (!title) {
@@ -146,8 +168,19 @@ function TaskNode({ task, allTasks, isTop = false }: TaskNodeProps) {
     <div className={`tree-node ${closed ? 'closed' : ''}`} data-node={task.id}>
       <div
         className={`tree-row ${closed ? 'closed' : ''} ${isTop ? 'top' : ''}`}
-        onClick={() => void toggleTask(task.id)}
+        onClick={() => onOpenSettings(task)}
       >
+        <button
+          className={`toggle-node ${closed ? 'done' : ''}`}
+          title={closed ? '重新打开' : '标记完成'}
+          onClick={(event) => {
+            event.stopPropagation();
+            void toggleTask(task.id);
+          }}
+        >
+          {closed && <CheckIcon size={10} />}
+        </button>
+
         <span className={`node-glyph ${hasChildren ? 'gi-branch' : 'gi-leaf'}`}>
           {hasChildren ? <BranchIcon size={17} /> : <LeafIcon size={17} />}
         </span>
@@ -181,6 +214,13 @@ function TaskNode({ task, allTasks, isTop = false }: TaskNodeProps) {
         <span className={`tag tag-priority ${task.priority === 0 ? 'p0' : ''}`}>
           P{task.priority}
         </span>
+        {task.executionMode === 'follow_up' && task.ownerName && (
+          <span className="tag tag-owner">{task.ownerName}</span>
+        )}
+        {visibleTags.map((tag) => (
+          <span key={tag} className="tag tag-label">{tag}</span>
+        ))}
+        {extraTagCount > 0 && <span className="tag tag-extra">+{extraTagCount}</span>}
 
         <span className="row-spacer" />
         <span className="task-actions">
@@ -207,6 +247,16 @@ function TaskNode({ task, allTasks, isTop = false }: TaskNodeProps) {
           >
             <EditIcon size={14} />
           </button>
+          <button
+            className="edit-btn"
+            title="任务设置"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenSettings(task);
+            }}
+          >
+            <SettingsIcon size={14} />
+          </button>
         </span>
       </div>
 
@@ -221,6 +271,7 @@ function TaskNode({ task, allTasks, isTop = false }: TaskNodeProps) {
                 key={child.id}
                 task={child}
                 allTasks={allTasks}
+                onOpenSettings={onOpenSettings}
               />
             ))}
 

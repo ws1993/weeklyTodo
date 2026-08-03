@@ -4,6 +4,8 @@ use rusqlite::{Connection, OptionalExtension, params};
 pub const TASK_STATUS_IN_PROGRESS: &str = "in_progress";
 pub const TASK_STATUS_CLOSED: &str = "closed";
 pub const DEFAULT_PRIORITY: i64 = 2;
+pub const EXECUTION_MODE_SELF: &str = "self";
+pub const EXECUTION_MODE_FOLLOW_UP: &str = "follow_up";
 
 pub const EVENT_TYPE_CREATE: &str = "create";
 pub const EVENT_TYPE_UPDATE: &str = "update";
@@ -37,6 +39,24 @@ pub struct Task {
     pub created_at: String,
     pub updated_at: String,
     pub closed_at: Option<String>,
+    pub execution_mode: String,
+    pub owner_id: Option<i64>,
+    pub owner_name: Option<String>,
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Owner {
+    pub id: i64,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Tag {
+    pub id: i64,
+    pub name: String,
 }
 
 /// Format a date as `YYYYMMDD`.
@@ -133,40 +153,171 @@ fn task_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Task> {
         created_at: row.get(10)?,
         updated_at: row.get(11)?,
         closed_at: row.get(12)?,
+        execution_mode: row.get(13)?,
+        owner_id: row.get(14)?,
+        owner_name: row.get(15)?,
+        tags: Vec::new(),
     })
 }
 
 fn get_task(conn: &Connection, week_id: &str, task_id: i64) -> Result<Option<Task>, String> {
-    conn.query_row(
-        "SELECT id, week_id, parent_id, title, description, status, priority, sort_index,
-                origin_week_id, carried_from_task_id, created_at, updated_at, closed_at
-         FROM tasks WHERE id = ?1 AND week_id = ?2",
-        params![task_id, week_id],
-        task_from_row,
-    )
-    .optional()
-    .map_err(|error| format!("读取任务失败：{error}"))
+    let mut task = conn
+        .query_row(
+            "SELECT t.id, t.week_id, t.parent_id, t.title, t.description, t.status, t.priority,
+                    t.sort_index, t.origin_week_id, t.carried_from_task_id, t.created_at,
+                    t.updated_at, t.closed_at, t.execution_mode, t.owner_id, o.name
+             FROM tasks t LEFT JOIN owners o ON o.id = t.owner_id
+             WHERE t.id = ?1 AND t.week_id = ?2",
+            params![task_id, week_id],
+            task_from_row,
+        )
+        .optional()
+        .map_err(|error| format!("读取任务失败：{error}"))?;
+    if let Some(task) = task.as_mut() {
+        attach_tags(conn, std::slice::from_mut(task))?;
+    }
+    Ok(task)
+}
+
+/// Load tag names for the given task ids as `task_id -> tag names` map.
+pub fn load_task_tags(
+    conn: &Connection,
+    task_ids: &[i64],
+) -> Result<std::collections::HashMap<i64, Vec<String>>, String> {
+    let mut result = std::collections::HashMap::new();
+    if task_ids.is_empty() {
+        return Ok(result);
+    }
+    let placeholders = task_ids
+        .iter()
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(",");
+    let sql = format!(
+        "SELECT tt.task_id, t.name
+         FROM task_tags tt JOIN tags t ON t.id = tt.tag_id
+         WHERE tt.task_id IN ({placeholders}) ORDER BY t.name"
+    );
+    let mut stmt = conn
+        .prepare(&sql)
+        .map_err(|error| format!("准备标签查询失败：{error}"))?;
+    let rows = stmt
+        .query_map(rusqlite::params_from_iter(task_ids), |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|error| format!("查询标签失败：{error}"))?;
+    for row in rows {
+        let (task_id, name) = row.map_err(|error| format!("读取标签失败：{error}"))?;
+        result.entry(task_id).or_insert_with(Vec::new).push(name);
+    }
+    Ok(result)
+}
+
+fn attach_tags(conn: &Connection, tasks: &mut [Task]) -> Result<(), String> {
+    let ids: Vec<i64> = tasks.iter().map(|task| task.id).collect();
+    let tag_map = load_task_tags(conn, &ids)?;
+    for task in tasks.iter_mut() {
+        task.tags = tag_map.get(&task.id).cloned().unwrap_or_default();
+    }
+    Ok(())
 }
 
 fn list_tasks(conn: &Connection, week_id: &str) -> Result<Vec<Task>, String> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, week_id, parent_id, title, description, status, priority, sort_index,
-                    origin_week_id, carried_from_task_id, created_at, updated_at, closed_at
-             FROM tasks WHERE week_id = ?1 ORDER BY sort_index, id",
+            "SELECT t.id, t.week_id, t.parent_id, t.title, t.description, t.status, t.priority,
+                    t.sort_index, t.origin_week_id, t.carried_from_task_id, t.created_at,
+                    t.updated_at, t.closed_at, t.execution_mode, t.owner_id, o.name
+             FROM tasks t LEFT JOIN owners o ON o.id = t.owner_id
+             WHERE t.week_id = ?1 ORDER BY t.sort_index, t.id",
         )
         .map_err(|error| format!("查询任务失败：{error}"))?;
-    let tasks = stmt
+    let mut tasks = stmt
         .query_map(params![week_id], task_from_row)
         .map_err(|error| format!("遍历任务失败：{error}"))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|error| format!("读取任务失败：{error}"))?;
+    attach_tags(conn, &mut tasks)?;
     Ok(tasks)
 }
 
 /// Public variant used by commands and queries.
 pub fn list_tasks_for_week(conn: &Connection, week_id: &str) -> Result<Vec<Task>, String> {
     list_tasks(conn, week_id)
+}
+
+/// Ensure an owner exists by name; create it when missing. Returns the owner id.
+pub fn ensure_owner(conn: &Connection, name: &str) -> Result<i64, String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err("负责人不能为空".to_string());
+    }
+    conn.execute(
+        "INSERT OR IGNORE INTO owners (name) VALUES (?1)",
+        params![trimmed],
+    )
+    .map_err(|error| format!("写入负责人失败：{error}"))?;
+    conn.query_row(
+        "SELECT id FROM owners WHERE name = ?1",
+        params![trimmed],
+        |row| row.get(0),
+    )
+    .map_err(|error| format!("读取负责人失败：{error}"))
+}
+
+/// Ensure a tag exists by name; create it when missing. Returns the tag id.
+pub fn ensure_tag(conn: &Connection, name: &str) -> Result<i64, String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err("标签不能为空".to_string());
+    }
+    conn.execute(
+        "INSERT OR IGNORE INTO tags (name) VALUES (?1)",
+        params![trimmed],
+    )
+    .map_err(|error| format!("写入标签失败：{error}"))?;
+    conn.query_row(
+        "SELECT id FROM tags WHERE name = ?1",
+        params![trimmed],
+        |row| row.get(0),
+    )
+    .map_err(|error| format!("读取标签失败：{error}"))
+}
+
+/// All owners ordered by name, for dropdown options.
+pub fn list_owners(conn: &Connection) -> Result<Vec<Owner>, String> {
+    let mut stmt = conn
+        .prepare("SELECT id, name FROM owners ORDER BY name COLLATE NOCASE, id")
+        .map_err(|error| format!("查询负责人列表失败：{error}"))?;
+    let owners = stmt
+        .query_map([], |row| {
+            Ok(Owner {
+                id: row.get(0)?,
+                name: row.get(1)?,
+            })
+        })
+        .map_err(|error| format!("遍历负责人列表失败：{error}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("读取负责人列表失败：{error}"))?;
+    Ok(owners)
+}
+
+/// All tags ordered by name, for dropdown options.
+pub fn list_tags(conn: &Connection) -> Result<Vec<Tag>, String> {
+    let mut stmt = conn
+        .prepare("SELECT id, name FROM tags ORDER BY name COLLATE NOCASE, id")
+        .map_err(|error| format!("查询标签列表失败：{error}"))?;
+    let tags = stmt
+        .query_map([], |row| {
+            Ok(Tag {
+                id: row.get(0)?,
+                name: row.get(1)?,
+            })
+        })
+        .map_err(|error| format!("遍历标签列表失败：{error}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("读取标签列表失败：{error}"))?;
+    Ok(tags)
 }
 
 fn has_week(conn: &Connection, week_id: &str) -> Result<bool, String> {
@@ -199,6 +350,9 @@ pub struct CreateTaskInput {
     pub description: String,
     pub parent_id: Option<i64>,
     pub priority: i64,
+    pub execution_mode: String,
+    pub owner_name: Option<String>,
+    pub tag_names: Vec<String>,
 }
 
 /// Create a task in `week_id`. Returns the created task.
@@ -222,6 +376,19 @@ pub fn create_task(
         }
     }
 
+    let execution_mode = if input.execution_mode == EXECUTION_MODE_FOLLOW_UP {
+        EXECUTION_MODE_FOLLOW_UP
+    } else {
+        EXECUTION_MODE_SELF
+    };
+    let owner_id = match &input.owner_name {
+        Some(name) if !name.trim().is_empty() => Some(ensure_owner(conn, name)?),
+        _ => None,
+    };
+    if execution_mode == EXECUTION_MODE_FOLLOW_UP && owner_id.is_none() {
+        return Err("跟进任务需要指定负责人".to_string());
+    }
+
     let now = iso_now();
     let priority = input.priority.clamp(0, 3);
     let next_index: f64 = conn
@@ -234,8 +401,9 @@ pub fn create_task(
 
     conn.execute(
         "INSERT INTO tasks (week_id, parent_id, title, description, status, priority, sort_index,
-                            origin_week_id, carried_from_task_id, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, NULL, ?8, ?8)",
+                            origin_week_id, carried_from_task_id, created_at, updated_at,
+                            execution_mode, owner_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, NULL, ?8, ?8, ?9, ?10)",
         params![
             week_id,
             input.parent_id,
@@ -244,12 +412,15 @@ pub fn create_task(
             TASK_STATUS_IN_PROGRESS,
             priority,
             next_index,
-            now
+            now,
+            execution_mode,
+            owner_id
         ],
     )
     .map_err(|error| format!("写入任务失败：{error}"))?;
 
     let task_id = conn.last_insert_rowid();
+    set_task_tags(conn, task_id, &input.tag_names)?;
     record_event(conn, week_id, Some(task_id), EVENT_TYPE_CREATE, None)?;
     get_task(conn, week_id, task_id)?
         .ok_or_else(|| "创建任务后读取失败".to_string())
@@ -259,6 +430,11 @@ pub struct UpdateTaskInput {
     pub title: Option<String>,
     pub description: Option<String>,
     pub priority: Option<i64>,
+    pub execution_mode: Option<String>,
+    /// `Some("")` clears the owner; `None` keeps the current owner.
+    pub owner_name: Option<String>,
+    /// `Some(names)` replaces all tags; `None` leaves tags unchanged.
+    pub tag_names: Option<Vec<String>>,
 }
 
 /// Update task fields. Returns the updated task.
@@ -281,16 +457,82 @@ pub fn update_task(
     let description = input.description.unwrap_or(current.description.clone());
     let priority = input.priority.unwrap_or(current.priority).clamp(0, 3);
 
+    let execution_mode = match input.execution_mode.as_deref() {
+        Some(EXECUTION_MODE_FOLLOW_UP) => EXECUTION_MODE_FOLLOW_UP.to_string(),
+        Some(_) => EXECUTION_MODE_SELF.to_string(),
+        None => current.execution_mode.clone(),
+    };
+    let owner_id = match &input.owner_name {
+        Some(name) if name.trim().is_empty() => None,
+        Some(name) => Some(ensure_owner(conn, name)?),
+        None => current.owner_id,
+    };
+    if execution_mode == EXECUTION_MODE_FOLLOW_UP && owner_id.is_none() {
+        return Err("跟进任务需要指定负责人".to_string());
+    }
+
     conn.execute(
-        "UPDATE tasks SET title = ?1, description = ?2, priority = ?3, updated_at = ?4
-         WHERE id = ?5 AND week_id = ?6",
-        params![title, description, priority, iso_now(), task_id, week_id],
+        "UPDATE tasks SET title = ?1, description = ?2, priority = ?3, updated_at = ?4,
+                          execution_mode = ?5, owner_id = ?6
+         WHERE id = ?7 AND week_id = ?8",
+        params![
+            title,
+            description,
+            priority,
+            iso_now(),
+            execution_mode,
+            owner_id,
+            task_id,
+            week_id
+        ],
     )
     .map_err(|error| format!("更新任务失败：{error}"))?;
 
+    if let Some(tag_names) = &input.tag_names {
+        set_task_tags(conn, task_id, tag_names)?;
+    }
     record_event(conn, week_id, Some(task_id), EVENT_TYPE_UPDATE, None)?;
     get_task(conn, week_id, task_id)?
         .ok_or_else(|| "更新任务后读取失败".to_string())
+}
+
+/// Replace a task's tags with the given names, auto-creating missing tags.
+fn set_task_tags(conn: &Connection, task_id: i64, tag_names: &[String]) -> Result<(), String> {
+    conn.execute("DELETE FROM task_tags WHERE task_id = ?1", params![task_id])
+        .map_err(|error| format!("清理任务标签失败：{error}"))?;
+    for raw_name in tag_names {
+        let name = raw_name.trim();
+        if name.is_empty() {
+            continue;
+        }
+        let tag_id = ensure_tag(conn, name)?;
+        conn.execute(
+            "INSERT OR IGNORE INTO task_tags (task_id, tag_id) VALUES (?1, ?2)",
+            params![task_id, tag_id],
+        )
+        .map_err(|error| format!("写入任务标签失败：{error}"))?;
+    }
+    Ok(())
+}
+
+/// Copy a task's tag associations from `source_id` to `target_id`.
+fn copy_task_tags(conn: &Connection, source_id: i64, target_id: i64) -> Result<(), String> {
+    let mut stmt = conn
+        .prepare("SELECT tag_id FROM task_tags WHERE task_id = ?1")
+        .map_err(|error| format!("查询源任务标签失败：{error}"))?;
+    let tag_ids = stmt
+        .query_map(params![source_id], |row| row.get::<_, i64>(0))
+        .map_err(|error| format!("遍历源任务标签失败：{error}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("读取源任务标签失败：{error}"))?;
+    for tag_id in tag_ids {
+        conn.execute(
+            "INSERT OR IGNORE INTO task_tags (task_id, tag_id) VALUES (?1, ?2)",
+            params![target_id, tag_id],
+        )
+        .map_err(|error| format!("写入结转任务标签失败：{error}"))?;
+    }
+    Ok(())
 }
 
 /// Whether the subtree rooted at `root_id` contains at least one open task.
@@ -596,8 +838,9 @@ fn carry_over_branch(
     let now = iso_now();
     conn.execute(
         "INSERT INTO tasks (week_id, parent_id, title, description, status, priority, sort_index,
-                            origin_week_id, carried_from_task_id, created_at, updated_at, closed_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10, ?11)",
+                            origin_week_id, carried_from_task_id, created_at, updated_at, closed_at,
+                            execution_mode, owner_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10, ?11, ?12, ?13)",
         params![
             target_week_id,
             target_parent_id,
@@ -609,11 +852,14 @@ fn carry_over_branch(
             task.origin_week_id.as_deref().unwrap_or(source_week_id),
             source_id,
             now,
-            task.closed_at
+            task.closed_at,
+            task.execution_mode,
+            task.owner_id
         ],
     )
     .map_err(|error| format!("复制任务失败：{error}"))?;
     let new_id = conn.last_insert_rowid();
+    copy_task_tags(conn, source_id, new_id)?;
     id_map.insert(source_id, new_id);
     record_event(
         conn,
@@ -712,6 +958,28 @@ mod tests {
         .unwrap();
     }
 
+    fn create_plain_task(
+        conn: &Connection,
+        week_id: &str,
+        title: &str,
+        parent_id: Option<i64>,
+    ) -> Task {
+        create_task(
+            conn,
+            week_id,
+            CreateTaskInput {
+                title: title.into(),
+                description: String::new(),
+                parent_id,
+                priority: DEFAULT_PRIORITY,
+                execution_mode: EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                tag_names: Vec::new(),
+            },
+        )
+        .unwrap()
+    }
+
     #[test]
     fn monday_of_known_date() {
         // 2026-08-03 is a Monday.
@@ -743,40 +1011,10 @@ mod tests {
         seed_week(&conn, "20260803-20260809");
 
         // Open root with open child.
-        let root = create_task(
-            &conn,
-            "20260727-20260802",
-            CreateTaskInput {
-                title: "项目A".into(),
-                description: String::new(),
-                parent_id: None,
-                priority: DEFAULT_PRIORITY,
-            },
-        )
-        .unwrap();
-        let child = create_task(
-            &conn,
-            "20260727-20260802",
-            CreateTaskInput {
-                title: "子任务1".into(),
-                description: String::new(),
-                parent_id: Some(root.id),
-                priority: DEFAULT_PRIORITY,
-            },
-        )
-        .unwrap();
+        let root = create_plain_task(&conn, "20260727-20260802", "项目A", None);
+        let child = create_plain_task(&conn, "20260727-20260802", "子任务1", Some(root.id));
         // Completed root with no open descendants.
-        let done_root = create_task(
-            &conn,
-            "20260727-20260802",
-            CreateTaskInput {
-                title: "已完成项目".into(),
-                description: String::new(),
-                parent_id: None,
-                priority: DEFAULT_PRIORITY,
-            },
-        )
-        .unwrap();
+        let done_root = create_plain_task(&conn, "20260727-20260802", "已完成项目", None);
         close_task(&mut conn, "20260727-20260802", done_root.id).unwrap();
 
         let target = "20260803-20260809";
@@ -806,39 +1044,9 @@ mod tests {
         seed_week(&conn, "20260727-20260802");
         seed_week(&conn, "20260803-20260809");
 
-        let root = create_task(
-            &conn,
-            "20260727-20260802",
-            CreateTaskInput {
-                title: "项目B".into(),
-                description: String::new(),
-                parent_id: None,
-                priority: DEFAULT_PRIORITY,
-            },
-        )
-        .unwrap();
-        let done_child = create_task(
-            &conn,
-            "20260727-20260802",
-            CreateTaskInput {
-                title: "已完成步骤".into(),
-                description: String::new(),
-                parent_id: Some(root.id),
-                priority: DEFAULT_PRIORITY,
-            },
-        )
-        .unwrap();
-        create_task(
-            &conn,
-            "20260727-20260802",
-            CreateTaskInput {
-                title: "进行中的步骤".into(),
-                description: String::new(),
-                parent_id: Some(root.id),
-                priority: DEFAULT_PRIORITY,
-            },
-        )
-        .unwrap();
+        let root = create_plain_task(&conn, "20260727-20260802", "项目B", None);
+        let done_child = create_plain_task(&conn, "20260727-20260802", "已完成步骤", Some(root.id));
+        create_plain_task(&conn, "20260727-20260802", "进行中的步骤", Some(root.id));
         close_task(&mut conn, "20260727-20260802", done_child.id).unwrap();
 
         carry_over_week(&conn, "20260803-20260809", "20260727-20260802").unwrap();
@@ -870,5 +1078,164 @@ mod tests {
         let monday = NaiveDate::from_ymd_opt(2026, 8, 17).unwrap();
         create_week_for_monday(&conn, monday).unwrap();
         assert!(create_week_for_monday(&conn, monday).is_err());
+    }
+
+    #[test]
+    fn follow_up_task_requires_owner() {
+        let conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+
+        let missing_owner = create_task(
+            &conn,
+            "20260803-20260809",
+            CreateTaskInput {
+                title: "跟进任务".into(),
+                description: String::new(),
+                parent_id: None,
+                priority: DEFAULT_PRIORITY,
+                execution_mode: EXECUTION_MODE_FOLLOW_UP.into(),
+                owner_name: None,
+                tag_names: Vec::new(),
+            },
+        );
+        assert!(missing_owner.is_err());
+
+        let with_owner = create_task(
+            &conn,
+            "20260803-20260809",
+            CreateTaskInput {
+                title: "跟进任务".into(),
+                description: String::new(),
+                parent_id: None,
+                priority: DEFAULT_PRIORITY,
+                execution_mode: EXECUTION_MODE_FOLLOW_UP.into(),
+                owner_name: Some("小王".into()),
+                tag_names: Vec::new(),
+            },
+        )
+        .unwrap();
+        assert_eq!(with_owner.execution_mode, EXECUTION_MODE_FOLLOW_UP);
+        assert_eq!(with_owner.owner_name.as_deref(), Some("小王"));
+    }
+
+    #[test]
+    fn owner_and_tags_are_saved_and_auto_created() {
+        let conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+
+        let task = create_task(
+            &conn,
+            "20260803-20260809",
+            CreateTaskInput {
+                title: "写周报".into(),
+                description: String::new(),
+                parent_id: None,
+                priority: DEFAULT_PRIORITY,
+                execution_mode: EXECUTION_MODE_SELF.into(),
+                owner_name: Some("小明".into()),
+                tag_names: vec!["总结".into(), "高优".into()],
+            },
+        )
+        .unwrap();
+
+        assert_eq!(task.owner_name.as_deref(), Some("小明"));
+        assert_eq!(task.tags, vec!["总结".to_string(), "高优".to_string()]);
+
+        // Reusing the same owner/tag names must not duplicate rows.
+        ensure_owner(&conn, "小明").unwrap();
+        ensure_tag(&conn, "总结").unwrap();
+        let owners = list_owners(&conn).unwrap();
+        let tags = list_tags(&conn).unwrap();
+        assert_eq!(owners.len(), 1);
+        assert_eq!(tags.len(), 2);
+    }
+
+    #[test]
+    fn update_task_replaces_tags_and_clears_owner() {
+        let conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+        let task = create_task(
+            &conn,
+            "20260803-20260809",
+            CreateTaskInput {
+                title: "写周报".into(),
+                description: String::new(),
+                parent_id: None,
+                priority: DEFAULT_PRIORITY,
+                execution_mode: EXECUTION_MODE_SELF.into(),
+                owner_name: Some("小明".into()),
+                tag_names: vec!["总结".into()],
+            },
+        )
+        .unwrap();
+
+        let updated = update_task(
+            &conn,
+            "20260803-20260809",
+            task.id,
+            UpdateTaskInput {
+                title: None,
+                description: None,
+                priority: None,
+                execution_mode: Some(EXECUTION_MODE_FOLLOW_UP.into()),
+                owner_name: Some("小红".into()),
+                tag_names: Some(vec!["总结".into(), "汇报".into()]),
+            },
+        )
+        .unwrap();
+        assert_eq!(updated.execution_mode, EXECUTION_MODE_FOLLOW_UP);
+        assert_eq!(updated.owner_name.as_deref(), Some("小红"));
+        let mut updated_tags = updated.tags.clone();
+        let mut expected_tags = vec!["汇报".to_string(), "总结".to_string()];
+        updated_tags.sort();
+        expected_tags.sort();
+        assert_eq!(updated_tags, expected_tags);
+
+        // Clearing the owner is only allowed for self-executed tasks.
+        let cleared = update_task(
+            &conn,
+            "20260803-20260809",
+            task.id,
+            UpdateTaskInput {
+                title: None,
+                description: None,
+                priority: None,
+                execution_mode: Some(EXECUTION_MODE_SELF.into()),
+                owner_name: Some(String::new()),
+                tag_names: Some(Vec::new()),
+            },
+        )
+        .unwrap();
+        assert_eq!(cleared.owner_name, None);
+        assert!(cleared.tags.is_empty());
+    }
+
+    #[test]
+    fn carry_over_copies_owner_and_tags() {
+        let conn = db::open_in_memory();
+        seed_week(&conn, "20260727-20260802");
+        seed_week(&conn, "20260803-20260809");
+
+        create_task(
+            &conn,
+            "20260727-20260802",
+            CreateTaskInput {
+                title: "项目A".into(),
+                description: String::new(),
+                parent_id: None,
+                priority: DEFAULT_PRIORITY,
+                execution_mode: EXECUTION_MODE_FOLLOW_UP.into(),
+                owner_name: Some("小王".into()),
+                tag_names: vec!["开发".into()],
+            },
+        )
+        .unwrap();
+
+        carry_over_week(&conn, "20260803-20260809", "20260727-20260802").unwrap();
+        let target_tasks = list_tasks(&conn, "20260803-20260809").unwrap();
+        assert_eq!(target_tasks.len(), 1);
+        assert_eq!(target_tasks[0].execution_mode, EXECUTION_MODE_FOLLOW_UP);
+        assert_eq!(target_tasks[0].owner_name.as_deref(), Some("小王"));
+        assert_eq!(target_tasks[0].tags, vec!["开发".to_string()]);
     }
 }

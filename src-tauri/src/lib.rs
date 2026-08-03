@@ -37,6 +37,8 @@ pub fn run() {
             commands::create_week,
             commands::create_task,
             commands::update_task,
+            commands::list_owners,
+            commands::list_tags,
             commands::close_task,
             commands::reopen_task,
             commands::move_task,

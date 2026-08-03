@@ -1,9 +1,12 @@
 import type {
   AppStatePayload,
+  ExecutionMode,
   MigrateResult,
+  Owner,
   ProxyConfigPayload,
   QueryFilter,
   QueryTaskRow,
+  Tag,
   Task,
   UpdateCheckResult,
   UpdateDownloadProgress,
@@ -58,8 +61,20 @@ export async function createTask(input: {
   description?: string;
   parentId?: number | null;
   priority?: number;
+  executionMode?: ExecutionMode;
+  ownerName?: string | null;
+  tagNames?: string[];
 }): Promise<Task> {
-  return invokeCommand<Task>('create_task', input);
+  return invokeCommand<Task>('create_task', {
+    weekId: input.weekId,
+    title: input.title,
+    description: input.description,
+    parentId: input.parentId ?? null,
+    priority: input.priority,
+    executionMode: input.executionMode,
+    ownerName: input.ownerName,
+    tagNames: input.tagNames,
+  });
 }
 
 export async function updateTask(input: {
@@ -68,8 +83,28 @@ export async function updateTask(input: {
   title?: string;
   description?: string;
   priority?: number;
+  executionMode?: ExecutionMode;
+  ownerName?: string | null;
+  tagNames?: string[];
 }): Promise<Task> {
-  return invokeCommand<Task>('update_task', input);
+  return invokeCommand<Task>('update_task', {
+    weekId: input.weekId,
+    taskId: input.taskId,
+    title: input.title,
+    description: input.description,
+    priority: input.priority,
+    executionMode: input.executionMode,
+    ownerName: input.ownerName,
+    tagNames: input.tagNames,
+  });
+}
+
+export async function listOwners(): Promise<Owner[]> {
+  return invokeCommand<Owner[]>('list_owners');
+}
+
+export async function listTags(): Promise<Tag[]> {
+  return invokeCommand<Tag[]>('list_tags');
 }
 
 export async function closeTask(weekId: string, taskId: number): Promise<Task> {
