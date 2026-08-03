@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ConfigProvider } from 'antd';
+import { ConfigProvider, theme } from 'antd';
 import { useAppStore } from './store/appStore';
 import { WeekRail } from './components/WeekRail';
 import { TaskTree } from './components/TaskTree';
@@ -45,6 +45,7 @@ export function App() {
   return (
     <ConfigProvider
       theme={{
+        algorithm: theme.darkAlgorithm,
         token: {
           colorPrimary: '#7FB069',
           colorTextBase: '#EDEAE2',

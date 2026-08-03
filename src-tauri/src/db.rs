@@ -9,7 +9,8 @@ pub const SCHEMA_VERSION: i32 = 2;
 pub fn open_database(data_dir: &Path) -> Result<Connection, String> {
     std::fs::create_dir_all(data_dir).map_err(|error| format!("创建数据目录失败：{error}"))?;
     let db_path = data_dir.join(DB_FILE_NAME);
-    let mut conn = Connection::open(&db_path).map_err(|error| format!("打开数据库失败：{error}"))?;
+    let mut conn =
+        Connection::open(&db_path).map_err(|error| format!("打开数据库失败：{error}"))?;
     conn.pragma_update(None, "foreign_keys", "ON")
         .map_err(|error| format!("启用外键失败：{error}"))?;
     conn.pragma_update(None, "journal_mode", "WAL")
@@ -105,7 +106,8 @@ pub fn migrate(conn: &mut Connection) -> Result<(), String> {
 #[cfg(test)]
 pub fn open_in_memory() -> Connection {
     let mut conn = Connection::open_in_memory().expect("open in-memory database");
-    conn.pragma_update(None, "foreign_keys", "ON").expect("enable foreign keys");
+    conn.pragma_update(None, "foreign_keys", "ON")
+        .expect("enable foreign keys");
     migrate(&mut conn).expect("run migrations");
     conn
 }

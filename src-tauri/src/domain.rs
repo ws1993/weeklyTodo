@@ -1,5 +1,5 @@
 use chrono::{Datelike, Duration, Local, NaiveDate};
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{params, Connection, OptionalExtension};
 
 pub const TASK_STATUS_IN_PROGRESS: &str = "in_progress";
 pub const TASK_STATUS_CLOSED: &str = "closed";
@@ -188,11 +188,7 @@ pub fn load_task_tags(
     if task_ids.is_empty() {
         return Ok(result);
     }
-    let placeholders = task_ids
-        .iter()
-        .map(|_| "?")
-        .collect::<Vec<_>>()
-        .join(",");
+    let placeholders = task_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
     let sql = format!(
         "SELECT tt.task_id, t.name
          FROM task_tags tt JOIN tags t ON t.id = tt.tag_id
@@ -369,8 +365,8 @@ pub fn create_task(
         return Err("任务标题不能为空".to_string());
     }
     if let Some(parent_id) = input.parent_id {
-        let parent = get_task(conn, week_id, parent_id)?
-            .ok_or_else(|| "父任务不存在".to_string())?;
+        let parent =
+            get_task(conn, week_id, parent_id)?.ok_or_else(|| "父任务不存在".to_string())?;
         if parent.status == TASK_STATUS_CLOSED {
             return Err("不能向已关闭的任务添加子任务".to_string());
         }
@@ -422,8 +418,7 @@ pub fn create_task(
     let task_id = conn.last_insert_rowid();
     set_task_tags(conn, task_id, &input.tag_names)?;
     record_event(conn, week_id, Some(task_id), EVENT_TYPE_CREATE, None)?;
-    get_task(conn, week_id, task_id)?
-        .ok_or_else(|| "创建任务后读取失败".to_string())
+    get_task(conn, week_id, task_id)?.ok_or_else(|| "创建任务后读取失败".to_string())
 }
 
 pub struct UpdateTaskInput {
@@ -444,8 +439,7 @@ pub fn update_task(
     task_id: i64,
     input: UpdateTaskInput,
 ) -> Result<Task, String> {
-    let current = get_task(conn, week_id, task_id)?
-        .ok_or_else(|| "任务不存在".to_string())?;
+    let current = get_task(conn, week_id, task_id)?.ok_or_else(|| "任务不存在".to_string())?;
 
     let title = input
         .title
@@ -492,8 +486,7 @@ pub fn update_task(
         set_task_tags(conn, task_id, tag_names)?;
     }
     record_event(conn, week_id, Some(task_id), EVENT_TYPE_UPDATE, None)?;
-    get_task(conn, week_id, task_id)?
-        .ok_or_else(|| "更新任务后读取失败".to_string())
+    get_task(conn, week_id, task_id)?.ok_or_else(|| "更新任务后读取失败".to_string())
 }
 
 /// Replace a task's tags with the given names, auto-creating missing tags.
@@ -567,8 +560,7 @@ fn subtree_has_open(conn: &Connection, root_id: i64) -> Result<bool, String> {
 
 /// Close a task and, when all siblings are closed, its ancestors (bottom-up).
 pub fn close_task(conn: &mut Connection, week_id: &str, task_id: i64) -> Result<Task, String> {
-    let mut current = get_task(conn, week_id, task_id)?
-        .ok_or_else(|| "任务不存在".to_string())?;
+    let mut current = get_task(conn, week_id, task_id)?.ok_or_else(|| "任务不存在".to_string())?;
     if current.status == TASK_STATUS_CLOSED {
         return Ok(current);
     }
@@ -617,8 +609,7 @@ pub fn close_task(conn: &mut Connection, week_id: &str, task_id: i64) -> Result<
 
 /// Reopen a closed task. Ancestors stay closed unless reopened explicitly.
 pub fn reopen_task(conn: &mut Connection, week_id: &str, task_id: i64) -> Result<Task, String> {
-    let current = get_task(conn, week_id, task_id)?
-        .ok_or_else(|| "任务不存在".to_string())?;
+    let current = get_task(conn, week_id, task_id)?.ok_or_else(|| "任务不存在".to_string())?;
     if current.status == TASK_STATUS_IN_PROGRESS {
         return Ok(current);
     }
@@ -663,8 +654,7 @@ pub fn reopen_task(conn: &mut Connection, week_id: &str, task_id: i64) -> Result
 
     tx.commit()
         .map_err(|error| format!("提交重新打开事务失败：{error}"))?;
-    get_task(conn, week_id, task_id)?
-        .ok_or_else(|| "重新打开任务后读取失败".to_string())
+    get_task(conn, week_id, task_id)?.ok_or_else(|| "重新打开任务后读取失败".to_string())
 }
 
 /// Re-parent and re-order a task within the same week.
@@ -683,8 +673,8 @@ pub fn move_task(
         if parent_id == task_id {
             return Err("不能将任务移动到自身下面".to_string());
         }
-        let parent = get_task(conn, week_id, parent_id)?
-            .ok_or_else(|| "父任务不存在".to_string())?;
+        let parent =
+            get_task(conn, week_id, parent_id)?.ok_or_else(|| "父任务不存在".to_string())?;
         if parent.status == TASK_STATUS_CLOSED {
             return Err("不能移动到已关闭的任务下".to_string());
         }
@@ -822,12 +812,9 @@ fn carry_over_branch(
         .iter()
         .filter(|child| child.parent_id == Some(source_id))
         .collect();
-    let has_open_child = children
-        .iter()
-        .any(|child| {
-            child.status == TASK_STATUS_IN_PROGRESS
-                || subtree_has_open(conn, child.id).unwrap_or(false)
-        });
+    let has_open_child = children.iter().any(|child| {
+        child.status == TASK_STATUS_IN_PROGRESS || subtree_has_open(conn, child.id).unwrap_or(false)
+    });
 
     // Skip a completely closed top-level branch (no parent carried over) with no open descendants.
     if task.status == TASK_STATUS_CLOSED && target_parent_id.is_none() && !has_open_child {
@@ -884,10 +871,7 @@ fn carry_over_branch(
 }
 
 /// Create a week manually for a Monday start date. Duplicates are rejected.
-pub fn create_week_for_monday(
-    conn: &Connection,
-    monday: NaiveDate,
-) -> Result<Week, String> {
+pub fn create_week_for_monday(conn: &Connection, monday: NaiveDate) -> Result<Week, String> {
     let week = week_from_monday(monday, None);
     if has_week(conn, &week.id)? {
         return Err(format!("周已存在：{}", week.id));
@@ -1023,17 +1007,16 @@ mod tests {
         let target_tasks = list_tasks(&conn, target).unwrap();
         let titles: Vec<&str> = target_tasks.iter().map(|t| t.title.as_str()).collect();
         assert_eq!(titles, vec!["项目A", "子任务1"]);
-        assert!(target_tasks.iter().all(|t| t.carried_from_task_id.is_some()));
-        let copied_child = target_tasks
+        assert!(target_tasks
             .iter()
-            .find(|t| t.title == "子任务1")
-            .unwrap();
-        let copied_root = target_tasks
-            .iter()
-            .find(|t| t.title == "项目A")
-            .unwrap();
+            .all(|t| t.carried_from_task_id.is_some()));
+        let copied_child = target_tasks.iter().find(|t| t.title == "子任务1").unwrap();
+        let copied_root = target_tasks.iter().find(|t| t.title == "项目A").unwrap();
         assert_eq!(copied_child.parent_id, Some(copied_root.id));
-        assert_eq!(copied_root.origin_week_id.as_deref(), Some("20260727-20260802"));
+        assert_eq!(
+            copied_root.origin_week_id.as_deref(),
+            Some("20260727-20260802")
+        );
         assert_eq!(child.origin_week_id, None);
         assert_eq!(copied_child.status, TASK_STATUS_IN_PROGRESS);
     }

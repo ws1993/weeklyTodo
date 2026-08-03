@@ -1046,6 +1046,30 @@ svg.connector circle.bud.dim {
   color: var(--text-2);
 }
 
+/* Ant Design dropdown popup (rendered in a portal, outside the modal) */
+.ant-select-dropdown {
+  background: var(--bg-panel) !important;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  box-shadow: 0 12px 34px -12px rgba(0, 0, 0, 0.6);
+}
+.ant-select-dropdown .ant-select-item {
+  color: var(--text-2);
+}
+.ant-select-dropdown .ant-select-item-option-active {
+  background: rgba(127, 176, 105, 0.1);
+}
+.ant-select-dropdown .ant-select-item-option-selected {
+  color: var(--accent-hi);
+  background: var(--accent-soft);
+}
+.ant-select-dropdown .ant-select-item-option-selected .ant-select-item-option-state {
+  color: var(--accent-hi);
+}
+.ant-select-dropdown .ant-select-item-option-content {
+  color: inherit;
+}
+
 /* ---------- Query / filters ---------- */
 .query-filters {
   display: flex;

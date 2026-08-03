@@ -46,11 +46,9 @@ fn probe_writable(dir: &Path) -> bool {
 }
 
 fn config_path() -> Result<PathBuf, String> {
-    let app_data =
-        std::env::var_os("APPDATA").ok_or_else(|| "无法确定应用配置目录".to_string())?;
+    let app_data = std::env::var_os("APPDATA").ok_or_else(|| "无法确定应用配置目录".to_string())?;
     let dir = PathBuf::from(app_data).join("weeklytodo");
-    std::fs::create_dir_all(&dir)
-        .map_err(|error| format!("创建配置目录失败：{error}"))?;
+    std::fs::create_dir_all(&dir).map_err(|error| format!("创建配置目录失败：{error}"))?;
     Ok(dir.join(CONFIG_FILE_NAME))
 }
 
@@ -60,17 +58,17 @@ pub fn load_config() -> Result<Option<StorageConfig>, String> {
     if !path.exists() {
         return Ok(None);
     }
-    let content = std::fs::read_to_string(&path)
-        .map_err(|error| format!("读取配置文件失败：{error}"))?;
-    let config: StorageConfig = serde_json::from_str(&content)
-        .map_err(|error| format!("解析配置文件失败：{error}"))?;
+    let content =
+        std::fs::read_to_string(&path).map_err(|error| format!("读取配置文件失败：{error}"))?;
+    let config: StorageConfig =
+        serde_json::from_str(&content).map_err(|error| format!("解析配置文件失败：{error}"))?;
     Ok(Some(config))
 }
 
 fn save_config(config: &StorageConfig) -> Result<(), String> {
     let path = config_path()?;
-    let content = serde_json::to_string_pretty(config)
-        .map_err(|error| format!("序列化配置失败：{error}"))?;
+    let content =
+        serde_json::to_string_pretty(config).map_err(|error| format!("序列化配置失败：{error}"))?;
     std::fs::write(&path, content).map_err(|error| format!("写入配置文件失败：{error}"))
 }
 
@@ -120,10 +118,8 @@ pub fn migrate_storage(
     std::fs::remove_file(&target_db).ok();
 
     // Backup the source then copy.
-    let backup_path = PathBuf::from(&current.data_dir).join(format!(
-        "{}{DB_BACKUP_SUFFIX}",
-        db::DB_FILE_NAME
-    ));
+    let backup_path =
+        PathBuf::from(&current.data_dir).join(format!("{}{DB_BACKUP_SUFFIX}", db::DB_FILE_NAME));
     std::fs::copy(&source_db, &backup_path)
         .map_err(|error| format!("备份源数据库失败：{error}"))?;
     std::fs::copy(&source_db, &target_db).map_err(|error| format!("复制数据库失败：{error}"))?;

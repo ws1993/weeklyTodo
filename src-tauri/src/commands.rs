@@ -214,10 +214,7 @@ pub async fn get_storage_dir() -> Result<String, String> {
 /// Pick a new directory via dialog and migrate storage there.
 #[tauri::command]
 pub async fn pick_and_migrate_storage(app: AppHandle) -> Result<MigrateResult, String> {
-    let folder = app
-        .dialog()
-        .file()
-        .blocking_pick_folder();
+    let folder = app.dialog().file().blocking_pick_folder();
     let Some(folder_path) = folder.and_then(|path| path.into_path().ok()) else {
         return Err("未选择目录".to_string());
     };

@@ -51,7 +51,9 @@ fn build_client(proxy: Option<&ProxyConfig>) -> Result<reqwest::Client, String> 
             }
         }
     }
-    builder.build().map_err(|error| format!("创建 HTTP 客户端失败：{error}"))
+    builder
+        .build()
+        .map_err(|error| format!("创建 HTTP 客户端失败：{error}"))
 }
 
 /// Query GitHub for the latest release and compare against the running version.
@@ -281,12 +283,11 @@ pub async fn download_and_install_update(
         .unwrap_or("weeklytodo-setup.exe")
         .to_string();
     let download_dir = std::env::temp_dir().join("weeklytodo_update");
-    std::fs::create_dir_all(&download_dir)
-        .map_err(|error| format!("创建更新目录失败：{error}"))?;
+    std::fs::create_dir_all(&download_dir).map_err(|error| format!("创建更新目录失败：{error}"))?;
     let installer_path = download_dir.join(&installer_name);
 
-    let mut file = File::create(&installer_path)
-        .map_err(|error| format!("创建安装包失败：{error}"))?;
+    let mut file =
+        File::create(&installer_path).map_err(|error| format!("创建安装包失败：{error}"))?;
     let mut downloaded: u64 = 0;
     while let Some(chunk) = response
         .chunk()
@@ -332,15 +333,33 @@ mod tests {
 
     #[test]
     fn semantic_version_comparison() {
-        assert_eq!(compare_versions("1.0.0", "1.0.0"), std::cmp::Ordering::Equal);
-        assert_eq!(compare_versions("1.0.1", "1.0.0"), std::cmp::Ordering::Greater);
+        assert_eq!(
+            compare_versions("1.0.0", "1.0.0"),
+            std::cmp::Ordering::Equal
+        );
+        assert_eq!(
+            compare_versions("1.0.1", "1.0.0"),
+            std::cmp::Ordering::Greater
+        );
         assert_eq!(compare_versions("1.0.0", "1.0.1"), std::cmp::Ordering::Less);
-        assert_eq!(compare_versions("2.0.0", "1.9.9"), std::cmp::Ordering::Greater);
+        assert_eq!(
+            compare_versions("2.0.0", "1.9.9"),
+            std::cmp::Ordering::Greater
+        );
         // Missing segments count as zero.
-        assert_eq!(compare_versions("1.1", "1.0.9"), std::cmp::Ordering::Greater);
+        assert_eq!(
+            compare_versions("1.1", "1.0.9"),
+            std::cmp::Ordering::Greater
+        );
         assert_eq!(compare_versions("1.1", "1.1.0"), std::cmp::Ordering::Equal);
         // Leading v and non-numeric fallback.
-        assert_eq!(compare_versions("v1.2.3", "1.2.3"), std::cmp::Ordering::Equal);
-        assert_eq!(compare_versions("1.2.3", "beta"), std::cmp::Ordering::Greater);
+        assert_eq!(
+            compare_versions("v1.2.3", "1.2.3"),
+            std::cmp::Ordering::Equal
+        );
+        assert_eq!(
+            compare_versions("1.2.3", "beta"),
+            std::cmp::Ordering::Greater
+        );
     }
 }

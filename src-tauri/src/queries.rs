@@ -1,4 +1,4 @@
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::contracts::{QueryFilter, QueryTaskRow};
 use crate::domain::Task;
@@ -170,7 +170,7 @@ pub fn recent_week_ids(conn: &Connection, limit: i64) -> Result<Vec<String>, Str
 mod tests {
     use super::*;
     use crate::db;
-    use crate::domain::{CreateTaskInput, create_task, insert_week_helper};
+    use crate::domain::{create_task, insert_week_helper, CreateTaskInput};
 
     #[test]
     fn query_filters_by_keyword_and_status() {
@@ -297,9 +297,6 @@ mod tests {
         insert_week_helper(&conn, "20260803-20260809", "20260803", "20260809");
         insert_week_helper(&conn, "20260727-20260802", "20260727", "20260802");
         let ids = recent_week_ids(&conn, 4).unwrap();
-        assert_eq!(
-            ids,
-            vec!["20260803-20260809", "20260727-20260802"]
-        );
+        assert_eq!(ids, vec!["20260803-20260809", "20260727-20260802"]);
     }
 }
