@@ -108,6 +108,23 @@ export function ChevronRightIcon({ size = 15 }: { size?: number }) {
   );
 }
 
+export function ChevronDownIcon({ size = 15 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function CalendarIcon({ size = 15 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <rect x="3.5" y="4.5" width="17" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M3.5 9.5h17M8 2.8v3.6M16 2.8v3.6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 export function ClockIcon({ size = 13 }: { size?: number }) {
   return (
     <Svg size={size}>
