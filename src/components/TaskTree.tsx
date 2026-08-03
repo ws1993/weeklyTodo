@@ -1,12 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Task } from '../shared/contracts/types';
 import { useAppStore } from '../store/appStore';
 import {
-  BranchIcon,
   CheckIcon,
+  ChevronRightIcon,
   CrossIcon,
   EditIcon,
-  LeafIcon,
   PlusIcon,
   SettingsIcon,
 } from './ForestIcons';
@@ -22,9 +21,13 @@ export function TaskTree({ tasks }: TaskTreeProps) {
   const [draftTitle, setDraftTitle] = useState('');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
-  const rootTasks = tasks
-    .filter((task) => task.parentId === null)
-    .sort((a, b) => a.sortIndex - b.sortIndex || a.id - b.id);
+  const rootTasks = useMemo(
+    () =>
+      tasks
+        .filter((task) => task.parentId === null)
+        .sort((a, b) => a.sortIndex - b.sortIndex || a.id - b.id),
+    [tasks],
+  );
 
   const submitDraft = async () => {
     const title = draftTitle.trim();
@@ -39,16 +42,16 @@ export function TaskTree({ tasks }: TaskTreeProps) {
   if (tasks.length === 0 && addingParentId === null) {
     return (
       <div className="empty-forest">
-        <span className="empty-glyph"><BranchIcon size={74} /></span>
-        <p>这一周还没有种下任务</p>
-        <p className="empty-sub">为这一周种下第一棵任务树吧</p>
+        <span className="empty-glyph"><PlusIcon size={28} /></span>
+        <p>本周还没有任务</p>
+        <p className="empty-sub">点击「新建任务」开始规划</p>
         <button
           className="btn btn-primary"
           style={{ marginTop: 6 }}
           onClick={() => setAddingParentId('root')}
         >
           <PlusIcon size={15} />
-          种下第一个任务
+          新建任务
         </button>
       </div>
     );
@@ -67,19 +70,17 @@ export function TaskTree({ tasks }: TaskTreeProps) {
       ))}
 
       {addingParentId === null ? (
-        <div className="add-inline" style={{ marginTop: 10 }}>
-          <span className="node-glyph"><LeafIcon size={17} /></span>
+        <div className="add-inline" style={{ marginTop: 10, paddingLeft: 14 }}>
           <button className="btn btn-ghost btn-sm" onClick={() => setAddingParentId('root')}>
             <PlusIcon size={13} />
-            新建根分支
+            新建任务
           </button>
         </div>
       ) : (
-        <div className="add-inline">
-          <span className="node-glyph"><LeafIcon size={17} /></span>
+        <div className="add-inline" style={{ paddingLeft: 14 }}>
           <input
             autoFocus
-            placeholder="输入新分支，回车确认…"
+            placeholder="输入任务名称，回车确认…"
             value={draftTitle}
             onChange={(event) => setDraftTitle(event.target.value)}
             onKeyDown={(event) => {
@@ -129,15 +130,19 @@ function TaskNode({ task, allTasks, isTop = false, onOpenSettings }: TaskNodePro
   const toggleTask = useAppStore((state) => state.toggleTask);
   const editTask = useAppStore((state) => state.editTask);
   const addTask = useAppStore((state) => state.addTask);
+  const [expanded, setExpanded] = useState(true);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(task.title);
   const [showInlineAdd, setShowInlineAdd] = useState(false);
   const [inlineDraft, setInlineDraft] = useState('');
-  const childrenRef = useRef<HTMLDivElement>(null);
 
-  const children = allTasks
-    .filter((child) => child.parentId === task.id)
-    .sort((a, b) => a.sortIndex - b.sortIndex || a.id - b.id);
+  const children = useMemo(
+    () =>
+      allTasks
+        .filter((child) => child.parentId === task.id)
+        .sort((a, b) => a.sortIndex - b.sortIndex || a.id - b.id),
+    [allTasks, task.id],
+  );
   const hasChildren = children.length > 0;
   const closed = task.status === 'closed';
 
@@ -171,19 +176,28 @@ function TaskNode({ task, allTasks, isTop = false, onOpenSettings }: TaskNodePro
         onClick={() => onOpenSettings(task)}
       >
         <button
-          className={`toggle-node ${closed ? 'done' : ''}`}
+          className={`task-toggle ${hasChildren ? (expanded ? 'open' : '') : 'leaf'}`}
+          title={hasChildren ? (expanded ? '折叠' : '展开') : undefined}
+          onClick={(event) => {
+            event.stopPropagation();
+            if (hasChildren) {
+              setExpanded((value) => !value);
+            }
+          }}
+        >
+          {hasChildren && <ChevronRightIcon size={15} />}
+        </button>
+
+        <button
+          className={`task-check ${closed ? 'done' : ''}`}
           title={closed ? '重新打开' : '标记完成'}
           onClick={(event) => {
             event.stopPropagation();
             void toggleTask(task.id);
           }}
         >
-          {closed && <CheckIcon size={10} />}
+          {closed && <CheckIcon size={12} />}
         </button>
-
-        <span className={`node-glyph ${hasChildren ? 'gi-branch' : 'gi-leaf'}`}>
-          {hasChildren ? <BranchIcon size={17} /> : <LeafIcon size={17} />}
-        </span>
 
         <span className="node-title-wrap" onClick={(event) => event.stopPropagation()}>
           {editing ? (
@@ -227,14 +241,13 @@ function TaskNode({ task, allTasks, isTop = false, onOpenSettings }: TaskNodePro
           {!closed && (
             <button
               className="add-btn"
-              title="添加分支"
+              title="添加子任务"
               onClick={(event) => {
                 event.stopPropagation();
                 setShowInlineAdd(true);
               }}
             >
               <PlusIcon size={12} />
-              分支
             </button>
           )}
           <button
@@ -260,142 +273,56 @@ function TaskNode({ task, allTasks, isTop = false, onOpenSettings }: TaskNodePro
         </span>
       </div>
 
-      {(hasChildren || showInlineAdd) && (
-        <div
-          className={`tree-children ${closed ? 'dormant' : ''}`}
-          ref={childrenRef}
-        >
-          {hasChildren &&
-            children.map((child) => (
-              <TaskNode
-                key={child.id}
-                task={child}
-                allTasks={allTasks}
-                onOpenSettings={onOpenSettings}
-              />
-            ))}
+      {hasChildren && expanded && (
+        <div className="tree-children">
+          {children.map((child) => (
+            <TaskNode
+              key={child.id}
+              task={child}
+              allTasks={allTasks}
+              onOpenSettings={onOpenSettings}
+            />
+          ))}
+        </div>
+      )}
 
-          {showInlineAdd && !closed && (
-            <div className="add-inline">
-              <span className="node-glyph"><LeafIcon size={17} /></span>
-              <input
-                autoFocus
-                placeholder="输入新分支，回车确认…"
-                value={inlineDraft}
-                onChange={(event) => setInlineDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    void commitInline();
-                  } else if (event.key === 'Escape') {
-                    setShowInlineAdd(false);
-                    setInlineDraft('');
-                  }
-                }}
-              />
-              <button
-                className="ok-btn"
-                title="确认"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => void commitInline()}
-              >
-                <CheckIcon size={13} />
-              </button>
-              <button
-                className="no-btn"
-                title="取消"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  setShowInlineAdd(false);
-                  setInlineDraft('');
-                }}
-              >
-                <CrossIcon size={13} />
-              </button>
-            </div>
-          )}
-
-          <ChildrenConnector
-            containerRef={childrenRef}
-            childrenCount={children.length + (showInlineAdd && !closed ? 1 : 0)}
+      {showInlineAdd && !closed && (
+        <div className="add-inline">
+          <input
+            autoFocus
+            placeholder="输入子任务名称，回车确认…"
+            value={inlineDraft}
+            onChange={(event) => setInlineDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                void commitInline();
+              } else if (event.key === 'Escape') {
+                setShowInlineAdd(false);
+                setInlineDraft('');
+              }
+            }}
           />
+          <button
+            className="ok-btn"
+            title="确认"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => void commitInline()}
+          >
+            <CheckIcon size={13} />
+          </button>
+          <button
+            className="no-btn"
+            title="取消"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => {
+              setShowInlineAdd(false);
+              setInlineDraft('');
+            }}
+          >
+            <CrossIcon size={13} />
+          </button>
         </div>
       )}
     </div>
-  );
-}
-
-interface ChildrenConnectorProps {
-  containerRef: React.RefObject<HTMLDivElement | null>;
-  childrenCount: number;
-}
-
-/** 有机连接线：在 children 容器内测量每行位置并绘制枝干与芽点。 */
-function ChildrenConnector({ containerRef, childrenCount }: ChildrenConnectorProps) {
-  const [rows, setRows] = useState<{ y: number; dim: boolean }[]>([]);
-  const [height, setHeight] = useState(0);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) {
-      return;
-    }
-    const measure = () => {
-      const cRect = container.getBoundingClientRect();
-      setHeight(Math.max(container.scrollHeight, 12));
-      const items = Array.from(container.children).filter(
-        (child) => child instanceof HTMLElement && child.classList.contains('tree-node'),
-      ) as HTMLElement[];
-      setRows(
-        items.map((item) => {
-          const rowEl = item.querySelector(':scope > .tree-row') as HTMLElement | null;
-          const rect = rowEl ? rowEl.getBoundingClientRect() : item.getBoundingClientRect();
-          return {
-            y: rect.top - cRect.top + rect.height / 2,
-            dim: item.classList.contains('closed'),
-          };
-        }),
-      );
-    };
-    measure();
-    const raf = requestAnimationFrame(measure);
-    const observer = new ResizeObserver(measure);
-    observer.observe(container);
-    return () => {
-      cancelAnimationFrame(raf);
-      observer.disconnect();
-    };
-  }, [containerRef, childrenCount]);
-
-  if (rows.length === 0) {
-    return null;
-  }
-
-  return (
-    <svg className="connector" width={30} height={height} aria-hidden="true">
-      <path
-        d={`M13 0 V${Math.max(height - 6, 8)}`}
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        opacity="0.45"
-      />
-      {rows.map((row, index) => (
-        <g key={index}>
-          <path
-            d={`M13 ${row.y} C 13 ${row.y + 7}, 27 ${row.y - 4}, 30 ${row.y}`}
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-            opacity={row.dim ? '0.35' : '0.8'}
-          />
-          <circle
-            cx="13"
-            cy={row.y}
-            r="2.2"
-            className={`bud ${row.dim ? 'dim' : ''}`}
-          />
-        </g>
-      ))}
-    </svg>
   );
 }

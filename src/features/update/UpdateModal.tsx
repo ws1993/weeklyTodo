@@ -6,6 +6,7 @@ import {
   subscribeUpdateDownloadProgress,
 } from '../../api/nativeBridge';
 import { CrossIcon } from '../../components/ForestIcons';
+import { getSavedProxyConfig } from '../settings/proxySettings';
 
 interface UpdateModalProps {
   open: boolean;
@@ -28,7 +29,7 @@ export function UpdateModal({ open, onClose }: UpdateModalProps) {
     }
     setState('checking');
     setError('');
-    void checkForAppUpdate()
+    void checkForAppUpdate(getSavedProxyConfig())
       .then((result) => {
         if (result.available && result.version && result.downloadUrl) {
           setVersion(result.version);
@@ -62,7 +63,7 @@ export function UpdateModal({ open, onClose }: UpdateModalProps) {
     setState('downloading');
     setPercent(0);
     try {
-      await downloadAndInstallUpdate(downloadUrl);
+      await downloadAndInstallUpdate(downloadUrl, getSavedProxyConfig());
       // The installer launches after app exit; the window may stay open briefly.
     } catch (downloadError) {
       setError(String(downloadError));
@@ -96,7 +97,7 @@ export function UpdateModal({ open, onClose }: UpdateModalProps) {
           {state === 'available' && (
             <>
               <div className="modal-hint" style={{ fontSize: 14 }}>
-                发现新版本 <span className="mono" style={{ color: 'var(--accent-hi)' }}>v{version}</span>
+                发现新版本 <span className="mono" style={{ color: 'var(--brand)' }}>v{version}</span>
               </div>
               <div className="modal-hint" style={{ whiteSpace: 'pre-wrap', marginTop: 10 }}>
                 {body || '暂无更新说明'}
@@ -115,8 +116,8 @@ export function UpdateModal({ open, onClose }: UpdateModalProps) {
               <div
                 style={{
                   height: 8,
-                  background: 'rgba(237,234,226,.06)',
-                  border: '1px solid var(--line-strong)',
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--border)',
                   borderRadius: 99,
                   overflow: 'hidden',
                 }}
@@ -125,7 +126,7 @@ export function UpdateModal({ open, onClose }: UpdateModalProps) {
                   style={{
                     width: `${percent}%`,
                     height: '100%',
-                    background: 'var(--accent)',
+                    background: 'var(--brand)',
                   }}
                 />
               </div>

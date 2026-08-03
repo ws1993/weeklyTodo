@@ -153,7 +153,12 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
                   </span>
                   <span className="r-path">{row.path}</span>
                 </span>
-                {row.task.carriedFromTaskId != null && <span className="tag">带入</span>}
+                {row.task.carriedFromTaskId != null && <span className="tag tag-carry">带入</span>}
+                <span className={`tag tag-priority p${row.task.priority}`}>P{row.task.priority}</span>
+                {row.task.executionMode === 'self' && <span className="tag tag-self">自己</span>}
+                {row.task.executionMode === 'follow_up' && (
+                  <span className="tag tag-follow">跟进</span>
+                )}
                 {row.task.executionMode === 'follow_up' && row.task.ownerName && (
                   <span className="tag tag-owner">{row.task.ownerName}</span>
                 )}

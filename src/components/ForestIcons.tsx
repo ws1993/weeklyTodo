@@ -100,6 +100,73 @@ export function SearchIcon({ size = 15 }: { size?: number }) {
   );
 }
 
+export function ChevronRightIcon({ size = 15 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function ClockIcon({ size = 13 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M12 7.5V12l3 2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function ArrowRightIcon({ size = 14 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <path d="M4 12h15M13.5 6.5 19 12l-5.5 5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function BoltIcon({ size = 14 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <path d="M13 2.5 5.5 13.5H11l-1 8 7.5-11H12l1-8z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function FolderIcon({ size = 15 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <path
+        d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+export function UpdateIcon({ size = 15 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <path d="M21 12a9 9 0 1 1-2.64-6.36" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M21 3v6h-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+/** 工作台四宫格 Logo：蓝色方块。 */
+export function WorkbenchLogoIcon({ size = 15 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 export function EditIcon({ size = 14 }: { size?: number }) {
   return (
     <Svg size={size}>
