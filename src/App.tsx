@@ -77,7 +77,7 @@ export function App() {
               title="设置"
               onClick={() => setSettingsOpen(true)}
             >
-              <SettingsIcon size={14} />
+              <SettingsIcon size={17} />
             </button>
             <button className="btn btn-ghost btn-sm" onClick={() => setUpdateOpen(true)}>
               v{__APP_VERSION__}
@@ -137,7 +137,14 @@ export function App() {
         onNavigate={(weekId) => void selectWeek(weekId)}
       />
       <CreateWeekModal open={createOpen} onClose={() => setCreateOpen(false)} />
-      <SettingsOverlay open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsOverlay
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onCheckUpdate={() => {
+          setSettingsOpen(false);
+          setUpdateOpen(true);
+        }}
+      />
       <UpdateModal open={updateOpen} onClose={() => setUpdateOpen(false)} />
     </ConfigProvider>
   );

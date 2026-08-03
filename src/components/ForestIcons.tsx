@@ -184,13 +184,14 @@ export function EditIcon({ size = 14 }: { size?: number }) {
 export function SettingsIcon({ size = 14 }: { size?: number }) {
   return (
     <Svg size={size}>
-      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="12" cy="12" r="4.5" stroke="currentColor" strokeWidth="1.6" />
       <path
-        d="M12 3.2v2.6M12 18.2v2.6M3.2 12h2.6M18.2 12h2.6M5.9 5.9l1.8 1.8M16.3 16.3l1.8 1.8M18.1 5.9l-1.8 1.8M7.7 16.3l-1.8 1.8"
+        d="M12 6.4V4.9M15.96 8.04l1.06-1.06M17.6 12h1.5M15.96 15.96l1.06 1.06M12 17.6v1.5M8.04 15.96l-1.06 1.06M6.4 12H4.9M8.04 8.04 6.98 6.98"
         stroke="currentColor"
         strokeWidth="1.5"
         strokeLinecap="round"
       />
+      <circle cx="12" cy="12" r="1.7" stroke="currentColor" strokeWidth="1.4" />
     </Svg>
   );
 }

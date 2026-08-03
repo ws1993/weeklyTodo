@@ -112,6 +112,7 @@ button{font-family:inherit;color:inherit}
 .btn-ghost:hover{background:var(--surface-2)}
 .btn svg{width:15px;height:15px;flex:none}
 .icon-btn{width:30px;height:30px;padding:0;justify-content:center}
+.icon-btn svg{width:17px;height:17px}
 .count{
   margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--text-3);
   border:1px solid var(--border);border-radius:999px;padding:0 6px;line-height:16px;
@@ -406,12 +407,12 @@ button{font-family:inherit;color:inherit}
 .field{margin-top:12px;display:flex;flex-direction:column;gap:7px}
 .field label{font-size:12px;color:var(--text-2);letter-spacing:.4px}
 .modal input[type="date"],.modal input[type="text"],.modal select,
-.modal-body input,.modal-body select,.detail-textarea{
+.modal-body input:not(.ant-select-selection-search-input),.modal-body select,.detail-textarea{
   background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius);
   padding:7px 10px;color:var(--text-1);font-family:inherit;font-size:13px;
   outline:none;color-scheme:light;width:100%;
 }
-.modal input:focus,.modal select:focus,.modal-body input:focus,.modal-body select:focus,.detail-textarea:focus{
+.modal input:focus,.modal select:focus,.modal-body input:not(.ant-select-selection-search-input):focus,.modal-body select:focus,.detail-textarea:focus{
   border-color:var(--brand);box-shadow:0 0 0 3px rgba(21,87,208,.14);
 }
 .week-preview{margin-top:12px;font-size:13px;color:var(--text-2);min-height:21px}
@@ -434,16 +435,8 @@ button{font-family:inherit;color:inherit}
 .task-detail .modal-body{max-height:calc(92vh - 120px);overflow-y:auto;padding-right:4px}
 .task-detail .ant-select-selector{
   background:var(--surface) !important;
-  border:1px solid var(--border) !important;
   border-color:var(--border-strong) !important;
   color:var(--text-1) !important;
-  box-shadow:none !important;
-  outline:none !important;
-}
-.task-detail .ant-select-focused .ant-select-selector{
-  border-color:var(--brand) !important;
-  box-shadow:0 0 0 3px rgba(21,87,208,.14) !important;
-  outline:none !important;
 }
 .task-detail .ant-select-selection-placeholder,
 .task-detail .ant-select-selection-search-input{color:var(--text-3) !important}
@@ -483,7 +476,7 @@ button{font-family:inherit;color:inherit}
   display:grid;place-items:center;flex:none;
   box-shadow:0 1px 3px rgba(21,87,208,.35);
 }
-.settings-overlay-glyph svg{width:15px;height:15px;display:block}
+.settings-overlay-glyph svg{width:17px;height:17px;display:block}
 .settings-overlay-close{
   width:30px;height:30px;display:grid;place-items:center;border-radius:var(--radius);
   border:1px solid transparent;background:transparent;color:var(--text-3);cursor:pointer;
@@ -491,38 +484,145 @@ button{font-family:inherit;color:inherit}
 }
 .settings-overlay-close:hover{color:var(--text-1);background:var(--surface-2);border-color:var(--border)}
 .settings-overlay-close svg{width:15px;height:15px}
-.settings-overlay-body{
-  flex:1;min-height:0;overflow-y:auto;
-  width:100%;max-width:680px;margin:0 auto;
-  padding:22px 28px 60px;
-  display:flex;flex-direction:column;gap:16px;
+
+/* 左右分栏：左侧导航栏，右侧内容页 */
+.settings-shell{
+  flex:1;min-height:0;
+  display:flex;
 }
-.settings-section{
-  background:var(--surface);border:1px solid var(--border);border-radius:6px;
-  padding:18px 20px;
+.settings-nav{
+  flex:none;width:224px;min-width:0;
+  display:flex;flex-direction:column;
+  padding:18px 0 24px;
+  background:var(--surface-2);
+  border-right:1px solid var(--border);
+  overflow-y:auto;
+}
+.settings-nav-head{
+  flex:none;
+  font-size:10.5px;font-weight:600;letter-spacing:2px;
+  color:var(--text-4);
+  padding:0 20px 10px;
+}
+.settings-nav-item{
+  position:relative;
+  display:flex;align-items:center;gap:12px;
+  width:100%;text-align:left;
+  padding:10px 20px;
+  border:none;background:transparent;color:var(--text-2);
+  cursor:pointer;
+  transition:background .12s,color .12s;
+}
+.settings-nav-item:hover{background:rgba(23,32,51,.05)}
+.settings-nav-item.active{
+  background:var(--surface);
+  color:var(--brand);
+}
+.settings-nav-item.active::before{
+  content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;
+  border-radius:999px;background:var(--brand);
+}
+.settings-nav-index{
+  flex:none;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.8px;
+  color:var(--text-4);font-variant-numeric:tabular-nums;
+}
+.settings-nav-item.active .settings-nav-index{color:var(--brand)}
+.settings-nav-text{
+  flex:1;min-width:0;
+  display:flex;flex-direction:column;gap:1px;
+}
+.settings-nav-label{
+  font-size:13px;font-weight:600;color:var(--text-1);line-height:1.35;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.settings-nav-item.active .settings-nav-label{color:var(--brand)}
+.settings-nav-caption{
+  font-size:11px;color:var(--text-3);line-height:1.4;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+
+.settings-content{
+  flex:1;min-width:0;overflow-y:auto;
+  display:flex;justify-content:center;
+}
+.settings-page{
+  width:100%;max-width:660px;
+  padding:28px 36px 80px;
+  display:flex;flex-direction:column;
+}
+.settings-page-head{
+  padding-bottom:16px;margin-bottom:24px;
+  border-bottom:1px solid var(--border);
+}
+.settings-page-title{
+  font-size:19px;font-weight:700;letter-spacing:.2px;color:var(--text-1);
+}
+.settings-page-sub{
+  margin-top:6px;
+  font-size:12.5px;color:var(--text-3);line-height:1.75;
+}
+.settings-info-list{
+  display:flex;flex-direction:column;
+  border:1px solid var(--border);border-radius:6px;
+  background:var(--surface);
   box-shadow:0 1px 2px rgba(23,32,51,.03);
+  overflow:hidden;
 }
-.settings-section-head{display:flex;align-items:center;gap:10px}
-.settings-section-title{font-size:14px;font-weight:600;letter-spacing:.3px}
-.settings-section-index{
-  margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--text-4);
-  letter-spacing:1px;white-space:nowrap;
+.settings-info-row{
+  display:flex;gap:18px;align-items:flex-start;
+  padding:13px 16px;
+  border-bottom:1px solid var(--border);
 }
-.settings-section-sub{font-size:12px;color:var(--text-3);margin-top:4px;line-height:1.7}
-.settings-section-hint{
-  font-size:12px;color:var(--text-2);line-height:1.8;margin-top:12px;
+.settings-info-row:last-child{border-bottom:none}
+.settings-info-row dt{
+  flex:none;width:88px;
+  font-size:12.5px;font-weight:600;color:var(--text-2);
+  padding-top:2px;
 }
-.settings-section-hint code{
-  font-family:var(--mono);color:var(--text-2);background:var(--surface-2);
-  border:1px solid var(--border);border-radius:3px;padding:1px 6px;
+.settings-info-row dd{
+  flex:1;min-width:0;
+  font-size:12.5px;color:var(--text-1);line-height:1.75;
+  word-break:break-word;
 }
-.settings-section-actions{
-  display:flex;justify-content:flex-end;gap:8px;margin-top:16px;
+.settings-info-code{
+  display:inline-block;max-width:100%;
+  font-family:var(--mono);font-size:11.5px;
+  background:var(--surface-2);border:1px solid var(--border);
+  border-radius:4px;padding:2px 8px;word-break:break-all;
 }
-.settings-section .modal-message{margin-top:10px;font-size:13px;color:var(--success)}
+.settings-page-actions{
+  display:flex;align-items:center;gap:10px;margin-top:20px;
+}
+.settings-page .modal-message{margin-top:14px;font-size:13px;color:var(--success)}
+.settings-page .modal-error{margin-top:14px}
+
+/* ---------- About page ---------- */
+.about-hero{
+  display:flex;flex-direction:column;align-items:center;text-align:center;
+  padding:36px 24px 30px;margin-bottom:20px;
+  background:var(--surface-2);
+  border:1px solid var(--border);border-radius:6px;
+}
+.about-logo{
+  width:76px;height:76px;border-radius:16px;
+  display:grid;place-items:center;
+  background:var(--surface);
+  border:1px solid var(--border);
+  box-shadow:0 2px 12px -2px rgba(23,32,51,.14);
+}
+.about-logo svg{width:58px;height:58px;display:block}
+.about-name{
+  margin-top:18px;
+  font-size:17px;font-weight:700;letter-spacing:3px;color:var(--text-1);
+}
+.about-sub{
+  margin-top:6px;
+  font-size:12px;color:var(--text-3);line-height:1.7;
+}
 
 /* ---------- Proxy settings panel ---------- */
-.proxy-settings-panel{display:flex;flex-direction:column;gap:14px;margin-top:14px}
+.proxy-settings-panel{display:flex;flex-direction:column;gap:14px}
 .proxy-settings-hint{
   padding:10px 12px;background:var(--surface-2);
   border:1px solid var(--border);border-radius:var(--radius);
