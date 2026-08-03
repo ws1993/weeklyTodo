@@ -16,6 +16,14 @@
   --line: rgba(237, 234, 226, 0.08);
   --line-strong: rgba(237, 234, 226, 0.17);
   --warn: #c9856b;
+  /* Priority palette: P0 emergency (--warn), P1 high (golden), P2 normal (green), P3 low (neutral) */
+  --prio-high: #d9c08c;
+  --prio-high-line: rgba(217, 192, 140, 0.4);
+  --prio-high-soft: rgba(217, 192, 140, 0.1);
+  --prio-normal: #96c982;
+  --prio-normal-line: rgba(127, 176, 105, 0.4);
+  --prio-normal-soft: rgba(127, 176, 105, 0.1);
+  --prio-low: #8b968b;
   --font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   --font-mono: "Cascadia Mono", "Cascadia Code", Consolas, "JetBrains Mono", monospace;
@@ -285,7 +293,7 @@ button {
 .week-line1 {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   min-width: 0;
 }
 .week-item-id {
@@ -511,8 +519,36 @@ button {
 .tag-priority.p0 {
   color: var(--warn);
   border-color: rgba(201, 133, 107, 0.45);
+  background: rgba(201, 133, 107, 0.08);
+}
+.tag-priority.p1 {
+  color: var(--prio-high);
+  border-color: var(--prio-high-line);
+  background: var(--prio-high-soft);
+}
+.tag-priority.p2 {
+  color: var(--prio-normal);
+  border-color: var(--prio-normal-line);
+  background: var(--prio-normal-soft);
+}
+.tag-priority.p3 {
+  color: var(--prio-low);
+  border-color: var(--line);
+  background: transparent;
 }
 .tag-owner {
+  color: #d9c08c;
+  border-color: rgba(217, 192, 140, 0.4);
+  background: rgba(217, 192, 140, 0.1);
+  letter-spacing: 0.3px;
+}
+.tag-self {
+  color: var(--text-3);
+  border-color: var(--line);
+  background: rgba(237, 234, 226, 0.04);
+  letter-spacing: 0.3px;
+}
+.tag-follow {
   color: #d9c08c;
   border-color: rgba(217, 192, 140, 0.4);
   background: rgba(217, 192, 140, 0.1);
