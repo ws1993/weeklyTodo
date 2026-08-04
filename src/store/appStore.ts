@@ -47,6 +47,7 @@ interface AppState {
   ) => Promise<void>;
   toggleTask: (taskId: number) => Promise<void>;
   moveTask: (taskId: number, newParentId: number | null, newIndex: number) => Promise<void>;
+  deleteTask: (taskId: number) => Promise<void>;
   createWeek: (mondayDate: string) => Promise<Week>;
 }
 
@@ -163,6 +164,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { activeWeekId } = get();
     await bridge.moveTask(activeWeekId, taskId, newParentId, newIndex);
     await get().refreshTree();
+  },
+
+  deleteTask: async (taskId) => {
+    const { activeWeekId } = get();
+    await bridge.deleteTask(activeWeekId, taskId);
+    await get().refreshTree();
+    await get().refreshMetadata();
   },
 
   createWeek: async (mondayDate) => {

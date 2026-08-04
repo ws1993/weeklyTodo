@@ -5,8 +5,11 @@ import { useAppStore } from '../../store/appStore';
 import { ProxySettingsPanel } from './ProxySettingsPanel';
 import type { ProxySettings } from './proxySettings';
 import { loadProxySettings, saveProxySettings } from './proxySettings';
+import { WebDavSyncPanel } from './WebDavSyncPanel';
+import type { WebDavSettings } from './webdavSettings';
+import { loadWebDavSettings, saveWebDavSettings } from './webdavSettings';
 
-type SettingsTab = 'network' | 'storage' | 'about';
+type SettingsTab = 'network' | 'storage' | 'sync' | 'about';
 
 interface SettingsTabMeta {
   id: SettingsTab;
@@ -18,7 +21,8 @@ interface SettingsTabMeta {
 const settingsTabs: SettingsTabMeta[] = [
   { id: 'network', index: '01', label: '网络', caption: '代理与更新' },
   { id: 'storage', index: '02', label: '存储', caption: '数据目录' },
-  { id: 'about', index: '03', label: '关于', caption: '版本信息' },
+  { id: 'sync', index: '03', label: '同步', caption: 'WebDAV' },
+  { id: 'about', index: '04', label: '关于', caption: '版本信息' },
 ];
 
 interface SettingsOverlayProps {
@@ -32,6 +36,9 @@ export function SettingsOverlay({ open, onClose, onCheckUpdate }: SettingsOverla
   const storageDir = useAppStore((state) => state.storageDir);
   const [activeTab, setActiveTab] = useState<SettingsTab>('network');
   const [proxySettings, setProxySettings] = useState<ProxySettings>(() => loadProxySettings());
+  const [webdavSettings, setWebdavSettings] = useState<WebDavSettings>(() =>
+    loadWebDavSettings(),
+  );
   const [migrating, setMigrating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +48,7 @@ export function SettingsOverlay({ open, onClose, onCheckUpdate }: SettingsOverla
       return;
     }
     setProxySettings(loadProxySettings());
+    setWebdavSettings(loadWebDavSettings());
     setMessage(null);
     setError(null);
   }, [open]);
@@ -52,6 +60,11 @@ export function SettingsOverlay({ open, onClose, onCheckUpdate }: SettingsOverla
   const updateProxySettings = (next: ProxySettings) => {
     setProxySettings(next);
     saveProxySettings(next);
+  };
+
+  const updateWebDavSettings = (next: WebDavSettings) => {
+    setWebdavSettings(next);
+    saveWebDavSettings(next);
   };
 
   const runMigration = async () => {
@@ -146,6 +159,18 @@ export function SettingsOverlay({ open, onClose, onCheckUpdate }: SettingsOverla
               </div>
               {message && <div className="modal-message">{message}</div>}
               {error && <div className="modal-error">{error}</div>}
+            </section>
+          )}
+
+          {activeTab === 'sync' && (
+            <section className="settings-page">
+              <header className="settings-page-head">
+                <h2 className="settings-page-title">同步</h2>
+                <p className="settings-page-sub">
+                  将本地数据库备份到 WebDAV，支持手动、启动时与定时同步。
+                </p>
+              </header>
+              <WebDavSyncPanel settings={webdavSettings} onChange={updateWebDavSettings} />
             </section>
           )}
 

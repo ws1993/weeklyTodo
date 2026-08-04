@@ -213,6 +213,20 @@ export function SettingsIcon({ size = 14 }: { size?: number }) {
   );
 }
 
+export function TrashIcon({ size = 14 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <path
+        d="M5 7.5h14M9 7.5V5.8a1.8 1.8 0 0 1 1.8-1.8h2.4A1.8 1.8 0 0 1 15 5.8v1.7M6.7 7.5l.8 11a1.5 1.5 0 0 0 1.5 1.4h6a1.5 1.5 0 0 0 1.5-1.4l.8-11M10 11v5M14 11v5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 export function GrassIcon({ width = 120 }: { width?: number }) {
   return (
     <svg width={width} height={12} viewBox="0 0 120 12" fill="none" aria-hidden="true">

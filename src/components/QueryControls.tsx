@@ -59,16 +59,26 @@ interface DropdownSelectProps {
   /** 空字符串表示「全部」，由调用方负责与具体类型互转。 */
   value: string;
   onChange: (value: string) => void;
+  /** 是否在选项前追加「全部」项，默认 true。 */
+  allowAll?: boolean;
 }
 
-export function DropdownSelect({ label, options, value, onChange }: DropdownSelectProps) {
+export function DropdownSelect({
+  label,
+  options,
+  value,
+  onChange,
+  allowAll = true,
+}: DropdownSelectProps) {
   const [open, setOpen] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const menuOptions: DropdownOption[] = [{ value: '', label: `全部${label}` }, ...options];
+  const menuOptions: DropdownOption[] = allowAll
+    ? [{ value: '', label: `全部${label}` }, ...options]
+    : options;
   const selected = options.find((option) => option.value === value);
-  const isAll = value === '';
+  const isAll = allowAll && value === '';
 
   useEffect(() => {
     if (!open) {

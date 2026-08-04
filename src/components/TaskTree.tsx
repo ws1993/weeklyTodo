@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { Task } from '../shared/contracts/types';
 import { useAppStore } from '../store/appStore';
+import { computeDrop, sortedChildren, subtreeSize } from '../utils/tree';
+import type { DropPosition } from '../utils/tree';
 import {
   CheckIcon,
   ChevronRightIcon,
@@ -8,6 +10,7 @@ import {
   EditIcon,
   PlusIcon,
   SettingsIcon,
+  TrashIcon,
 } from './ForestIcons';
 import { TaskDetailPanel } from './TaskDetailPanel';
 
@@ -15,19 +18,33 @@ interface TaskTreeProps {
   tasks: Task[];
 }
 
+interface DropIndicator {
+  taskId: number;
+  position: DropPosition;
+}
+
+interface TreeDragProps {
+  draggingId: number | null;
+  dropIndicator: DropIndicator | null;
+  startDrag: (taskId: number) => void;
+  endDrag: () => void;
+  updateDrop: (indicator: DropIndicator | null) => void;
+  handleDrop: (target: Task, position: DropPosition) => void;
+  suppressNextClick: () => boolean;
+}
+
 export function TaskTree({ tasks }: TaskTreeProps) {
   const addTask = useAppStore((state) => state.addTask);
+  const moveTask = useAppStore((state) => state.moveTask);
   const [addingParentId, setAddingParentId] = useState<number | 'root' | null>(null);
   const [draftTitle, setDraftTitle] = useState('');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
+  // Some browsers fire a click on the dragged row after the drag ends; swallow it.
+  const suppressClickRef = useRef(false);
 
-  const rootTasks = useMemo(
-    () =>
-      tasks
-        .filter((task) => task.parentId === null)
-        .sort((a, b) => a.sortIndex - b.sortIndex || a.id - b.id),
-    [tasks],
-  );
+  const rootTasks = useMemo(() => sortedChildren(tasks, null), [tasks]);
 
   const submitDraft = async () => {
     const title = draftTitle.trim();
@@ -37,6 +54,54 @@ export function TaskTree({ tasks }: TaskTreeProps) {
     await addTask({ title, parentId: addingParentId === 'root' ? null : addingParentId });
     setDraftTitle('');
     setAddingParentId(null);
+  };
+
+  const startDrag = (taskId: number) => {
+    setDraggingId(taskId);
+    setDropIndicator(null);
+  };
+
+  const endDrag = () => {
+    setDraggingId(null);
+    setDropIndicator(null);
+    suppressClickRef.current = true;
+  };
+
+  const updateDrop = (indicator: DropIndicator | null) => {
+    setDropIndicator((prev) =>
+      prev?.taskId === indicator?.taskId && prev?.position === indicator?.position
+        ? prev
+        : indicator,
+    );
+  };
+
+  const handleDrop = (target: Task, position: DropPosition) => {
+    if (draggingId === null) {
+      return;
+    }
+    const drop = computeDrop(tasks, draggingId, target, position);
+    if (drop) {
+      void moveTask(draggingId, drop.parentId, drop.index);
+    }
+    endDrag();
+  };
+
+  const suppressNextClick = () => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return true;
+    }
+    return false;
+  };
+
+  const dragProps: TreeDragProps = {
+    draggingId,
+    dropIndicator,
+    startDrag,
+    endDrag,
+    updateDrop,
+    handleDrop,
+    suppressNextClick,
   };
 
   if (tasks.length === 0 && addingParentId === null) {
@@ -65,7 +130,9 @@ export function TaskTree({ tasks }: TaskTreeProps) {
           task={task}
           allTasks={tasks}
           isTop
+          depth={0}
           onOpenSettings={setSelectedTask}
+          drag={dragProps}
         />
       ))}
 
@@ -123,26 +190,31 @@ interface TaskNodeProps {
   task: Task;
   allTasks: Task[];
   isTop?: boolean;
+  depth?: number;
   onOpenSettings: (task: Task) => void;
+  drag: TreeDragProps;
 }
 
-function TaskNode({ task, allTasks, isTop = false, onOpenSettings }: TaskNodeProps) {
+function TaskNode({
+  task,
+  allTasks,
+  isTop = false,
+  depth = 0,
+  onOpenSettings,
+  drag,
+}: TaskNodeProps) {
   const toggleTask = useAppStore((state) => state.toggleTask);
   const editTask = useAppStore((state) => state.editTask);
   const addTask = useAppStore((state) => state.addTask);
+  const deleteTask = useAppStore((state) => state.deleteTask);
   const [expanded, setExpanded] = useState(true);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(task.title);
   const [showInlineAdd, setShowInlineAdd] = useState(false);
   const [inlineDraft, setInlineDraft] = useState('');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  const children = useMemo(
-    () =>
-      allTasks
-        .filter((child) => child.parentId === task.id)
-        .sort((a, b) => a.sortIndex - b.sortIndex || a.id - b.id),
-    [allTasks, task.id],
-  );
+  const children = useMemo(() => sortedChildren(allTasks, task.id), [allTasks, task.id]);
   const hasChildren = children.length > 0;
   const closed = task.status === 'closed';
 
@@ -169,11 +241,83 @@ function TaskNode({ task, allTasks, isTop = false, onOpenSettings }: TaskNodePro
     setInlineDraft('');
   };
 
+  const isDragging = drag.draggingId === task.id;
+  const drop = drag.dropIndicator?.taskId === task.id ? drag.dropIndicator.position : null;
+  const depthClass = depth > 0 ? `depth-${Math.min(depth, 5)}` : '';
+  const nodeClass = [
+    'tree-node',
+    closed ? 'closed' : '',
+    depthClass,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const rowClass = [
+    'tree-row',
+    closed ? 'closed' : '',
+    isTop ? 'top' : '',
+    depthClass,
+    isDragging ? 'dragging' : '',
+    drop ? `drop-${drop}` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    if (drag.draggingId === null || drag.draggingId === task.id) {
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const ratio = (event.clientY - rect.top) / rect.height;
+    const position: DropPosition = ratio < 0.25 ? 'before' : ratio > 0.75 ? 'after' : 'inside';
+    if (!computeDrop(allTasks, drag.draggingId, task, position)) {
+      event.dataTransfer.dropEffect = 'none';
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    drag.updateDrop({ taskId: task.id, position });
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    const related = event.relatedTarget as Node | null;
+    if (related && event.currentTarget.contains(related)) {
+      return;
+    }
+    if (drag.dropIndicator?.taskId === task.id) {
+      drag.updateDrop(null);
+    }
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const ratio = (event.clientY - rect.top) / rect.height;
+    const position: DropPosition = ratio < 0.25 ? 'before' : ratio > 0.75 ? 'after' : 'inside';
+    drag.handleDrop(task, position);
+  };
+
+  const deleteSubtreeSize = subtreeSize(allTasks, task.id);
+
   return (
-    <div className={`tree-node ${closed ? 'closed' : ''}`} data-node={task.id}>
+    <div className={nodeClass} data-node={task.id}>
       <div
-        className={`tree-row ${closed ? 'closed' : ''} ${isTop ? 'top' : ''}`}
-        onClick={() => onOpenSettings(task)}
+        className={rowClass}
+        onClick={() => {
+          if (drag.suppressNextClick()) {
+            return;
+          }
+          onOpenSettings(task);
+        }}
+        draggable={!editing}
+        onDragStart={(event) => {
+          event.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.setData('text/plain', String(task.id));
+          drag.startDrag(task.id);
+        }}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onDragEnd={drag.endDrag}
       >
         <button
           className={`task-toggle ${hasChildren ? (expanded ? 'open' : '') : 'leaf'}`}
@@ -270,6 +414,30 @@ function TaskNode({ task, allTasks, isTop = false, onOpenSettings }: TaskNodePro
           >
             <SettingsIcon size={14} />
           </button>
+          <button
+            className={`edit-btn danger ${confirmingDelete ? 'armed' : ''}`}
+            title={
+              confirmingDelete
+                ? `再次点击确认删除（含 ${deleteSubtreeSize} 项）`
+                : '删除任务'
+            }
+            onClick={(event) => {
+              event.stopPropagation();
+              if (confirmingDelete) {
+                void deleteTask(task.id);
+              } else {
+                setConfirmingDelete(true);
+                window.setTimeout(() => setConfirmingDelete(false), 3000);
+              }
+            }}
+            onMouseLeave={() => {
+              if (confirmingDelete) {
+                setConfirmingDelete(false);
+              }
+            }}
+          >
+            {confirmingDelete ? <CrossIcon size={14} /> : <TrashIcon size={14} />}
+          </button>
         </span>
       </div>
 
@@ -281,13 +449,15 @@ function TaskNode({ task, allTasks, isTop = false, onOpenSettings }: TaskNodePro
               task={child}
               allTasks={allTasks}
               onOpenSettings={onOpenSettings}
+              depth={depth + 1}
+              drag={drag}
             />
           ))}
         </div>
       )}
 
       {showInlineAdd && !closed && (
-        <div className="add-inline">
+        <div className={`add-inline ${depthClass}`}>
           <input
             autoFocus
             placeholder="输入子任务名称，回车确认…"

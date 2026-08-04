@@ -8,7 +8,14 @@ import { QueryView } from './components/QueryView';
 import { CreateWeekModal } from './components/CreateWeekModal';
 import { UpdateModal } from './features/update/UpdateModal';
 import { SettingsOverlay } from './features/settings/SettingsOverlay';
+import { syncWebDav } from './api/nativeBridge';
 import { SettingsIcon, WorkbenchLogoIcon } from './components/ForestIcons';
+import {
+  isSyncDue,
+  loadWebDavSettings,
+  saveWebDavSettings,
+  type WebDavSettings,
+} from './features/settings/webdavSettings';
 import {
   currentWeekId as currentWeekIdOf,
   formatCnRange,
@@ -16,9 +23,14 @@ import {
   weekStatus,
 } from './utils/weekFormat';
 
+/** 防止启动同步与定时同步同时触发。 */
+let webdavSyncInFlight = false;
+
 export function App() {
   const initialize = useAppStore((state) => state.initialize);
   const loading = useAppStore((state) => state.loading);
+  const refreshWeeks = useAppStore((state) => state.refreshWeeks);
+  const refreshTree = useAppStore((state) => state.refreshTree);
   const error = useAppStore((state) => state.error);
   const tree = useAppStore((state) => state.tree);
   const activeWeekId = useAppStore((state) => state.activeWeekId);
@@ -33,6 +45,51 @@ export function App() {
   useEffect(() => {
     void initialize();
   }, [initialize]);
+
+  // 启动时同步一次，并按小时间隔轮询定时同步。
+  useEffect(() => {
+    if (loading) {
+      return;
+    }
+    const startup = loadWebDavSettings();
+    if (startup.syncOnStartup && startup.url && startup.username) {
+      void runWebDavSync(startup);
+    }
+    const tick = window.setInterval(() => {
+      const current = loadWebDavSettings();
+      if (isSyncDue(current, new Date(), 60_000)) {
+        void runWebDavSync(current);
+      }
+    }, 60_000);
+    return () => window.clearInterval(tick);
+  }, [loading]);
+
+  const runWebDavSync = async (settings: WebDavSettings) => {
+    if (webdavSyncInFlight || !settings.url || !settings.username) {
+      return;
+    }
+    webdavSyncInFlight = true;
+    try {
+      const result = await syncWebDav(settings.url, settings.username);
+      const nextSettings = {
+        ...loadWebDavSettings(),
+        lastSyncedAt: new Date().toISOString(),
+        lastSyncStatus: `同步完成（${result.direction}）${
+          result.backupFiles.length > 0 ? `，备份 ${result.backupFiles.length} 个` : ''
+        }`,
+      };
+      saveWebDavSettings(nextSettings);
+      // 远端较新并已覆盖本地时，刷新当前界面数据。
+      if (result.direction === 'download') {
+        await Promise.all([refreshWeeks(), refreshTree()]);
+      }
+    } catch (syncError) {
+      const current = loadWebDavSettings();
+      saveWebDavSettings({ ...current, lastSyncStatus: `同步失败：${String(syncError)}` });
+    } finally {
+      webdavSyncInFlight = false;
+    }
+  };
 
   if (loading) {
     return <div className="loading-state">正在初始化数据…</div>;
@@ -121,7 +178,7 @@ export function App() {
               <section className="tree-card">
                 <div className="tree-toolbar">
                   <span className="tree-title">任务树</span>
-                  <span className="tree-hint">点击复选框切换完成状态 · 悬停行查看操作</span>
+                  <span className="tree-hint">点击复选框切换完成状态 · 拖拽行调整层级与顺序 · 悬停行查看操作</span>
                 </div>
                 <div className="tree">{tree && <TaskTree tasks={tree.tasks} />}</div>
               </section>

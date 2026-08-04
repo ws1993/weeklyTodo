@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Radio, Select } from 'antd';
 import type { ExecutionMode, Task } from '../shared/contracts/types';
 import { useAppStore } from '../store/appStore';
-import { CheckIcon, CrossIcon } from './ForestIcons';
+import { appendIndex, descendantIds, subtreeSize, taskPath } from '../utils/tree';
+import { CheckIcon, CrossIcon, TrashIcon } from './ForestIcons';
 
 interface TaskDetailPanelProps {
   task: Task | null;
@@ -19,8 +20,11 @@ const priorityOptions = [
 export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
   const editTask = useAppStore((state) => state.editTask);
   const toggleTask = useAppStore((state) => state.toggleTask);
+  const moveTask = useAppStore((state) => state.moveTask);
+  const deleteTask = useAppStore((state) => state.deleteTask);
   const owners = useAppStore((state) => state.owners);
   const tags = useAppStore((state) => state.tags);
+  const treeTasks = useAppStore((state) => state.tree?.tasks ?? []);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -28,6 +32,8 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
   const [executionMode, setExecutionMode] = useState<ExecutionMode>('self');
   const [ownerValue, setOwnerValue] = useState<string[]>([]);
   const [tagNames, setTagNames] = useState<string[]>([]);
+  const [parentValue, setParentValue] = useState<string>('none');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,8 +47,27 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
     setExecutionMode(task.executionMode ?? 'self');
     setOwnerValue(task.ownerName ? [task.ownerName] : []);
     setTagNames(task.tags ?? []);
+    setParentValue(task.parentId == null ? 'none' : String(task.parentId));
+    setConfirmingDelete(false);
     setError(null);
   }, [task]);
+
+  const parentOptions = useMemo(() => {
+    if (!task) {
+      return [];
+    }
+    const excluded = new Set([task.id, ...descendantIds(treeTasks, task.id)]);
+    return [
+      { value: 'none', label: '（无上级 · 顶层任务）' },
+      ...treeTasks
+        .filter((item) => !excluded.has(item.id))
+        .map((item) => ({
+          value: String(item.id),
+          label: taskPath(treeTasks, item.id),
+          disabled: item.status === 'closed',
+        })),
+    ];
+  }, [treeTasks, task]);
 
   if (!task) {
     return null;
@@ -64,6 +89,10 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
     setBusy(true);
     setError(null);
     try {
+      const newParentId = parentValue === 'none' ? null : Number(parentValue);
+      if (newParentId !== task.parentId) {
+        await moveTask(task.id, newParentId, appendIndex(treeTasks, newParentId, task.id));
+      }
       await editTask(task.id, {
         title: trimmedTitle,
         description,
@@ -85,6 +114,19 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
     try {
       await toggleTask(task.id);
       onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doDelete = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteTask(task.id);
+      onClose();
+    } catch (deleteError) {
+      setError(String(deleteError));
     } finally {
       setBusy(false);
     }
@@ -180,6 +222,19 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
             />
           </div>
 
+          <div className="field">
+            <label>上级任务（修改层级，保存后生效）</label>
+            <Select
+              showSearch
+              value={parentValue}
+              options={parentOptions}
+              onChange={(value: string) => setParentValue(value)}
+              placeholder="选择新的上级任务…"
+              optionFilterProp="label"
+              style={{ width: '100%' }}
+            />
+          </div>
+
           {error && <div className="modal-error">{error}</div>}
 
           <div className="modal-actions">
@@ -188,6 +243,23 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
               {task.status === 'closed' ? '重新打开' : '标记完成'}
             </button>
             <span className="action-spacer" />
+            <button
+              className={`btn btn-danger ${confirmingDelete ? 'armed' : ''}`}
+              onClick={() => {
+                if (confirmingDelete) {
+                  void doDelete();
+                } else {
+                  setConfirmingDelete(true);
+                  window.setTimeout(() => setConfirmingDelete(false), 4000);
+                }
+              }}
+              disabled={busy}
+            >
+              <TrashIcon size={14} />
+              {confirmingDelete
+                ? `确认删除（含 ${subtreeSize(treeTasks, task.id)} 项）`
+                : '删除任务'}
+            </button>
             <button className="btn btn-ghost" onClick={onClose} disabled={busy}>
               取消
             </button>

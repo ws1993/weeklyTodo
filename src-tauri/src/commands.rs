@@ -5,14 +5,17 @@ use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
 
 use crate::contracts::{
-    AppStatePayload, MigrateResult, ProxyConfig, QueryFilter, QueryTaskRow, UpdateCheckResult,
-    WeekTreePayload,
+    AppStatePayload, MigrateResult, ProxyConfig, QueryFilter, QueryTaskRow, SyncResult,
+    UpdateCheckResult, WeekTreePayload,
 };
+use crate::credentials;
 use crate::db;
 use crate::domain;
 use crate::queries;
 use crate::storage::{self, StorageConfig};
+use crate::sync;
 use crate::updater;
+use crate::webdav;
 
 /// Open the configured database for a command.
 fn open_conn(config: &StorageConfig) -> Result<Connection, String> {
@@ -190,6 +193,14 @@ pub async fn move_task(
     domain::move_task(&conn, &week_id, task_id, new_parent_id, new_index)
 }
 
+/// Delete a task and its whole subtree (children cascade via foreign keys).
+#[tauri::command]
+pub async fn delete_task(week_id: String, task_id: i64) -> Result<usize, String> {
+    let config = resolve_storage()?;
+    let mut conn = open_conn(&config)?;
+    domain::delete_task(&mut conn, &week_id, task_id)
+}
+
 #[tauri::command]
 pub async fn query_all_tasks(filter: QueryFilter) -> Result<Vec<QueryTaskRow>, String> {
     let config = resolve_storage()?;
@@ -248,4 +259,53 @@ pub async fn download_and_install_update(
 #[tauri::command]
 pub async fn open_release_page() -> Result<(), String> {
     updater::open_release_page().await
+}
+
+/// Validate WebDAV connectivity and create the target directory when missing.
+#[tauri::command]
+pub async fn webdav_test_connection(
+    url: String,
+    username: String,
+    password: String,
+) -> Result<String, String> {
+    let base_url = webdav::normalize_dir_url(&url)?;
+    let client = webdav::build_client()?;
+    // 密码留空时回退到系统凭据中已保存的密码。
+    let actual_password = if password.is_empty() {
+        credentials::load_password(&username)?
+            .ok_or_else(|| "未填写密码，且系统凭据中未保存该账号的密码".to_string())?
+    } else {
+        password
+    };
+    webdav::ensure_dir(&client, &base_url, &username, &actual_password).await?;
+    Ok(format!("连接成功：{base_url}"))
+}
+
+/// Persist the WebDAV password in the OS credential store.
+#[tauri::command]
+pub async fn webdav_save_credentials(username: String, password: String) -> Result<bool, String> {
+    if password.is_empty() {
+        return Ok(false);
+    }
+    credentials::save_password(&username, &password)?;
+    Ok(true)
+}
+
+/// Whether a password is stored for the given WebDAV username.
+#[tauri::command]
+pub async fn webdav_has_credentials(username: String) -> Result<bool, String> {
+    credentials::has_password(&username)
+}
+
+/// Remove the stored password for the given WebDAV username.
+#[tauri::command]
+pub async fn webdav_clear_credentials(username: String) -> Result<(), String> {
+    credentials::delete_password(&username)
+}
+
+/// Run one file-level sync against the configured WebDAV directory.
+#[tauri::command]
+pub async fn webdav_sync_now(url: String, username: String) -> Result<SyncResult, String> {
+    let config = resolve_storage()?;
+    sync::sync_now(&config.data_dir, &url, &username).await
 }

@@ -12,6 +12,7 @@ pub const EVENT_TYPE_UPDATE: &str = "update";
 pub const EVENT_TYPE_CLOSE: &str = "close";
 pub const EVENT_TYPE_REOPEN: &str = "reopen";
 pub const EVENT_TYPE_CARRY_OVER: &str = "carry_over";
+pub const EVENT_TYPE_DELETE: &str = "delete";
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -705,6 +706,35 @@ pub fn move_task(
     Ok(())
 }
 
+/// Delete a task and its whole subtree. Children, tags and events cascade
+/// through the `ON DELETE CASCADE` foreign keys.
+pub fn delete_task(conn: &mut Connection, week_id: &str, task_id: i64) -> Result<usize, String> {
+    let task = get_task(conn, week_id, task_id)?.ok_or_else(|| "任务不存在".to_string())?;
+
+    let tx = conn
+        .transaction()
+        .map_err(|error| format!("开启删除事务失败：{error}"))?;
+    // The task row is removed right away, so record the event with a NULL
+    // task_id and keep the deleted task info in the payload.
+    let payload = serde_json::json!({ "taskId": task_id, "title": task.title });
+    record_event(
+        &tx,
+        week_id,
+        None,
+        EVENT_TYPE_DELETE,
+        Some(&payload.to_string()),
+    )?;
+    let affected = tx
+        .execute(
+            "DELETE FROM tasks WHERE id = ?1 AND week_id = ?2",
+            params![task_id, week_id],
+        )
+        .map_err(|error| format!("删除任务失败：{error}"))?;
+    tx.commit()
+        .map_err(|error| format!("提交删除事务失败：{error}"))?;
+    Ok(affected)
+}
+
 /// Ensure the current week exists, creating it (with carry-over) when missing.
 /// Returns the current week and whether it was newly created.
 pub fn ensure_current_week(conn: &mut Connection) -> Result<(Week, bool), String> {
@@ -1220,5 +1250,82 @@ mod tests {
         assert_eq!(target_tasks[0].execution_mode, EXECUTION_MODE_FOLLOW_UP);
         assert_eq!(target_tasks[0].owner_name.as_deref(), Some("小王"));
         assert_eq!(target_tasks[0].tags, vec!["开发".to_string()]);
+    }
+
+    #[test]
+    fn delete_task_removes_whole_subtree() {
+        let mut conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+
+        let root = create_plain_task(&conn, "20260803-20260809", "项目A", None);
+        let child = create_plain_task(&conn, "20260803-20260809", "子任务1", Some(root.id));
+        let _grandchild =
+            create_plain_task(&conn, "20260803-20260809", "孙任务", Some(child.id));
+        let sibling = create_plain_task(&conn, "20260803-20260809", "任务B", None);
+        create_task(
+            &conn,
+            "20260803-20260809",
+            CreateTaskInput {
+                title: "带标签的子任务".into(),
+                description: String::new(),
+                parent_id: Some(root.id),
+                priority: DEFAULT_PRIORITY,
+                execution_mode: EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                tag_names: vec!["开发".into()],
+            },
+        )
+        .unwrap();
+
+        let affected = delete_task(&mut conn, "20260803-20260809", root.id).unwrap();
+        assert_eq!(affected, 1);
+
+        let remaining = list_tasks(&conn, "20260803-20260809").unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].id, sibling.id);
+    }
+
+    #[test]
+    fn delete_task_rejects_missing_task() {
+        let mut conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+        assert!(delete_task(&mut conn, "20260803-20260809", 999).is_err());
+    }
+
+    #[test]
+    fn move_task_reparents_and_reorders() {
+        let conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+
+        let first = create_plain_task(&conn, "20260803-20260809", "第一个", None);
+        let second = create_plain_task(&conn, "20260803-20260809", "第二个", None);
+        let third = create_plain_task(&conn, "20260803-20260809", "第三个", None);
+
+        // Move "第三个" before "第一个".
+        move_task(&conn, "20260803-20260809", third.id, None, -1.0).unwrap();
+        // Make "第二个" a child of "第一个".
+        move_task(&conn, "20260803-20260809", second.id, Some(first.id), 0.0).unwrap();
+
+        let tasks = list_tasks(&conn, "20260803-20260809").unwrap();
+        let third_now = tasks.iter().find(|task| task.id == third.id).unwrap();
+        let second_now = tasks.iter().find(|task| task.id == second.id).unwrap();
+        assert_eq!(third_now.parent_id, None);
+        assert_eq!(second_now.parent_id, Some(first.id));
+    }
+
+    #[test]
+    fn move_task_rejects_cycle() {
+        let conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+
+        let root = create_plain_task(&conn, "20260803-20260809", "根任务", None);
+        let child = create_plain_task(&conn, "20260803-20260809", "子任务", Some(root.id));
+
+        // Moving a task under itself is rejected.
+        assert!(move_task(&conn, "20260803-20260809", root.id, Some(root.id), 0.0).is_err());
+        // Moving a parent under its own child would create a cycle.
+        assert!(
+            move_task(&conn, "20260803-20260809", root.id, Some(child.id), 0.0).is_err()
+        );
     }
 }

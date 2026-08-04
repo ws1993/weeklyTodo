@@ -1,10 +1,13 @@
+pub mod credentials;
 pub mod commands;
 pub mod contracts;
 pub mod db;
 pub mod domain;
 pub mod queries;
 pub mod storage;
+pub mod sync;
 pub mod updater;
+pub mod webdav;
 
 use tauri::Manager;
 
@@ -42,6 +45,7 @@ pub fn run() {
             commands::close_task,
             commands::reopen_task,
             commands::move_task,
+            commands::delete_task,
             commands::query_all_tasks,
             commands::week_summaries,
             commands::get_storage_dir,
@@ -50,6 +54,11 @@ pub fn run() {
             commands::check_for_app_update,
             commands::download_and_install_update,
             commands::open_release_page,
+            commands::webdav_test_connection,
+            commands::webdav_save_credentials,
+            commands::webdav_has_credentials,
+            commands::webdav_clear_credentials,
+            commands::webdav_sync_now,
         ])
         .run(tauri::generate_context!())
         .expect("error while running weeklytodo");

@@ -124,6 +124,10 @@ export async function moveTask(
   return invokeCommand<void>('move_task', { weekId, taskId, newParentId, newIndex });
 }
 
+export async function deleteTask(weekId: string, taskId: number): Promise<void> {
+  return invokeCommand<void>('delete_task', { weekId, taskId });
+}
+
 export async function queryAllTasks(filter: QueryFilter): Promise<QueryTaskRow[]> {
   return invokeCommand<QueryTaskRow[]>('query_all_tasks', { filter });
 }
@@ -169,6 +173,46 @@ export async function openReleasePage(): Promise<void> {
     return;
   }
   await invokeCommand('open_release_page');
+}
+
+/** 一次 WebDAV 同步的返回结果。 */
+export interface SyncResult {
+  direction: 'upload' | 'download' | 'noop';
+  backupFiles: string[];
+  syncedAt: string;
+  message: string;
+}
+
+/** 校验 WebDAV 配置连通性（会创建缺失的同步目录）。 */
+export async function testWebDavConnection(
+  url: string,
+  username: string,
+  password: string,
+): Promise<string> {
+  return invokeCommand<string>('webdav_test_connection', { url, username, password });
+}
+
+/** 将密码存入系统凭据管理器。返回是否实际保存（空密码不保存）。 */
+export async function saveWebDavCredentials(
+  username: string,
+  password: string,
+): Promise<boolean> {
+  return invokeCommand<boolean>('webdav_save_credentials', { username, password });
+}
+
+/** 系统凭据管理器中是否已保存该用户名的密码。 */
+export async function hasWebDavCredentials(username: string): Promise<boolean> {
+  return invokeCommand<boolean>('webdav_has_credentials', { username });
+}
+
+/** 清除系统凭据管理器中该用户名的密码。 */
+export async function clearWebDavCredentials(username: string): Promise<void> {
+  return invokeCommand<void>('webdav_clear_credentials', { username });
+}
+
+/** 执行一次文件级同步，密码由 Rust 侧从系统凭据管理器读取。 */
+export async function syncWebDav(url: string, username: string): Promise<SyncResult> {
+  return invokeCommand<SyncResult>('webdav_sync_now', { url, username });
 }
 
 export function subscribeUpdateDownloadProgress(

@@ -63,3 +63,5 @@ pub struct MigrateResult {
     pub data_dir: String,
     pub message: String,
 }
+
+pub type SyncResult = crate::sync::SyncResult;
