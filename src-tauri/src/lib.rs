@@ -69,6 +69,9 @@ pub fn run() {
             commands::webdav_has_credentials,
             commands::webdav_clear_credentials,
             commands::webdav_sync_now,
+            commands::webdav_sync_automatic,
+            commands::webdav_list_versions,
+            commands::webdav_restore_version,
         ])
         .run(tauri::generate_context!())
         .expect("error while running weeklytodo");

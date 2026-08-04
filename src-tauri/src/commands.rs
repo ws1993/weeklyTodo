@@ -411,3 +411,35 @@ pub async fn webdav_sync_now(url: String, username: String) -> Result<SyncResult
     let config = resolve_storage()?;
     sync::sync_now(&config.data_dir, &url, &username).await
 }
+
+/// Run one scheduler-driven sync with the empty-database overwrite guard enabled.
+#[tauri::command]
+pub async fn webdav_sync_automatic(url: String, username: String) -> Result<SyncResult, String> {
+    let config = resolve_storage()?;
+    sync::sync_automatically(&config.data_dir, &url, &username).await
+}
+
+/// List the current remote database and its timestamped backups.
+#[tauri::command]
+pub async fn webdav_list_versions(
+    url: String,
+    username: String,
+) -> Result<Vec<crate::contracts::RemoteDatabaseVersion>, String> {
+    let password = credentials::load_password(&username)?
+        .ok_or_else(|| "尚未保存该账号的密码，请在同步设置中填写密码后重试".to_string())?;
+    let base_url = webdav::normalize_dir_url(&url)?;
+    let client = webdav::build_client()?;
+    webdav::ensure_dir(&client, &base_url, &username, &password).await?;
+    webdav::list_database_versions(&client, &base_url, &username, &password).await
+}
+
+/// Restore a server-listed database version after backing up the current local database.
+#[tauri::command]
+pub async fn webdav_restore_version(
+    url: String,
+    username: String,
+    file_name: String,
+) -> Result<crate::contracts::RestoreResult, String> {
+    let config = resolve_storage()?;
+    sync::restore_database_version(&config.data_dir, &url, &username, &file_name).await
+}

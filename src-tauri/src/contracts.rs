@@ -65,3 +65,5 @@ pub struct MigrateResult {
 }
 
 pub type SyncResult = crate::sync::SyncResult;
+pub type RestoreResult = crate::sync::RestoreResult;
+pub type RemoteDatabaseVersion = crate::webdav::RemoteDatabaseVersion;

@@ -5,12 +5,26 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use reqwest::Method;
+use rusqlite::{Connection, OpenFlags};
+use serde::Serialize;
+
+use crate::db;
 
 /// Remote file metadata returned by a PROPFIND probe.
 #[derive(Debug, Clone)]
 pub struct RemoteFileInfo {
     pub last_modified_utc: i64,
     pub size: u64,
+}
+
+/// A restorable database version discovered in the configured WebDAV directory.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteDatabaseVersion {
+    pub file_name: String,
+    pub last_modified_utc: i64,
+    pub size: u64,
+    pub is_current: bool,
 }
 
 fn propfind_method() -> Method {
@@ -88,6 +102,132 @@ pub fn parse_http_date_to_utc_seconds(value: &str) -> Option<i64> {
     DateTime::parse_from_rfc2822(value.trim())
         .ok()
         .map(|datetime| datetime.with_timezone(&Utc).timestamp())
+}
+
+/// Accept only the stable database filename and its timestamped backup format.
+pub fn is_database_version_filename(file_name: &str) -> bool {
+    if file_name == db::DB_FILE_NAME {
+        return true;
+    }
+
+    let Some(timestamp) = file_name
+        .strip_prefix(&format!("{}.", db::DB_FILE_NAME))
+        .and_then(|suffix| suffix.strip_suffix(".bak"))
+    else {
+        return false;
+    };
+
+    timestamp.len() == 15
+        && timestamp.as_bytes().get(8) == Some(&b'-')
+        && chrono::NaiveDateTime::parse_from_str(timestamp, "%Y%m%d-%H%M%S").is_ok()
+}
+
+/// Read all XML element contents for one local-name, regardless of namespace prefix.
+fn extract_element_blocks<'body>(body: &'body str, local_name: &str) -> Vec<&'body str> {
+    let mut blocks = Vec::new();
+    let mut remaining = body;
+
+    while let Some(opening_start) = find_xml_tag(remaining, local_name, false) {
+        let opening_end = match remaining[opening_start..].find('>') {
+            Some(offset) => opening_start + offset + 1,
+            None => break,
+        };
+        let after_opening = &remaining[opening_end..];
+        let Some(closing_relative_start) = find_xml_tag(after_opening, local_name, true) else {
+            break;
+        };
+        let closing_start = opening_end + closing_relative_start;
+        blocks.push(&remaining[opening_end..closing_start]);
+
+        let closing_end = match remaining[closing_start..].find('>') {
+            Some(offset) => closing_start + offset + 1,
+            None => break,
+        };
+        remaining = &remaining[closing_end..];
+    }
+
+    blocks
+}
+
+/// Locate an opening or closing XML tag by local name without assuming a prefix.
+fn find_xml_tag(body: &str, local_name: &str, closing: bool) -> Option<usize> {
+    let marker = if closing { "</" } else { "<" };
+    let mut search_start = 0;
+
+    while let Some(relative_start) = body[search_start..].find(marker) {
+        let tag_start = search_start + relative_start;
+        let name_start = tag_start + marker.len();
+        let remainder = &body[name_start..];
+        let tag_end = remainder.find('>')?;
+        let token = remainder[..tag_end]
+            .trim_start()
+            .split(|character: char| character.is_whitespace() || character == '/' || character == '>')
+            .next()
+            .unwrap_or_default();
+        if token.rsplit(':').next() == Some(local_name) {
+            return Some(tag_start);
+        }
+        search_start = name_start;
+    }
+
+    None
+}
+
+/// Parse a WebDAV `Depth: 1` Multi-Status response into valid database versions.
+fn parse_database_versions(xml: &str) -> Vec<RemoteDatabaseVersion> {
+    let mut versions = extract_element_blocks(xml, "response")
+        .into_iter()
+        .filter_map(|response| {
+            let href = extract_prop(response, "href")?;
+            let file_name = href.rsplit('/').next()?.trim();
+            if file_name.is_empty() || file_name.contains('%') || !is_database_version_filename(file_name) {
+                return None;
+            }
+            let last_modified_utc = extract_prop(response, "getlastmodified")
+                .and_then(parse_http_date_to_utc_seconds)?;
+            let size = extract_prop(response, "getcontentlength")
+                .and_then(|value| value.parse::<u64>().ok())
+                .unwrap_or(0);
+            Some(RemoteDatabaseVersion {
+                file_name: file_name.to_string(),
+                last_modified_utc,
+                size,
+                is_current: file_name == db::DB_FILE_NAME,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    versions.sort_by(|left, right| {
+        right
+            .is_current
+            .cmp(&left.is_current)
+            .then_with(|| right.last_modified_utc.cmp(&left.last_modified_utc))
+    });
+    versions
+}
+
+/// List the current database and timestamped backups in the configured directory.
+pub async fn list_database_versions(
+    client: &reqwest::Client,
+    dir_url: &str,
+    username: &str,
+    password: &str,
+) -> Result<Vec<RemoteDatabaseVersion>, String> {
+    let response = client
+        .request(propfind_method(), dir_url)
+        .basic_auth(username, Some(password))
+        .header("Depth", "1")
+        .send()
+        .await
+        .map_err(|error| format!("列出 WebDAV 备份失败：{error}"))?;
+    if !response.status().is_success() {
+        return Err(format!("列出 WebDAV 备份失败：HTTP {}", response.status()));
+    }
+    let body = response
+        .text()
+        .await
+        .map_err(|error| format!("读取 WebDAV 备份列表失败：{error}"))?;
+    Ok(parse_database_versions(&body))
 }
 
 /// Probe a remote file. Returns `None` when the file does not exist.
@@ -227,6 +367,8 @@ pub async fn download_file(
         .map_err(|error| format!("同步临时文件失败：{error}"))?;
     drop(temp_file);
 
+    validate_sqlite_database(&temp_path)?;
+
     std::fs::rename(&temp_path, dest_path)
         .map_err(|error| format!("替换本地数据库失败：{error}"))?;
 
@@ -234,6 +376,19 @@ pub async fn download_file(
     for suffix in ["-wal", "-shm"] {
         let stale = dest_path.with_file_name(format!("{file_name}{suffix}"));
         let _ = std::fs::remove_file(stale);
+    }
+    Ok(())
+}
+
+/// Verify that a downloaded file is a readable SQLite database before replacing local data.
+fn validate_sqlite_database(database_path: &Path) -> Result<(), String> {
+    let connection = Connection::open_with_flags(database_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .map_err(|error| format!("下载的 SQLite 数据库无法打开，已放弃覆盖：{error}"))?;
+    let integrity: String = connection
+        .query_row("PRAGMA integrity_check", [], |row| row.get(0))
+        .map_err(|error| format!("校验下载的 SQLite 数据库失败，已放弃覆盖：{error}"))?;
+    if integrity != "ok" {
+        return Err(format!("下载的 SQLite 数据库完整性校验失败：{integrity}"));
     }
     Ok(())
 }
@@ -298,6 +453,36 @@ mod tests {
         </d:multistatus>"#;
         assert_eq!(extract_prop(body, "getcontentlength"), Some("12345"));
     }
+
+    #[test]
+    fn accepts_only_current_database_and_timestamped_backup_filenames() {
+        assert!(is_database_version_filename("weeklytodo.db"));
+        assert!(is_database_version_filename("weeklytodo.db.20260804-133200.bak"));
+
+        assert!(!is_database_version_filename("weeklytodo.db-wal"));
+        assert!(!is_database_version_filename("weeklytodo.db.20260804-1332.bak"));
+        assert!(!is_database_version_filename("weeklytodo.db.20261304-133200.bak"));
+        assert!(!is_database_version_filename("../weeklytodo.db"));
+        assert!(!is_database_version_filename("weeklytodo.db?version=old"));
+    }
+
+    #[test]
+    fn parses_current_database_and_valid_backups_from_directory_listing() {
+        let xml = r#"<D:multistatus xmlns:D="DAV:">
+          <D:response><D:href>/weeklytodo/</D:href><D:propstat><D:prop><D:resourcetype><D:collection/></D:resourcetype></D:prop></D:propstat></D:response>
+          <D:response><D:href>/weeklytodo/weeklytodo.db.20260804-133200.bak</D:href><D:propstat><D:prop><D:getlastmodified>Mon, 04 Aug 2026 13:32:00 GMT</D:getlastmodified><D:getcontentlength>65536</D:getcontentlength></D:prop></D:propstat></D:response>
+          <D:response><D:href>/weeklytodo/unrelated.txt</D:href><D:propstat><D:prop><D:getlastmodified>Mon, 04 Aug 2026 13:33:00 GMT</D:getlastmodified></D:prop></D:propstat></D:response>
+          <D:response><D:href>/weeklytodo/weeklytodo.db</D:href><D:propstat><D:prop><D:getlastmodified>Mon, 04 Aug 2026 13:34:00 GMT</D:getlastmodified><D:getcontentlength>73728</D:getcontentlength></D:prop></D:propstat></D:response>
+        </D:multistatus>"#;
+
+        let versions = parse_database_versions(xml);
+
+        assert_eq!(versions.len(), 2);
+        assert_eq!(versions[0].file_name, "weeklytodo.db");
+        assert!(versions[0].is_current);
+        assert_eq!(versions[1].file_name, "weeklytodo.db.20260804-133200.bak");
+        assert_eq!(versions[1].size, 65_536);
+    }
 }
 
 /// 供集成测试使用的内存式本地 WebDAV 服务器（基于 tiny_http）。
@@ -355,6 +540,11 @@ pub mod test_server {
             for mut request in server.incoming_requests() {
                 let method = request.method().as_str().to_string();
                 let url = request.url().to_string();
+                let depth = request
+                    .headers()
+                    .iter()
+                    .find(|header| header.field.equiv("Depth"))
+                    .map(|header| header.value.as_str().to_string());
                 let path = url
                     .split('?')
                     .next()
@@ -363,7 +553,7 @@ pub mod test_server {
                     .to_string();
                 let mut body = Vec::new();
                 let _ = request.as_reader().read_to_end(&mut body);
-                let response = handle_request(&server_root, &method, &path, &body);
+                let response = handle_request(&server_root, &method, &path, &body, depth.as_deref());
                 let _ = request.respond(response);
             }
         });
@@ -380,11 +570,15 @@ pub mod test_server {
         method: &str,
         path: &str,
         body: &[u8],
+        depth: Option<&str>,
     ) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
         let fs_path = root.join(path);
         match method {
             "PROPFIND" => {
                 if fs_path.is_dir() {
+                    if depth == Some("1") {
+                        return directory_multistatus_response(root, path);
+                    }
                     return multistatus_response(path, None);
                 }
                 match std::fs::metadata(&fs_path) {
@@ -465,5 +659,56 @@ pub mod test_server {
                     .parse::<tiny_http::Header>()
                     .unwrap(),
             )
+    }
+
+    fn directory_multistatus_response(
+        root: &Path,
+        path: &str,
+    ) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
+        let mut entries = vec![directory_response_entry(path)];
+        let directory_path = root.join(path);
+        if let Ok(read_dir) = std::fs::read_dir(directory_path) {
+            for entry in read_dir.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                let child_path = format!("{}/{}", path.trim_end_matches('/'), name);
+                if let Ok(metadata) = entry.metadata() {
+                    if metadata.is_file() {
+                        entries.push(file_response_entry(
+                            &child_path,
+                            metadata.modified().unwrap(),
+                            metadata.len(),
+                        ));
+                    } else if metadata.is_dir() {
+                        entries.push(directory_response_entry(&child_path));
+                    }
+                }
+            }
+        }
+        let xml = format!(
+            r#"<?xml version="1.0" encoding="utf-8"?>
+<D:multistatus xmlns:D="DAV:">{}</D:multistatus>"#,
+            entries.join("\n")
+        );
+        tiny_http::Response::from_data(xml.into_bytes())
+            .with_status_code(207)
+            .with_header(
+                "Content-Type: application/xml"
+                    .parse::<tiny_http::Header>()
+                    .unwrap(),
+            )
+    }
+
+    fn directory_response_entry(path: &str) -> String {
+        format!(
+            r#"<D:response><D:href>/{path}</D:href><D:propstat><D:prop><D:resourcetype><D:collection/></D:resourcetype></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>"#
+        )
+    }
+
+    fn file_response_entry(path: &str, mtime: std::time::SystemTime, size: u64) -> String {
+        let datetime: DateTime<Utc> = mtime.into();
+        let last_modified = datetime.format("%a, %d %b %Y %H:%M:%S GMT");
+        format!(
+            r#"<D:response><D:href>/{path}</D:href><D:propstat><D:prop><D:getlastmodified>{last_modified}</D:getlastmodified><D:getcontentlength>{size}</D:getcontentlength></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>"#
+        )
     }
 }

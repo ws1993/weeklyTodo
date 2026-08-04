@@ -9,6 +9,8 @@ export interface WebDavSettings {
   lastSyncedAt?: string;
   /** 最近一次同步的状态文案（成功或失败原因）。 */
   lastSyncStatus?: string;
+  /** 恢复远端版本后暂停自动同步，直到用户显式恢复。 */
+  autoSyncPausedAfterRestore: boolean;
 }
 
 export const SYNC_INTERVAL_HOURS_OPTIONS = [0, 1, 2, 4, 6, 12, 24];
@@ -21,6 +23,7 @@ export function createDefaultWebDavSettings(): WebDavSettings {
     username: '',
     syncOnStartup: false,
     syncIntervalHours: 0,
+    autoSyncPausedAfterRestore: false,
   };
 }
 
@@ -59,6 +62,7 @@ export function loadWebDavSettings(): WebDavSettings {
       syncIntervalHours: isValidIntervalHours(Number(parsed.syncIntervalHours))
         ? Number(parsed.syncIntervalHours)
         : 0,
+      autoSyncPausedAfterRestore: Boolean(parsed.autoSyncPausedAfterRestore),
     };
   } catch {
     return createDefaultWebDavSettings();
@@ -82,7 +86,7 @@ export function isSyncDue(
   now: Date,
   tickIntervalMs: number,
 ): boolean {
-  if (settings.syncIntervalHours <= 0 || !settings.url) {
+  if (settings.autoSyncPausedAfterRestore || settings.syncIntervalHours <= 0 || !settings.url) {
     return false;
   }
   if (!settings.lastSyncedAt) {

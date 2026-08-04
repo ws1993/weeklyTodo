@@ -7,6 +7,8 @@ import type {
   ProxyConfigPayload,
   QueryFilter,
   QueryTaskRow,
+  RemoteDatabaseVersion,
+  RestoreDatabaseVersionResult,
   Tag,
   Task,
   UpdateCheckResult,
@@ -218,7 +220,7 @@ export async function openReleasePage(): Promise<void> {
 
 /** 一次 WebDAV 同步的返回结果。 */
 export interface SyncResult {
-  direction: 'upload' | 'download' | 'noop';
+  direction: 'upload' | 'download' | 'noop' | 'skipped';
   backupFiles: string[];
   syncedAt: string;
   message: string;
@@ -254,6 +256,32 @@ export async function clearWebDavCredentials(username: string): Promise<void> {
 /** 执行一次文件级同步，密码由 Rust 侧从系统凭据管理器读取。 */
 export async function syncWebDav(url: string, username: string): Promise<SyncResult> {
   return invokeCommand<SyncResult>('webdav_sync_now', { url, username });
+}
+
+/** Runs scheduler-driven synchronization with the empty-local overwrite guard enabled. */
+export async function syncWebDavAutomatically(url: string, username: string): Promise<SyncResult> {
+  return invokeCommand<SyncResult>('webdav_sync_automatic', { url, username });
+}
+
+/** Lists the current remote database and timestamped restore points. */
+export async function listWebDavDatabaseVersions(
+  url: string,
+  username: string,
+): Promise<RemoteDatabaseVersion[]> {
+  return invokeCommand<RemoteDatabaseVersion[]>('webdav_list_versions', { url, username });
+}
+
+/** Backs up local data remotely, then restores one selected server version. */
+export async function restoreWebDavDatabaseVersion(
+  url: string,
+  username: string,
+  fileName: string,
+): Promise<RestoreDatabaseVersionResult> {
+  return invokeCommand<RestoreDatabaseVersionResult>('webdav_restore_version', {
+    url,
+    username,
+    fileName,
+  });
 }
 
 export function subscribeUpdateDownloadProgress(

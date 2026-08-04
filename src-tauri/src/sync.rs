@@ -5,6 +5,7 @@ use std::path::Path;
 use std::time::SystemTime;
 
 use chrono::{DateTime, Utc};
+use rusqlite::{Connection, OpenFlags};
 use serde::Serialize;
 
 use crate::credentials;
@@ -22,6 +23,23 @@ pub struct SyncResult {
     /// ISO 8601 UTC time when the sync finished.
     pub synced_at: String,
     /// Human-readable summary.
+    pub message: String,
+}
+
+/// Selects whether synchronization is scheduler-driven or explicitly requested.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyncMode {
+    Automatic,
+    Manual,
+}
+
+/// Result returned after an explicitly selected WebDAV database version is restored.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestoreResult {
+    pub restored_file_name: String,
+    pub local_backup_file_name: String,
+    pub restored_at: String,
     pub message: String,
 }
 
@@ -61,7 +79,18 @@ pub fn decide_direction(local_modified_utc: i64, remote_modified_utc: i64) -> Op
 pub async fn sync_now(data_dir: &str, url: &str, username: &str) -> Result<SyncResult, String> {
     let password = credentials::load_password(username)?
         .ok_or_else(|| "尚未保存该账号的密码，请在同步设置中填写密码后重试".to_string())?;
-    sync_now_with_password(data_dir, url, username, &password).await
+    sync_now_with_mode_and_password(data_dir, url, username, &password, SyncMode::Manual).await
+}
+
+/// Run an automatic synchronization. Empty local databases never overwrite existing remote data.
+pub async fn sync_automatically(
+    data_dir: &str,
+    url: &str,
+    username: &str,
+) -> Result<SyncResult, String> {
+    let password = credentials::load_password(username)?
+        .ok_or_else(|| "尚未保存该账号的密码，请在同步设置中填写密码后重试".to_string())?;
+    sync_now_with_mode_and_password(data_dir, url, username, &password, SyncMode::Automatic).await
 }
 
 /// Core sync engine; the password is supplied by the caller (testable).
@@ -71,18 +100,40 @@ pub async fn sync_now_with_password(
     username: &str,
     password: &str,
 ) -> Result<SyncResult, String> {
-    checkpoint_db(Path::new(data_dir))?;
+    sync_now_with_mode_and_password(data_dir, url, username, password, SyncMode::Manual).await
+}
+
+/// Core synchronization implementation with an explicit scheduling mode.
+pub async fn sync_now_with_mode_and_password(
+    data_dir: &str,
+    url: &str,
+    username: &str,
+    password: &str,
+    mode: SyncMode,
+) -> Result<SyncResult, String> {
     let base_url = webdav::normalize_dir_url(url)?;
     let client = webdav::build_client()?;
     webdav::ensure_dir(&client, &base_url, username, password).await?;
 
     let local_path = Path::new(data_dir).join(db::DB_FILE_NAME);
     let file_url = format!("{base_url}{}", db::DB_FILE_NAME);
+    let remote = webdav::probe_file(&client, &file_url, username, password).await?;
+
+    // Do not create or checkpoint an empty local database before this decision.
+    if mode == SyncMode::Automatic
+        && remote.is_some()
+        && local_database_is_empty_or_missing(&local_path)?
+    {
+        return Ok(skipped_sync_result(
+            "已跳过自动同步：本地数据库为空，已阻止覆盖 WebDAV 现有数据。请在同步设置中恢复所需版本或手动确认同步。",
+        ));
+    }
+
+    checkpoint_db(Path::new(data_dir))?;
     let local_modified = std::fs::metadata(&local_path)
         .ok()
         .and_then(|metadata| metadata.modified().ok())
         .map(system_time_to_utc_seconds);
-    let remote = webdav::probe_file(&client, &file_url, username, password).await?;
 
     let mut backup_files: Vec<String> = Vec::new();
     let (direction, message) = match (local_modified, remote) {
@@ -104,8 +155,15 @@ pub async fn sync_now_with_password(
             match decide_direction(local_modified_utc, remote_info.last_modified_utc) {
                 None => ("noop", "两端数据库一致，无需同步".to_string()),
                 Some(true) => {
+                    if local_database_is_empty_or_missing(&local_path)? {
+                        return Ok(skipped_sync_result(
+                            "已跳过同步：本地数据库为空，已阻止覆盖 WebDAV 现有数据。请先恢复远端版本。",
+                        ));
+                    }
                     // 本地更新：先把远端旧版备份，再上传本地版本。
-                    let backup_name = backup_filename(remote_info.last_modified_utc);
+                    let backup_name =
+                        next_available_backup_filename(&client, &base_url, username, password)
+                            .await?;
                     let backup_url = format!("{base_url}{backup_name}");
                     let remote_bytes =
                         webdav::fetch_remote_bytes(&client, &file_url, username, password).await?;
@@ -123,7 +181,9 @@ pub async fn sync_now_with_password(
                 }
                 Some(false) => {
                     // 远端更新：先把本地旧版备份到远端，再下载覆盖本地。
-                    let backup_name = backup_filename(local_modified_utc);
+                    let backup_name =
+                        next_available_backup_filename(&client, &base_url, username, password)
+                            .await?;
                     let backup_url = format!("{base_url}{backup_name}");
                     webdav::upload_file(&client, &backup_url, &local_path, username, password)
                         .await?;
@@ -147,6 +207,126 @@ pub async fn sync_now_with_password(
         synced_at: Utc::now().to_rfc3339(),
         message,
     })
+}
+
+fn skipped_sync_result(message: &str) -> SyncResult {
+    SyncResult {
+        direction: "skipped".to_string(),
+        backup_files: Vec::new(),
+        synced_at: Utc::now().to_rfc3339(),
+        message: message.to_string(),
+    }
+}
+
+/// A database without tasks, owners, or tags is unsafe to publish automatically.
+fn local_database_is_empty_or_missing(database_path: &Path) -> Result<bool, String> {
+    if !database_path.is_file() {
+        return Ok(true);
+    }
+
+    let connection = Connection::open_with_flags(database_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .map_err(|error| format!("检查本地数据库内容失败：{error}"))?;
+    for table_name in ["tasks", "owners", "tags"] {
+        let exists: bool = connection
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1)",
+                [table_name],
+                |row| row.get(0),
+            )
+            .map_err(|error| format!("检查本地数据库表结构失败：{error}"))?;
+        if exists {
+            let query = format!("SELECT EXISTS(SELECT 1 FROM {table_name} LIMIT 1)");
+            let has_rows: bool = connection
+                .query_row(&query, [], |row| row.get(0))
+                .map_err(|error| format!("检查本地数据库内容失败：{error}"))?;
+            if has_rows {
+                return Ok(false);
+            }
+        }
+    }
+    Ok(true)
+}
+
+/// Restore an explicitly selected, server-listed database version over local storage.
+pub async fn restore_database_version(
+    data_dir: &str,
+    url: &str,
+    username: &str,
+    selected_file_name: &str,
+) -> Result<RestoreResult, String> {
+    let password = credentials::load_password(username)?
+        .ok_or_else(|| "尚未保存该账号的密码，请在同步设置中填写密码后重试".to_string())?;
+    restore_database_version_with_password(
+        data_dir,
+        url,
+        username,
+        &password,
+        selected_file_name,
+    )
+    .await
+}
+
+/// Testable selected-version restore flow. Remote backup succeeds before local replacement begins.
+pub async fn restore_database_version_with_password(
+    data_dir: &str,
+    url: &str,
+    username: &str,
+    password: &str,
+    selected_file_name: &str,
+) -> Result<RestoreResult, String> {
+    if !webdav::is_database_version_filename(selected_file_name) {
+        return Err("恢复文件名无效，只能选择当前数据库或时间戳备份".to_string());
+    }
+
+    let local_path = Path::new(data_dir).join(db::DB_FILE_NAME);
+    if !local_path.is_file() {
+        return Err("当前本地数据库不存在，已取消恢复以避免创建空库".to_string());
+    }
+
+    let base_url = webdav::normalize_dir_url(url)?;
+    let client = webdav::build_client()?;
+    webdav::ensure_dir(&client, &base_url, username, password).await?;
+    let versions = webdav::list_database_versions(&client, &base_url, username, password).await?;
+    if !versions
+        .iter()
+        .any(|version| version.file_name == selected_file_name)
+    {
+        return Err("所选恢复版本已不存在或不属于当前 WebDAV 目录".to_string());
+    }
+
+    checkpoint_db(Path::new(data_dir))?;
+    let local_backup_file_name = next_available_backup_filename(&client, &base_url, username, password).await?;
+    let local_backup_url = format!("{base_url}{local_backup_file_name}");
+    webdav::upload_file(&client, &local_backup_url, &local_path, username, password).await?;
+
+    let selected_url = format!("{base_url}{selected_file_name}");
+    webdav::download_file(&client, &selected_url, &local_path, username, password).await?;
+
+    Ok(RestoreResult {
+        restored_file_name: selected_file_name.to_string(),
+        local_backup_file_name,
+        restored_at: Utc::now().to_rfc3339(),
+        message: "已恢复所选 WebDAV 版本，本地旧数据已备份到远端".to_string(),
+    })
+}
+
+async fn next_available_backup_filename(
+    client: &reqwest::Client,
+    base_url: &str,
+    username: &str,
+    password: &str,
+) -> Result<String, String> {
+    for offset_seconds in 0..60 {
+        let candidate = backup_filename((Utc::now() + chrono::Duration::seconds(offset_seconds)).timestamp());
+        let candidate_url = format!("{base_url}{candidate}");
+        if webdav::probe_file(client, &candidate_url, username, password)
+            .await?
+            .is_none()
+        {
+            return Ok(candidate);
+        }
+    }
+    Err("无法生成不与现有备份冲突的恢复前备份文件名".to_string())
 }
 
 /// 上传/下载后校准本地 mtime 与远端一致，防止下次同步因时间偏差反复翻转。
@@ -237,7 +417,11 @@ mod tests {
         // 4) 模拟另一台设备更新远端，再同步：远端较新 -> 下载并备份本地旧版。
         std::thread::sleep(std::time::Duration::from_millis(1100));
         let local_before = std::fs::read(data_dir.join(db::DB_FILE_NAME)).unwrap();
-        let remote_edit: Vec<u8> = b"SQLite format 3\0".to_vec(); // 仅校验下载方向，不校验内容有效性
+        let remote_data_dir = temp_dir();
+        create_sample_week(&remote_data_dir);
+        add_sample_task(&remote_data_dir);
+        checkpoint_db(&remote_data_dir).unwrap();
+        let remote_edit = std::fs::read(remote_data_dir.join(db::DB_FILE_NAME)).unwrap();
         server.put_file("weeklytodo/weeklytodo.db", remote_edit.clone());
         let remote = sync_now_with_password(data_dir.to_str().unwrap(), &url, "alice", "secret")
             .await
@@ -253,6 +437,73 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&data_dir);
+        let _ = std::fs::remove_dir_all(&remote_data_dir);
+    }
+
+    #[tokio::test]
+    async fn automatic_sync_skips_empty_local_database_when_remote_exists() {
+        use crate::webdav::test_server;
+
+        let server = test_server::spawn();
+        let data_dir = temp_dir();
+        create_sample_week(&data_dir);
+        let remote_bytes = b"SQLite format 3\0remote-data".to_vec();
+        server.put_file("weeklytodo/weeklytodo.db", remote_bytes.clone());
+
+        let result = sync_now_with_mode_and_password(
+            data_dir.to_str().unwrap(),
+            &server.base_url("weeklytodo"),
+            "alice",
+            "secret",
+            SyncMode::Automatic,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.direction, "skipped");
+        assert_eq!(server.read_file("weeklytodo/weeklytodo.db"), remote_bytes);
+        let _ = std::fs::remove_dir_all(&data_dir);
+    }
+
+    #[tokio::test]
+    async fn restore_backs_up_local_database_before_replacing_it() {
+        use crate::webdav::test_server;
+
+        let server = test_server::spawn();
+        let local_data_dir = temp_dir();
+        let remote_data_dir = temp_dir();
+        create_sample_week(&local_data_dir);
+        add_sample_task(&local_data_dir);
+        checkpoint_db(&local_data_dir).unwrap();
+        let local_bytes = std::fs::read(local_data_dir.join(db::DB_FILE_NAME)).unwrap();
+
+        create_sample_week(&remote_data_dir);
+        checkpoint_db(&remote_data_dir).unwrap();
+        let remote_bytes = std::fs::read(remote_data_dir.join(db::DB_FILE_NAME)).unwrap();
+        let selected_file_name = "weeklytodo.db.20260804-133200.bak";
+        server.put_file(&format!("weeklytodo/{selected_file_name}"), remote_bytes.clone());
+
+        let result = restore_database_version_with_password(
+            local_data_dir.to_str().unwrap(),
+            &server.base_url("weeklytodo"),
+            "alice",
+            "secret",
+            selected_file_name,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.restored_file_name, selected_file_name);
+        assert_eq!(
+            server.read_file(&format!("weeklytodo/{}", result.local_backup_file_name)),
+            local_bytes
+        );
+        assert_eq!(
+            std::fs::read(local_data_dir.join(db::DB_FILE_NAME)).unwrap(),
+            remote_bytes
+        );
+        let _ = std::fs::remove_dir_all(&local_data_dir);
+        let _ = std::fs::remove_dir_all(&remote_data_dir);
     }
 
     fn temp_dir() -> std::path::PathBuf {

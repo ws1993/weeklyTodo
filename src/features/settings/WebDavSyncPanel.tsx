@@ -3,17 +3,21 @@ import { Globe, Lock, RefreshCw, User } from 'lucide-react';
 import {
   clearWebDavCredentials,
   hasWebDavCredentials,
+  listWebDavDatabaseVersions,
+  restoreWebDavDatabaseVersion,
   saveWebDavCredentials,
   syncWebDav,
   testWebDavConnection,
 } from '../../api/nativeBridge';
 import { DropdownSelect, ToggleSwitch } from '../../components/QueryControls';
+import type { RemoteDatabaseVersion } from '../../shared/contracts/types';
 import type { WebDavSettings } from './webdavSettings';
 import { isValidWebDavUrl, SYNC_INTERVAL_HOURS_OPTIONS } from './webdavSettings';
 
 interface WebDavSyncPanelProps {
   settings: WebDavSettings;
   onChange: (settings: WebDavSettings) => void;
+  onDatabaseRestored: () => Promise<void>;
 }
 
 const intervalOptions = SYNC_INTERVAL_HOURS_OPTIONS.map((hours) => ({
@@ -21,11 +25,15 @@ const intervalOptions = SYNC_INTERVAL_HOURS_OPTIONS.map((hours) => ({
   label: hours === 0 ? '关闭' : `每 ${hours} 小时`,
 }));
 
-export function WebDavSyncPanel({ settings, onChange }: WebDavSyncPanelProps) {
+export function WebDavSyncPanel({ settings, onChange, onDatabaseRestored }: WebDavSyncPanelProps) {
   const [password, setPassword] = useState('');
   const [passwordSaved, setPasswordSaved] = useState(false);
   const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [loadingVersions, setLoadingVersions] = useState(false);
+  const [restoringFileName, setRestoringFileName] = useState<string | null>(null);
+  const [armedRestoreFileName, setArmedRestoreFileName] = useState<string | null>(null);
+  const [versions, setVersions] = useState<RemoteDatabaseVersion[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,6 +42,7 @@ export function WebDavSyncPanel({ settings, onChange }: WebDavSyncPanelProps) {
     settings.url.trim() !== '' &&
     settings.username.trim() !== '' &&
     (password !== '' || passwordSaved);
+  const operationInProgress = testing || syncing || loadingVersions || restoringFileName !== null;
 
   useEffect(() => {
     let disposed = false;
@@ -104,8 +113,9 @@ export function WebDavSyncPanel({ settings, onChange }: WebDavSyncPanelProps) {
         result.backupFiles.length > 0 ? `；备份：${result.backupFiles.join('、')}` : '';
       setNotice(`${result.message}${backupText}`);
       patchSettings({
-        lastSyncedAt: new Date().toISOString(),
-        lastSyncStatus: `同步完成（${result.direction}）`,
+        lastSyncedAt: result.direction === 'skipped' ? settings.lastSyncedAt : new Date().toISOString(),
+        lastSyncStatus:
+          result.direction === 'skipped' ? `同步已跳过：${result.message}` : `同步完成（${result.direction}）`,
       });
     } catch (syncError) {
       const message = String(syncError);
@@ -115,6 +125,71 @@ export function WebDavSyncPanel({ settings, onChange }: WebDavSyncPanelProps) {
       setSyncing(false);
     }
   };
+
+  const loadVersions = async () => {
+    setLoadingVersions(true);
+    setNotice(null);
+    setError(null);
+    try {
+      const persisted = await persistPasswordIfProvided();
+      if (!persisted) {
+        return;
+      }
+      setVersions(await listWebDavDatabaseVersions(settings.url, settings.username));
+    } catch (listError) {
+      setError(String(listError));
+    } finally {
+      setLoadingVersions(false);
+    }
+  };
+
+  const restoreVersion = async (version: RemoteDatabaseVersion) => {
+    if (armedRestoreFileName !== version.fileName) {
+      setArmedRestoreFileName(version.fileName);
+      setNotice(`再次点击“确认恢复”以覆盖本地数据；恢复前会先将当前本地库备份到 WebDAV。`);
+      setError(null);
+      return;
+    }
+
+    setRestoringFileName(version.fileName);
+    setNotice(null);
+    setError(null);
+    try {
+      const persisted = await persistPasswordIfProvided();
+      if (!persisted) {
+        return;
+      }
+      const result = await restoreWebDavDatabaseVersion(
+        settings.url,
+        settings.username,
+        version.fileName,
+      );
+      patchSettings({
+        autoSyncPausedAfterRestore: true,
+        lastSyncedAt: undefined,
+        lastSyncStatus: `已恢复 ${result.restoredFileName}；自动同步已暂停`,
+      });
+      await onDatabaseRestored();
+      setArmedRestoreFileName(null);
+      setNotice(`${result.message}。恢复前备份：${result.localBackupFileName}`);
+    } catch (restoreError) {
+      setError(String(restoreError));
+    } finally {
+      setRestoringFileName(null);
+    }
+  };
+
+  const resumeAutomaticSync = () => {
+    patchSettings({
+      autoSyncPausedAfterRestore: false,
+      lastSyncStatus: '已恢复自动同步；下次按启动或定时设置执行。',
+    });
+    setNotice('自动同步已恢复');
+  };
+
+  const formatVersionTime = (utcSeconds: number) => new Date(utcSeconds * 1000).toLocaleString();
+
+  const formatFileSize = (bytes: number) => `${(bytes / 1024).toFixed(bytes < 1024 * 1024 ? 0 : 1)} KB`;
 
   const forgetPassword = async () => {
     setError(null);
@@ -199,7 +274,7 @@ export function WebDavSyncPanel({ settings, onChange }: WebDavSyncPanelProps) {
             type="button"
             className="btn"
             onClick={() => void runTest()}
-            disabled={testing || !canConnect}
+            disabled={operationInProgress || !canConnect}
           >
             {testing ? '测试中…' : '测试连接'}
           </button>
@@ -207,12 +282,58 @@ export function WebDavSyncPanel({ settings, onChange }: WebDavSyncPanelProps) {
             type="button"
             className="btn btn-primary"
             onClick={() => void runSync()}
-            disabled={syncing || !canConnect}
+            disabled={operationInProgress || !canConnect}
           >
             <RefreshCw size={14} />
             <span>{syncing ? '同步中…' : '立即同步'}</span>
           </button>
         </div>
+
+        <section className="webdav-recovery" aria-labelledby="webdav-recovery-title">
+          <div className="webdav-recovery-head">
+            <div>
+              <h3 id="webdav-recovery-title">远端版本与恢复</h3>
+              <p>恢复会覆盖本地数据库；当前本地库会先备份为新的 WebDAV 历史版本。</p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => void loadVersions()}
+              disabled={operationInProgress || !canConnect}
+            >
+              <RefreshCw size={14} />
+              <span>{loadingVersions ? '读取中…' : '刷新版本'}</span>
+            </button>
+          </div>
+
+          {versions.length > 0 && (
+            <div className="webdav-version-list">
+              {versions.map((version) => {
+                const isArmed = armedRestoreFileName === version.fileName;
+                const isRestoring = restoringFileName === version.fileName;
+                return (
+                  <article className="webdav-version-row" key={version.fileName}>
+                    <div className="webdav-version-meta">
+                      <strong>{version.isCurrent ? '当前远端版本' : '历史备份'}</strong>
+                      <code>{version.fileName}</code>
+                      <span>
+                        {formatVersionTime(version.lastModifiedUtc)} · {formatFileSize(version.size)}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className={isArmed ? 'btn btn-danger btn-sm' : 'btn btn-sm'}
+                      onClick={() => void restoreVersion(version)}
+                      disabled={operationInProgress && !isRestoring}
+                    >
+                      {isRestoring ? '恢复中…' : isArmed ? '确认恢复' : '恢复到本地'}
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
       </div>
 
       <div className="webdav-strategy">
@@ -229,6 +350,15 @@ export function WebDavSyncPanel({ settings, onChange }: WebDavSyncPanelProps) {
           onChange={(value) => patchSettings({ syncIntervalHours: Number(value) })}
         />
       </div>
+
+      {settings.autoSyncPausedAfterRestore && (
+        <div className="webdav-recovery-paused">
+          <span>恢复完成后，自动同步已暂停，避免恢复数据被自动覆盖。</span>
+          <button type="button" className="btn btn-sm" onClick={resumeAutomaticSync}>
+            恢复自动同步
+          </button>
+        </div>
+      )}
 
       {(notice !== null || error !== null || settings.lastSyncStatus || settings.lastSyncedAt) && (
         <div className="webdav-status">

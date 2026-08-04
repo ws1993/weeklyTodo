@@ -18,6 +18,7 @@ describe('webdavSettings', () => {
       username: '',
       syncOnStartup: false,
       syncIntervalHours: 0,
+      autoSyncPausedAfterRestore: false,
     });
   });
 
@@ -83,5 +84,15 @@ describe('webdavSettings', () => {
         60_000,
       ),
     ).toBe(false);
+  });
+
+  it('suppresses automatic synchronization after a restore until the user resumes it', () => {
+    const settings = {
+      ...createDefaultWebDavSettings(),
+      url: 'https://dav.example.com/weeklytodo',
+      syncIntervalHours: 1,
+      autoSyncPausedAfterRestore: true,
+    };
+    expect(isSyncDue(settings, new Date('2026-08-04T12:00:00Z'), 60_000)).toBe(false);
   });
 });

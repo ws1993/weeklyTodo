@@ -32,9 +32,16 @@ interface SettingsOverlayProps {
   onClose: () => void;
   /** 打开「检查更新」弹窗（由 App 控制 UpdateModal）。 */
   onCheckUpdate?: () => void;
+  /** WebDAV 恢复完成后重新加载所有数据库状态。 */
+  onDatabaseRestored: () => Promise<void>;
 }
 
-export function SettingsOverlay({ open, onClose, onCheckUpdate }: SettingsOverlayProps) {
+export function SettingsOverlay({
+  open,
+  onClose,
+  onCheckUpdate,
+  onDatabaseRestored,
+}: SettingsOverlayProps) {
   const storageDir = useAppStore((state) => state.storageDir);
   const [activeTab, setActiveTab] = useState<SettingsTab>('network');
   const [proxySettings, setProxySettings] = useState<ProxySettings>(() => loadProxySettings());
@@ -172,7 +179,11 @@ export function SettingsOverlay({ open, onClose, onCheckUpdate }: SettingsOverla
                   将本地数据库备份到 WebDAV，支持手动、启动时与定时同步。
                 </p>
               </header>
-              <WebDavSyncPanel settings={webdavSettings} onChange={updateWebDavSettings} />
+              <WebDavSyncPanel
+                settings={webdavSettings}
+                onChange={updateWebDavSettings}
+                onDatabaseRestored={onDatabaseRestored}
+              />
             </section>
           )}
 

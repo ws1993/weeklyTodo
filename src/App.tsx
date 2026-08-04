@@ -8,7 +8,7 @@ import { QueryView } from './components/QueryView';
 import { CreateWeekModal } from './components/CreateWeekModal';
 import { UpdateModal } from './features/update/UpdateModal';
 import { SettingsOverlay } from './features/settings/SettingsOverlay';
-import { checkForAppUpdate, syncWebDav } from './api/nativeBridge';
+import { checkForAppUpdate, syncWebDavAutomatically } from './api/nativeBridge';
 import { PlusIcon, SettingsIcon, WorkbenchLogoIcon } from './components/ForestIcons';
 import {
   isSyncDue,
@@ -31,8 +31,6 @@ let webdavSyncInFlight = false;
 export function App() {
   const initialize = useAppStore((state) => state.initialize);
   const loading = useAppStore((state) => state.loading);
-  const refreshWeeks = useAppStore((state) => state.refreshWeeks);
-  const refreshTree = useAppStore((state) => state.refreshTree);
   const error = useAppStore((state) => state.error);
   const tree = useAppStore((state) => state.tree);
   const activeWeekId = useAppStore((state) => state.activeWeekId);
@@ -83,7 +81,12 @@ export function App() {
       return;
     }
     const startup = loadWebDavSettings();
-    if (startup.syncOnStartup && startup.url && startup.username) {
+    if (
+      startup.syncOnStartup &&
+      !startup.autoSyncPausedAfterRestore &&
+      startup.url &&
+      startup.username
+    ) {
       void runWebDavSync(startup);
     }
     const tick = window.setInterval(() => {
@@ -101,18 +104,18 @@ export function App() {
     }
     webdavSyncInFlight = true;
     try {
-      const result = await syncWebDav(settings.url, settings.username);
+      const result = await syncWebDavAutomatically(settings.url, settings.username);
       const nextSettings = {
         ...loadWebDavSettings(),
-        lastSyncedAt: new Date().toISOString(),
-        lastSyncStatus: `同步完成（${result.direction}）${
+        lastSyncedAt: result.direction === 'skipped' ? settings.lastSyncedAt : new Date().toISOString(),
+        lastSyncStatus: `${result.direction === 'skipped' ? '已跳过自动同步' : `同步完成（${result.direction}）`}${
           result.backupFiles.length > 0 ? `，备份 ${result.backupFiles.length} 个` : ''
-        }`,
+        }${result.direction === 'skipped' ? `：${result.message}` : ''}`,
       };
       saveWebDavSettings(nextSettings);
       // 远端较新并已覆盖本地时，刷新当前界面数据。
       if (result.direction === 'download') {
-        await Promise.all([refreshWeeks(), refreshTree()]);
+        await initialize();
       }
     } catch (syncError) {
       const current = loadWebDavSettings();
@@ -256,6 +259,7 @@ export function App() {
       <SettingsOverlay
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
+        onDatabaseRestored={() => initialize()}
         onCheckUpdate={() => {
           setSettingsOpen(false);
           setPreloadedUpdate(null);

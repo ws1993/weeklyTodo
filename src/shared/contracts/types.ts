@@ -102,3 +102,19 @@ export interface UpdateDownloadProgress {
   downloaded: number;
   total: number;
 }
+
+/** A current or historical SQLite database file discovered on WebDAV. */
+export interface RemoteDatabaseVersion {
+  fileName: string;
+  lastModifiedUtc: number;
+  size: number;
+  isCurrent: boolean;
+}
+
+/** Result of replacing local storage with an explicitly selected WebDAV version. */
+export interface RestoreDatabaseVersionResult {
+  restoredFileName: string;
+  localBackupFileName: string;
+  restoredAt: string;
+  message: string;
+}
