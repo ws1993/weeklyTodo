@@ -80,6 +80,6 @@ npm run tauri:build   # 生成 NSIS 安装器
 
 打 `v*` 标签推送到 GitHub 后，[release.yml](.github/workflows/release.yml) 会自动构建并把安装器发布到 GitHub Release；应用内「检查更新」会从最新 Release 获取安装包。
 
-## UI 原型
+## 友联
 
-`prototypes/` 下有三套可点击的高保真 HTML 原型（设计方向 A/B/C），可直接在浏览器打开对比。
+[LINUX DO - 新的理想型社区](https://linux.do/)
