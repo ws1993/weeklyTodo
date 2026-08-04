@@ -234,6 +234,7 @@ button{font-family:inherit;color:inherit}
 }
 .tree-row:last-child{border-bottom:none}
 .tree-row:hover{background:var(--surface-2)}
+.tree-row:not(.collapsible){cursor:default}
 .tree-row.top{background:rgba(21,87,208,.018)}
 .tree-row.top:hover{background:var(--brand-soft)}
 .tree-row.closed .node-title{color:var(--text-3);text-decoration:line-through;text-decoration-color:#C4CDDC;font-weight:400}

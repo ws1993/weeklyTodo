@@ -310,6 +310,7 @@ function TaskNode({
     depthClass,
     isDragging ? 'dragging' : '',
     drop ? `drop-${drop}` : '',
+    hasChildren ? 'collapsible' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -375,7 +376,10 @@ function TaskNode({
           if (drag.suppressNextClick()) {
             return;
           }
-          onOpenSettings(task);
+          // 行主体（复选框以前）作为收起/展开交互区，避免误触打开任务详情。
+          if (hasChildren) {
+            setExpanded((value) => !value);
+          }
         }}
         draggable={!editing}
         onDragEnter={handleDragEnter}
@@ -413,7 +417,15 @@ function TaskNode({
           {closed && <CheckIcon size={12} />}
         </button>
 
-        <span className="node-title-wrap" onClick={(event) => event.stopPropagation()}>
+        <span
+          className="node-title-wrap"
+          onClick={(event) => {
+            // 编辑标题时点击输入框不应触发整行的收起/展开。
+            if (editing) {
+              event.stopPropagation();
+            }
+          }}
+        >
           {editing ? (
             <input
               autoFocus
