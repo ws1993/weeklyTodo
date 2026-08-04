@@ -19,7 +19,7 @@ interface UpdateModalProps {
 
 export function UpdateModal({ open, onClose, preloaded }: UpdateModalProps) {
   const [state, setState] = useState<
-    'idle' | 'checking' | 'available' | 'downloading' | 'readyToInstall' | 'error'
+    'idle' | 'checking' | 'available' | 'downloading' | 'installing' | 'error'
   >('idle');
   const [version, setVersion] = useState('');
   const [body, setBody] = useState('');
@@ -74,18 +74,10 @@ export function UpdateModal({ open, onClose, preloaded }: UpdateModalProps) {
     try {
       await downloadAndInstallUpdate(downloadUrl, getSavedProxyConfig());
       setPercent(100);
-      setState('readyToInstall');
-    } catch (downloadError) {
-      setError(String(downloadError));
-      setState('error');
-    }
-  };
-
-  const closeAndInstall = async () => {
-    try {
+      setState('installing');
       await exitAppForUpdate();
-    } catch (exitError) {
-      setError(String(exitError));
+    } catch (updateError) {
+      setError(String(updateError));
       setState('error');
     }
   };
@@ -151,21 +143,10 @@ export function UpdateModal({ open, onClose, preloaded }: UpdateModalProps) {
               </div>
             </>
           )}
-          {state === 'readyToInstall' && (
-            <>
-              <div className="modal-hint" style={{ fontSize: 14 }}>
-                更新包已下载
-              </div>
-              <div className="modal-hint" style={{ marginTop: 10 }}>
-                关闭应用后将自动开始安装。
-              </div>
-              <div className="modal-actions">
-                <button className="btn btn-ghost" onClick={onClose}>稍后关闭</button>
-                <button className="btn btn-primary" onClick={() => void closeAndInstall()}>
-                  立即关闭并安装
-                </button>
-              </div>
-            </>
+          {state === 'installing' && (
+            <div className="modal-hint" style={{ fontSize: 14 }}>
+              更新包已下载，正在关闭应用并启动安装…
+            </div>
           )}
           {state === 'error' && <div className="modal-error">{error}</div>}
         </div>
