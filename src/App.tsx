@@ -9,7 +9,7 @@ import { CreateWeekModal } from './components/CreateWeekModal';
 import { UpdateModal } from './features/update/UpdateModal';
 import { SettingsOverlay } from './features/settings/SettingsOverlay';
 import { checkForAppUpdate, syncWebDavAutomatically } from './api/nativeBridge';
-import { PlusIcon, SettingsIcon, WorkbenchLogoIcon } from './components/ForestIcons';
+import { LogoIcon, PlusIcon, SettingsIcon } from './components/ForestIcons';
 import {
   isSyncDue,
   loadWebDavSettings,
@@ -154,7 +154,7 @@ export function App() {
       <div className="app-shell">
         <header className="topbar">
           <div className="topbar-brand">
-            <span className="brand-glyph"><WorkbenchLogoIcon size={15} /></span>
+            <span className="brand-glyph"><LogoIcon size={26} /></span>
             <span className="topbar-title">周计划</span>
             <span className="brand-dot" />
             <span className="topbar-subtitle">以周为单位的高效执行</span>

@@ -75,11 +75,10 @@ button{font-family:inherit;color:inherit}
 }
 .topbar-brand{display:flex;align-items:center;gap:10px;min-width:0}
 .brand-glyph{
-  width:26px;height:26px;border-radius:5px;background:var(--brand);color:#fff;
+  width:26px;height:26px;
   display:grid;place-items:center;flex:none;
-  box-shadow:0 1px 3px rgba(21,87,208,.35);
 }
-.brand-glyph svg{width:15px;height:15px;display:block}
+.brand-glyph svg{width:26px;height:26px;display:block}
 .topbar-title{font-size:15px;font-weight:600;letter-spacing:.5px;white-space:nowrap}
 .brand-dot{width:1px;height:18px;background:var(--border);flex:none}
 .topbar-subtitle{font-size:11px;color:var(--text-3);white-space:nowrap}

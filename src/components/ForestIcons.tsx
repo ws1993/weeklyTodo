@@ -270,7 +270,7 @@ export function GrassIcon({ width = 120 }: { width?: number }) {
   );
 }
 
-/** 年轮树桩 Logo：同心年轮 = 周期循环，七段金色刻度 = 一周七天，中心嫩芽 = 本周新任务。 */
+/** 亮色年轮树桩 Logo：年轮代表周循环，七段刻度代表七天，中心嫩芽代表本周新任务。 */
 export function LogoIcon({ size = 21 }: { size?: number }) {
   return (
     <svg
@@ -280,31 +280,23 @@ export function LogoIcon({ size = 21 }: { size?: number }) {
       fill="none"
       aria-hidden="true"
     >
-      <rect width="200" height="200" fill="#1C2720" rx="36" />
-      <circle cx="100" cy="104" r="68" fill="#233028" />
-      <circle cx="100" cy="104" r="68" stroke="#7FB069" strokeWidth="5" opacity=".6" />
-      <circle cx="100" cy="104" r="50" stroke="#7FB069" strokeWidth="3" opacity=".35" />
-      <circle cx="100" cy="104" r="32" stroke="#96C982" strokeWidth="3" opacity=".55" />
-      <circle cx="100" cy="104" r="16" stroke="#96C982" strokeWidth="2" opacity=".4" />
-      <g stroke="#D9A441" strokeWidth="5" strokeLinecap="round">
-        <line x1="100" y1="36" x2="100" y2="48" />
-        <line x1="148" y1="56" x2="141" y2="63" />
-        <line x1="168" y1="104" x2="156" y2="104" />
-        <line x1="148" y1="152" x2="141" y2="145" />
-        <line x1="100" y1="172" x2="100" y2="160" />
-        <line x1="52" y1="152" x2="59" y2="145" />
-        <line x1="32" y1="104" x2="44" y2="104" />
+      <rect width="200" height="200" rx="38" fill="#1557D0" />
+      <circle cx="100" cy="102" r="64" fill="#0B43AC" />
+      <circle cx="100" cy="102" r="64" stroke="#FFFFFF" strokeWidth="7" />
+      <circle cx="100" cy="102" r="42" stroke="#A9C7FF" strokeWidth="5" />
+      {/* Seven equal radial ticks keep the same gap from both rings. */}
+      <g stroke="#FFFFFF" strokeWidth="5" strokeLinecap="round">
+        <line x1="100" y1="47" x2="100" y2="53" />
+        <line x1="100" y1="47" x2="100" y2="53" transform="rotate(51.4286 100 102)" />
+        <line x1="100" y1="47" x2="100" y2="53" transform="rotate(102.8571 100 102)" />
+        <line x1="100" y1="47" x2="100" y2="53" transform="rotate(154.2857 100 102)" />
+        <line x1="100" y1="47" x2="100" y2="53" transform="rotate(205.7143 100 102)" />
+        <line x1="100" y1="47" x2="100" y2="53" transform="rotate(257.1429 100 102)" />
+        <line x1="100" y1="47" x2="100" y2="53" transform="rotate(308.5714 100 102)" />
       </g>
-      <path
-        d="M100 84 C 92 84, 86 90, 86 98 C 86 106, 92 112, 100 112 C 108 112, 114 106, 114 98 C 114 90, 108 84, 100 84 Z"
-        fill="#96C982"
-      />
-      <path
-        d="M100 112 C 96 124, 98 134, 104 140"
-        stroke="#96C982"
-        strokeWidth="5"
-        strokeLinecap="round"
-      />
+      <path d="M100 102C84 102 72 92 71 76c16 0 28 10 29 26Z" fill="#FFFFFF" />
+      <path d="M100 102c1-16 13-26 29-26-1 16-13 26-29 26Z" fill="#FFFFFF" />
+      <path d="M97 99h6v30a3 3 0 0 1-6 0Z" fill="#FFFFFF" />
     </svg>
   );
 }

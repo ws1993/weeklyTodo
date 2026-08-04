@@ -112,7 +112,7 @@ Commit message (conventional style):
 chore(release): bump version to X.Y.Z
 ```
 
-Note: unlike PrintAssist, weeklyTodo's `.github/workflows/ci.yml` has **no** `chore(release):` skip filter, so this commit also runs the normal CI jobs (a harmless duplicate build). Do not add unrelated changes to this commit.
+Note: weeklyTodo has no CI workflow anymore — pushing to `main` triggers nothing; only the `v*` tag push triggers `.github/workflows/release.yml` packaging. Do not add unrelated changes to this commit.
 
 Follow repo git safety rules: never amend unless user asks; never skip hooks unless user asks; never force-push.
 

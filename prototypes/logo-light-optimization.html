@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>周计划 · 现有 Logo 亮色优化</title>
+  <style>
+    :root {
+      --page: #f2f6fa;
+      --surface: #ffffff;
+      --surface-soft: #f7f9fc;
+      --ink: #172033;
+      --ink-soft: #647086;
+      --ink-faint: #8b95a7;
+      --line: #e1e7f0;
+      --line-strong: #c9dbf7;
+      --brand: #1557d0;
+      --brand-deep: #0b43ac;
+      --brand-pale: #eaf1ff;
+      --brand-light: #a9c7ff;
+      --font: "Segoe UI Variable", "Microsoft YaHei UI", -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+      --mono: "Cascadia Mono", "Cascadia Code", Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 980px; color: var(--ink); background: var(--page); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+    svg { display: block; }
+    .header { display: flex; align-items: end; justify-content: space-between; gap: 48px; padding: 52px 72px 34px; background: var(--surface); border-bottom: 1px solid var(--line); }
+    .eyebrow { margin: 0 0 13px; color: var(--brand); font: 600 11px/1 var(--mono); letter-spacing: .14em; }
+    h1 { margin: 0; font-size: 31px; font-weight: 680; letter-spacing: -.035em; }
+    .lead { max-width: 700px; margin: 14px 0 0; color: var(--ink-soft); font-size: 14px; line-height: 1.85; }
+    .state { flex: none; color: var(--brand); font: 600 11px/1 var(--mono); letter-spacing: .1em; }
+    main { max-width: 1180px; margin: 0 auto; padding: 36px 48px 72px; }
+    .comparison { display: grid; grid-template-columns: 1fr 1.2fr; gap: 18px; }
+    .card { border: 1px solid var(--line); background: var(--surface); }
+    .card-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+    .card-label { margin: 0; font: 600 11px/1 var(--mono); letter-spacing: .11em; }
+    .card.before .card-label { color: #788578; }
+    .card.after { border-color: var(--brand); box-shadow: 0 10px 28px rgba(21, 87, 208, .1); }
+    .card.after .card-label { color: var(--brand); }
+    .tag { padding: 5px 7px; border: 1px solid var(--line-strong); color: var(--brand); background: var(--brand-pale); font-size: 11px; }
+    .logo-stage { display: grid; min-height: 315px; place-items: center; padding: 40px; }
+    .before .logo-stage { background: #f8faf8; }
+    .after .logo-stage { background: linear-gradient(135deg, #f7faff, #eef4ff); }
+    .stage-logo { width: 190px; height: 190px; }
+    .caption { margin: 0; padding: 16px 18px 20px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 12px; line-height: 1.75; }
+    .caption strong { color: var(--ink); font-weight: 650; }
+    .scheme { display: grid; grid-template-columns: 1.3fr .7fr; gap: 18px; margin-top: 18px; }
+    .spec-card, .sizes-card { border: 1px solid var(--line); background: var(--surface); }
+    .section-head { padding: 18px 20px; border-bottom: 1px solid var(--line); }
+    h2 { margin: 0; font-size: 16px; letter-spacing: -.015em; }
+    .section-head p { margin: 7px 0 0; color: var(--ink-soft); font-size: 12px; line-height: 1.7; }
+    .rules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; }
+    .rule { padding: 20px; }
+    .rule + .rule { border-left: 1px solid var(--line); }
+    .rule-number { color: var(--brand); font: 600 11px/1 var(--mono); }
+    .rule-title { margin: 10px 0 6px; font-size: 13px; font-weight: 650; }
+    .rule-copy { margin: 0; color: var(--ink-soft); font-size: 12px; line-height: 1.75; }
+    .sizes { display: flex; align-items: end; justify-content: space-around; min-height: 177px; padding: 22px 16px; }
+    .size { display: grid; justify-items: center; gap: 9px; color: var(--ink-faint); font: 10px/1 var(--mono); }
+    .size svg { width: var(--mark-size); height: var(--mark-size); }
+    .lockup { display: flex; align-items: center; gap: 10px; margin-top: 18px; padding: 14px 16px; border: 1px solid var(--line); background: var(--surface); }
+    .glyph { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 5px; background: var(--brand); }
+    .glyph svg { width: 21px; height: 21px; }
+    .product-name { font-size: 15px; font-weight: 650; letter-spacing: .05em; }
+    .split { width: 1px; height: 17px; background: var(--line); }
+    .subtitle { color: var(--ink-faint); font-size: 11px; }
+    .palette { display: flex; gap: 8px; align-items: center; margin-top: 18px; padding: 15px 16px; border: 1px solid var(--line); background: var(--surface); }
+    .swatch { display: flex; align-items: center; gap: 7px; margin-right: 12px; color: var(--ink-soft); font: 11px/1 var(--mono); }
+    .color { width: 18px; height: 18px; border: 1px solid rgba(23,32,51,.11); }
+    @media (max-width: 1050px) { main { padding-left: 28px; padding-right: 28px; } .header { padding-left: 42px; padding-right: 42px; } }
+  </style>
+</head>
+<body>
+  <!--
+    亮色优化方案：保留现有图标的语义骨架——年轮（周循环）、七个刻度（一周七天）、中心嫩芽
+    （新的任务）——但对其做适合亮色产品系统的小尺寸重构。原稿在深绿底上依赖四层半透明年轮、
+    绿色描边、金色七刻度和很小的中心芽，视觉信息太多，缩至 32px 后芽、刻度和年轮层次会互相
+    干扰。优化稿严格使用现有产品色 #1557D0 / #0B43AC / #EAF1FF：以蓝色圆角方形获得桌面应用
+    所需的背景承载力；年轮减至两层，高对比白色外环确保边界；七天刻度改为外环内侧的七个短条，
+    仍然完整保留但不抢中心；嫩芽改为白色、放大且几何化的双叶形。这个版本不试图给 logo 添加
+    新含义，只提升已有的「年轮 + 周刻度 + 嫩芽」在亮色环境和 32px 中的可读性。
+  -->
+  <header class="header">
+    <div><p class="eyebrow">WEEKLYTODO / EXISTING MARK / LIGHT OPTIMIZATION</p><h1>保留年轮树桩，做成亮色系统 Logo</h1><p class="lead">只优化原有符号，不换概念：年轮仍代表以周为周期，七个刻度仍代表一周七天，中心嫩芽仍代表新任务。重点是减法、提亮与小尺寸可读性。</p></div>
+    <div class="state">ONE REFINED DIRECTION</div>
+  </header>
+  <main>
+    <section class="comparison">
+      <article class="card before"><div class="card-head"><p class="card-label">CURRENT / 深色原稿</p></div><div class="logo-stage"><svg class="stage-logo" viewBox="0 0 200 200" aria-label="现有年轮树桩标志"><rect width="200" height="200" fill="#1C2720" rx="36"/><circle cx="100" cy="104" r="68" fill="#233028"/><circle cx="100" cy="104" r="68" stroke="#7FB069" stroke-width="5" opacity=".6"/><circle cx="100" cy="104" r="50" stroke="#7FB069" stroke-width="3" opacity=".35"/><circle cx="100" cy="104" r="32" stroke="#96C982" stroke-width="3" opacity=".55"/><circle cx="100" cy="104" r="16" stroke="#96C982" stroke-width="2" opacity=".4"/><g stroke="#D9A441" stroke-width="5" stroke-linecap="round"><line x1="100" y1="36" x2="100" y2="48"/><line x1="148" y1="56" x2="141" y2="63"/><line x1="168" y1="104" x2="156" y2="104"/><line x1="148" y1="152" x2="141" y2="145"/><line x1="100" y1="172" x2="100" y2="160"/><line x1="52" y1="152" x2="59" y2="145"/><line x1="32" y1="104" x2="44" y2="104"/></g><path d="M100 84 C 92 84, 86 90, 86 98 C 86 106, 92 112, 100 112 C 108 112, 114 106, 114 98 C 114 90, 108 84, 100 84 Z" fill="#96C982"/><path d="M100 112 C 96 124, 98 134, 104 140" stroke="#96C982" stroke-width="5" stroke-linecap="round"/></svg></div><p class="caption"><strong>问题不是含义，而是密度。</strong> 深色、绿/金多色、四层年轮与较小嫩芽更适合大尺寸插画，和当前亮色蓝色工作台存在调性断层。</p></article>
+      <article class="card after"><div class="card-head"><p class="card-label">PROPOSAL / 亮色优化稿</p><span class="tag">推荐落地</span></div><div class="logo-stage"><svg class="stage-logo" viewBox="0 0 200 200" aria-label="亮色优化年轮树桩标志"><rect width="200" height="200" rx="38" fill="#1557D0"/><circle cx="100" cy="102" r="66" fill="#0B43AC"/><circle cx="100" cy="102" r="66" fill="none" stroke="#FFFFFF" stroke-width="7"/><circle cx="100" cy="102" r="43" fill="none" stroke="#A9C7FF" stroke-width="5"/><g stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"><line x1="100" y1="32" x2="100" y2="43"/><line x1="151" y1="57" x2="143" y2="64"/><line x1="164" y1="111" x2="153" y2="110"/><line x1="128" y1="157" x2="124" y2="147"/><line x1="72" y1="157" x2="76" y2="147"/><line x1="36" y1="111" x2="47" y2="110"/><line x1="49" y1="57" x2="57" y2="64"/></g><path d="M100 82c-15 3-24 13-25 29 17 0 28-10 29-25V82Z" fill="#FFFFFF"/><path d="M101 98c2-15 13-24 29-25 0 17-10 28-25 29h-4V98Z" fill="#FFFFFF" opacity=".78"/><path d="M101 101v31" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/></svg></div><p class="caption"><strong>保持三层原有含义，只留下必要形状。</strong> 明亮的品牌蓝承接现有系统；两层年轮建立周期感；白色七刻度与放大的嫩芽在 32px 仍有明确主次。</p></article>
+    </section>
+
+    <section class="scheme">
+      <article class="spec-card"><div class="section-head"><h2>优化规则</h2><p>不添加新故事，只将已有信息按应用图标的视觉优先级重新排序。</p></div><div class="rules"><div class="rule"><div class="rule-number">01 / COLOR</div><h3 class="rule-title">统一为系统蓝</h3><p class="rule-copy">深绿、浅绿和金色移除，直接使用现有品牌蓝、深蓝与浅蓝，设置页、标题栏和 app icon 形成同一识别系统。</p></div><div class="rule"><div class="rule-number">02 / RINGS</div><h3 class="rule-title">四环减为两环</h3><p class="rule-copy">外环承担清晰边界，内环保留年轮含义。删除的两层不会减少理解，却能为中心嫩芽与周刻度腾出空间。</p></div><div class="rule"><div class="rule-number">03 / SPROUT</div><h3 class="rule-title">中心芽加大、几何化</h3><p class="rule-copy">白色双叶成为第一识别点；保留“新任务正在生长”的原意，但不再依赖小面积绿色去辨认。</p></div></div></article>
+      <article class="sizes-card"><div class="section-head"><h2>32px 检查</h2><p>以标题栏和应用列表的真实尺寸为判断基准。</p></div><div class="sizes"><div class="size" style="--mark-size:56px"><svg viewBox="0 0 200 200" aria-hidden="true"><rect width="200" height="200" rx="38" fill="#1557D0"/><circle cx="100" cy="102" r="66" fill="#0B43AC"/><circle cx="100" cy="102" r="66" fill="none" stroke="#fff" stroke-width="7"/><circle cx="100" cy="102" r="43" fill="none" stroke="#A9C7FF" stroke-width="5"/><g stroke="#fff" stroke-width="7" stroke-linecap="round"><line x1="100" y1="32" x2="100" y2="43"/><line x1="151" y1="57" x2="143" y2="64"/><line x1="164" y1="111" x2="153" y2="110"/><line x1="128" y1="157" x2="124" y2="147"/><line x1="72" y1="157" x2="76" y2="147"/><line x1="36" y1="111" x2="47" y2="110"/><line x1="49" y1="57" x2="57" y2="64"/></g><path d="M100 82c-15 3-24 13-25 29 17 0 28-10 29-25V82Z" fill="#fff"/><path d="M101 98c2-15 13-24 29-25 0 17-10 28-25 29h-4V98Z" fill="#fff" opacity=".78"/><path d="M101 101v31" stroke="#fff" stroke-width="7" stroke-linecap="round"/></svg><span>56px</span></div><div class="size" style="--mark-size:32px"><svg viewBox="0 0 200 200" aria-hidden="true"><rect width="200" height="200" rx="38" fill="#1557D0"/><circle cx="100" cy="102" r="66" fill="#0B43AC"/><circle cx="100" cy="102" r="66" fill="none" stroke="#fff" stroke-width="8"/><circle cx="100" cy="102" r="43" fill="none" stroke="#A9C7FF" stroke-width="6"/><g stroke="#fff" stroke-width="9" stroke-linecap="round"><line x1="100" y1="32" x2="100" y2="43"/><line x1="151" y1="57" x2="143" y2="64"/><line x1="164" y1="111" x2="153" y2="110"/><line x1="128" y1="157" x2="124" y2="147"/><line x1="72" y1="157" x2="76" y2="147"/><line x1="36" y1="111" x2="47" y2="110"/><line x1="49" y1="57" x2="57" y2="64"/></g><path d="M100 82c-15 3-24 13-25 29 17 0 28-10 29-25V82Z" fill="#fff"/><path d="M101 98c2-15 13-24 29-25 0 17-10 28-25 29h-4V98Z" fill="#fff"/><path d="M101 101v31" stroke="#fff" stroke-width="9" stroke-linecap="round"/></svg><span>32px</span></div><div class="size" style="--mark-size:20px"><svg viewBox="0 0 200 200" aria-hidden="true"><rect width="200" height="200" rx="38" fill="#1557D0"/><circle cx="100" cy="102" r="66" fill="#0B43AC"/><circle cx="100" cy="102" r="66" fill="none" stroke="#fff" stroke-width="10"/><g stroke="#fff" stroke-width="10" stroke-linecap="round"><line x1="100" y1="32" x2="100" y2="43"/><line x1="164" y1="111" x2="153" y2="110"/><line x1="128" y1="157" x2="124" y2="147"/><line x1="72" y1="157" x2="76" y2="147"/><line x1="36" y1="111" x2="47" y2="110"/></g><path d="M100 82c-15 3-24 13-25 29 17 0 28-10 29-25V82Z" fill="#fff"/><path d="M101 98c2-15 13-24 29-25 0 17-10 28-25 29h-4V98Z" fill="#fff"/><path d="M101 101v31" stroke="#fff" stroke-width="10" stroke-linecap="round"/></svg><span>20px</span></div></div></article>
+    </section>
+    <div class="lockup"><span class="glyph"><svg viewBox="0 0 200 200" aria-hidden="true"><circle cx="100" cy="102" r="66" fill="#0B43AC"/><circle cx="100" cy="102" r="66" fill="none" stroke="#fff" stroke-width="8"/><circle cx="100" cy="102" r="43" fill="none" stroke="#A9C7FF" stroke-width="6"/><g stroke="#fff" stroke-width="9" stroke-linecap="round"><line x1="100" y1="32" x2="100" y2="43"/><line x1="164" y1="111" x2="153" y2="110"/><line x1="128" y1="157" x2="124" y2="147"/><line x1="72" y1="157" x2="76" y2="147"/><line x1="36" y1="111" x2="47" y2="110"/></g><path d="M100 82c-15 3-24 13-25 29 17 0 28-10 29-25V82Z" fill="#fff"/><path d="M101 98c2-15 13-24 29-25 0 17-10 28-25 29h-4V98Z" fill="#fff"/><path d="M101 101v31" stroke="#fff" stroke-width="9" stroke-linecap="round"/></svg></span><span class="product-name">周计划</span><i class="split"></i><span class="subtitle">以周为单位的高效执行</span></div>
+    <div class="palette"><span class="swatch"><i class="color" style="background:#1557D0"></i>#1557D0 主色</span><span class="swatch"><i class="color" style="background:#0B43AC"></i>#0B43AC 深环</span><span class="swatch"><i class="color" style="background:#A9C7FF"></i>#A9C7FF 内环</span><span class="swatch"><i class="color" style="background:#FFFFFF"></i>#FFFFFF 主图形</span></div>
+  </main>
+</body>
+</html>
