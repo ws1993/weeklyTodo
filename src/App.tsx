@@ -9,7 +9,7 @@ import { CreateWeekModal } from './components/CreateWeekModal';
 import { UpdateModal } from './features/update/UpdateModal';
 import { SettingsOverlay } from './features/settings/SettingsOverlay';
 import { syncWebDav } from './api/nativeBridge';
-import { SettingsIcon, WorkbenchLogoIcon } from './components/ForestIcons';
+import { PlusIcon, SettingsIcon, WorkbenchLogoIcon } from './components/ForestIcons';
 import {
   isSyncDue,
   loadWebDavSettings,
@@ -41,6 +41,8 @@ export function App() {
   const [createOpen, setCreateOpen] = useState(false);
   const [updateOpen, setUpdateOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // 每次点击「新建任务」递增，通知任务树打开根级新建输入行。
+  const [newTaskRequest, setNewTaskRequest] = useState(0);
 
   useEffect(() => {
     void initialize();
@@ -123,7 +125,7 @@ export function App() {
             <span className="brand-glyph"><WorkbenchLogoIcon size={15} /></span>
             <span className="topbar-title">周计划</span>
             <span className="brand-dot" />
-            <span className="topbar-subtitle">精密工作台</span>
+            <span className="topbar-subtitle">以周为单位的高效执行</span>
           </div>
           <div className="topbar-actions">
             <span className="today">{todayLabel()}</span>
@@ -132,6 +134,7 @@ export function App() {
             <button
               className="btn btn-ghost btn-sm icon-btn"
               title="设置"
+              aria-label="打开设置"
               onClick={() => setSettingsOpen(true)}
             >
               <SettingsIcon size={17} />
@@ -179,8 +182,18 @@ export function App() {
                 <div className="tree-toolbar">
                   <span className="tree-title">任务树</span>
                   <span className="tree-hint">点击复选框切换完成状态 · 拖拽行调整层级与顺序 · 悬停行查看操作</span>
+                  <button
+                    className="btn btn-primary"
+                    title="新建任务"
+                    onClick={() => setNewTaskRequest((request) => request + 1)}
+                  >
+                    <PlusIcon size={15} />
+                    新建任务
+                  </button>
                 </div>
-                <div className="tree">{tree && <TaskTree tasks={tree.tasks} />}</div>
+                <div className="tree">
+                  {tree && <TaskTree tasks={tree.tasks} newTaskRequest={newTaskRequest} />}
+                </div>
               </section>
             </>
           )}

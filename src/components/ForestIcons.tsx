@@ -184,15 +184,24 @@ export function WorkbenchLogoIcon({ size = 15 }: { size?: number }) {
   );
 }
 
-export function EditIcon({ size = 14 }: { size?: number }) {
+/** 重命名：文本输入框 + 光标，比通用铅笔更贴合「重命名标题」。 */
+export function RenameIcon({ size = 14 }: { size?: number }) {
   return (
     <Svg size={size}>
-      <path
-        d="M15.6 4.2l-8.7 8.7L4.4 6.4 11.8 2.6l3.8 1.6zM4.4 15.4l1.4-1.6M13.9 7.6l2.7 3.1"
+      <rect
+        x="3.2"
+        y="5.2"
+        width="17.6"
+        height="13.6"
+        rx="2.6"
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="1.6"
+      />
+      <path
+        d="M8.6 9.2v5.6M7 14.8h3.2"
+        stroke="currentColor"
+        strokeWidth="1.6"
         strokeLinecap="round"
-        strokeLinejoin="round"
       />
     </Svg>
   );
@@ -201,14 +210,19 @@ export function EditIcon({ size = 14 }: { size?: number }) {
 export function SettingsIcon({ size = 14 }: { size?: number }) {
   return (
     <Svg size={size}>
-      <circle cx="12" cy="12" r="4.5" stroke="currentColor" strokeWidth="1.6" />
       <path
-        d="M12 6.4V4.9M15.96 8.04l1.06-1.06M17.6 12h1.5M15.96 15.96l1.06 1.06M12 17.6v1.5M8.04 15.96l-1.06 1.06M6.4 12H4.9M8.04 8.04 6.98 6.98"
+        d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"
         stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
       />
-      <circle cx="12" cy="12" r="1.7" stroke="currentColor" strokeWidth="1.4" />
+      <path
+        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </Svg>
   );
 }

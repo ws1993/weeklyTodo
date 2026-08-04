@@ -30,7 +30,7 @@ export function CurrentActions({ tasks }: CurrentActionsProps) {
         <span className="lane-glyph"><BoltIcon size={15} /></span>
         <div>
           <div className="actions-pane-title">当前行动</div>
-          <p className="lane-sub">可执行的叶子任务</p>
+          {/* <p className="lane-sub">可执行的叶子任务</p> */}
         </div>
         <span className="lane-count">{leaves.length}</span>
         <button className="panel-collapse" title="收起面板" onClick={() => setCollapsed(true)}>

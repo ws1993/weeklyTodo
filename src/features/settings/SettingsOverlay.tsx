@@ -90,7 +90,7 @@ export function SettingsOverlay({ open, onClose, onCheckUpdate }: SettingsOverla
           </span>
           设置
         </div>
-        <button className="settings-overlay-close" title="关闭设置" onClick={onClose}>
+        <button className="settings-overlay-close" title="关闭设置" aria-label="关闭设置" onClick={onClose}>
           <CrossIcon size={15} />
         </button>
       </header>
@@ -178,7 +178,7 @@ export function SettingsOverlay({ open, onClose, onCheckUpdate }: SettingsOverla
             <section className="settings-page">
               <header className="settings-page-head">
                 <h2 className="settings-page-title">关于</h2>
-                <p className="settings-page-sub">周计划 · 精密工作台</p>
+                <p className="settings-page-sub">周计划 · 以周为单位的高效执行</p>
               </header>
 
               <div className="about-hero">

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Task } from '../shared/contracts/types';
 import { useAppStore } from '../store/appStore';
 import { computeDrop, sortedChildren, subtreeSize } from '../utils/tree';
@@ -7,8 +7,8 @@ import {
   CheckIcon,
   ChevronRightIcon,
   CrossIcon,
-  EditIcon,
   PlusIcon,
+  RenameIcon,
   SettingsIcon,
   TrashIcon,
 } from './ForestIcons';
@@ -16,6 +16,8 @@ import { TaskDetailPanel } from './TaskDetailPanel';
 
 interface TaskTreeProps {
   tasks: Task[];
+  /** 每次变化都视为一次「新建任务」请求，打开根级新建输入行。 */
+  newTaskRequest?: number;
 }
 
 interface DropIndicator {
@@ -34,7 +36,7 @@ interface TreeDragProps {
   suppressNextClick: () => boolean;
 }
 
-export function TaskTree({ tasks }: TaskTreeProps) {
+export function TaskTree({ tasks, newTaskRequest = 0 }: TaskTreeProps) {
   const addTask = useAppStore((state) => state.addTask);
   const moveTask = useAppStore((state) => state.moveTask);
   const [addingParentId, setAddingParentId] = useState<number | 'root' | null>(null);
@@ -49,6 +51,13 @@ export function TaskTree({ tasks }: TaskTreeProps) {
   const draggingIdRef = useRef<number | null>(null);
 
   const rootTasks = useMemo(() => sortedChildren(tasks, null), [tasks]);
+
+  useEffect(() => {
+    if (newTaskRequest > 0) {
+      setAddingParentId('root');
+      setDraftTitle('');
+    }
+  }, [newTaskRequest]);
 
   const submitDraft = async () => {
     const title = draftTitle.trim();
@@ -425,16 +434,18 @@ function TaskNode({
           <button
             className="edit-btn"
             title="重命名"
+            aria-label="重命名"
             onClick={(event) => {
               event.stopPropagation();
               setEditing(true);
             }}
           >
-            <EditIcon size={14} />
+            <RenameIcon size={14} />
           </button>
           <button
             className="edit-btn"
             title="任务设置"
+            aria-label="打开任务设置"
             onClick={(event) => {
               event.stopPropagation();
               onOpenSettings(task);
