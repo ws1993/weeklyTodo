@@ -231,6 +231,7 @@ button{font-family:inherit;color:inherit}
   display:flex;align-items:center;gap:10px;min-height:42px;padding:4px 14px;
   border-bottom:1px solid var(--border);position:relative;cursor:pointer;
   transition:background .12s;
+  -webkit-user-select:none;user-select:none;
 }
 .tree-row:last-child{border-bottom:none}
 .tree-row:hover{background:var(--surface-2)}

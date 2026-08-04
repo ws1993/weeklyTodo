@@ -28,6 +28,7 @@ interface TreeDragProps {
   dropIndicator: DropIndicator | null;
   startDrag: (taskId: number) => void;
   endDrag: () => void;
+  getDraggingId: () => number | null;
   updateDrop: (indicator: DropIndicator | null) => void;
   handleDrop: (target: Task, position: DropPosition) => void;
   suppressNextClick: () => boolean;
@@ -43,6 +44,9 @@ export function TaskTree({ tasks }: TaskTreeProps) {
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
   // Some browsers fire a click on the dragged row after the drag ends; swallow it.
   const suppressClickRef = useRef(false);
+  // The HTML5 drag handlers run synchronously and cannot rely on React state
+  // (setState inside dragstart is async), so mirror the dragged id in a ref.
+  const draggingIdRef = useRef<number | null>(null);
 
   const rootTasks = useMemo(() => sortedChildren(tasks, null), [tasks]);
 
@@ -57,15 +61,19 @@ export function TaskTree({ tasks }: TaskTreeProps) {
   };
 
   const startDrag = (taskId: number) => {
+    draggingIdRef.current = taskId;
     setDraggingId(taskId);
     setDropIndicator(null);
   };
 
   const endDrag = () => {
+    draggingIdRef.current = null;
     setDraggingId(null);
     setDropIndicator(null);
     suppressClickRef.current = true;
   };
+
+  const getDraggingId = () => draggingIdRef.current;
 
   const updateDrop = (indicator: DropIndicator | null) => {
     setDropIndicator((prev) =>
@@ -76,12 +84,13 @@ export function TaskTree({ tasks }: TaskTreeProps) {
   };
 
   const handleDrop = (target: Task, position: DropPosition) => {
-    if (draggingId === null) {
+    const draggedId = draggingIdRef.current;
+    if (draggedId === null) {
       return;
     }
-    const drop = computeDrop(tasks, draggingId, target, position);
+    const drop = computeDrop(tasks, draggedId, target, position);
     if (drop) {
-      void moveTask(draggingId, drop.parentId, drop.index);
+      void moveTask(draggedId, drop.parentId, drop.index);
     }
     endDrag();
   };
@@ -99,6 +108,7 @@ export function TaskTree({ tasks }: TaskTreeProps) {
     dropIndicator,
     startDrag,
     endDrag,
+    getDraggingId,
     updateDrop,
     handleDrop,
     suppressNextClick,
@@ -263,19 +273,36 @@ function TaskNode({
     .join(' ');
 
   const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    if (drag.draggingId === null || drag.draggingId === task.id) {
+    const draggedId = drag.getDraggingId();
+    if (draggedId === null || draggedId === task.id) {
       return;
     }
+    // Always allow the drop event to fire so we control the outcome and the
+    // cursor (move vs no-drop) based on computeDrop, instead of leaving the
+    // browser's default "forbidden" gesture.
+    event.preventDefault();
     const rect = event.currentTarget.getBoundingClientRect();
     const ratio = (event.clientY - rect.top) / rect.height;
     const position: DropPosition = ratio < 0.25 ? 'before' : ratio > 0.75 ? 'after' : 'inside';
-    if (!computeDrop(allTasks, drag.draggingId, task, position)) {
+    const drop = computeDrop(allTasks, draggedId, task, position);
+    if (!drop) {
       event.dataTransfer.dropEffect = 'none';
+      drag.updateDrop(null);
+      return;
+    }
+    event.dataTransfer.dropEffect = 'move';
+    drag.updateDrop({ taskId: task.id, position });
+  };
+
+  // Some engines (e.g. WebView2) also require preventing default on dragenter
+  // before dragover can enable the drop.
+  const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+    const draggedId = drag.getDraggingId();
+    if (draggedId === null || draggedId === task.id) {
       return;
     }
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
-    drag.updateDrop({ taskId: task.id, position });
   };
 
   const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
@@ -309,6 +336,7 @@ function TaskNode({
           onOpenSettings(task);
         }}
         draggable={!editing}
+        onDragEnter={handleDragEnter}
         onDragStart={(event) => {
           event.dataTransfer.effectAllowed = 'move';
           event.dataTransfer.setData('text/plain', String(task.id));
