@@ -3,16 +3,21 @@ import { PlusIcon, TrashIcon, RenameIcon, CheckIcon, CrossIcon } from '../../com
 import { useAppStore } from '../../store/appStore';
 import type { Owner, Tag } from '../../shared/contracts/types';
 import * as bridge from '../../api/nativeBridge';
+import { GROUP_PALETTE } from '../../utils/groupColors';
 
 type EditingState = { id: number; name: string } | null;
 
 export function ManagementPanel() {
   const owners = useAppStore((state) => state.owners);
   const tags = useAppStore((state) => state.tags);
+  const groupColors = useAppStore((state) => state.groupColors);
+  const setGroupColor = useAppStore((state) => state.setGroupColor);
+  const resetGroupColor = useAppStore((state) => state.resetGroupColor);
   const refreshMetadata = useAppStore((state) => state.refreshMetadata);
   const refreshTree = useAppStore((state) => state.refreshTree);
 
-  const [activeSection, setActiveSection] = useState<'owners' | 'tags'>('owners');
+  const [activeSection, setActiveSection] = useState<'owners' | 'tags' | 'colors'>('owners');
+  const [expandedColorGroup, setExpandedColorGroup] = useState<string | null>(null);
   const [newOwnerName, setNewOwnerName] = useState('');
   const [newTagName, setNewTagName] = useState('');
   const [editingOwner, setEditingOwner] = useState<EditingState>(null);
@@ -119,6 +124,27 @@ export function ManagementPanel() {
     }
   };
 
+  const handleSetGroupColor = async (name: string, color: string) => {
+    setError(null);
+    setExpandedColorGroup(null);
+    try {
+      await setGroupColor(name, color);
+    } catch (backendError) {
+      setError(String(backendError));
+    }
+  };
+
+  const handleResetGroupColor = async (name: string) => {
+    setError(null);
+    try {
+      await resetGroupColor(name);
+    } catch (backendError) {
+      setError(String(backendError));
+    }
+  };
+
+  const usedColors = groupColors.map((entry) => entry.color);
+
   return (
     <div className="management-panel">
       <div className="management-tabs">
@@ -137,6 +163,14 @@ export function ManagementPanel() {
         >
           标签
           <span className="management-tab-count">{tags.length}</span>
+        </button>
+        <button
+          type="button"
+          className={`management-tab${activeSection === 'colors' ? ' active' : ''}`}
+          onClick={() => setActiveSection('colors')}
+        >
+          分组颜色
+          <span className="management-tab-count">{groupColors.length}</span>
         </button>
       </div>
 
@@ -310,6 +344,87 @@ export function ManagementPanel() {
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {activeSection === 'colors' && (
+          <div className="management-colors">
+            <p className="management-colors-hint">
+              每个根任务（分组）首次出现时自动分配色板中第一个未使用的颜色，标题不变则跨周保持同色；可手动覆盖。
+            </p>
+            <div className="management-palette" title="实心 = 已使用，空心 = 未使用">
+              {GROUP_PALETTE.map((color) => {
+                const inUse = usedColors.includes(color);
+                return (
+                  <span
+                    key={color}
+                    className={`palette-swatch${inUse ? ' in-use' : ''}`}
+                    style={{ background: color }}
+                    title={`${color}${inUse ? ' · 已使用' : ' · 未使用'}`}
+                  />
+                );
+              })}
+            </div>
+
+            {groupColors.length === 0 && (
+              <p className="management-empty">
+                暂无分组颜色。在任务树中新建根任务后，会在此自动分配颜色。
+              </p>
+            )}
+
+            <div className="management-group-list">
+              {groupColors.map((entry) => (
+                <div key={entry.name} className="management-group">
+                  <div className="management-group-row">
+                    <span className="management-group-dot" style={{ background: entry.color }} />
+                    <span className="management-group-name">{entry.name}</span>
+                    <span className={`management-group-badge${entry.isManual ? '' : ' auto'}`}>
+                      {entry.isManual ? '手动' : '自动'}
+                    </span>
+                    <div className="management-group-actions">
+                      <button
+                        type="button"
+                        className="management-group-btn"
+                        onClick={() =>
+                          setExpandedColorGroup((current) =>
+                            current === entry.name ? null : entry.name,
+                          )
+                        }
+                      >
+                        {expandedColorGroup === entry.name ? '收起' : '换色'}
+                      </button>
+                      {entry.isManual && (
+                        <button
+                          type="button"
+                          className="management-group-btn"
+                          onClick={() => void handleResetGroupColor(entry.name)}
+                        >
+                          恢复自动
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {expandedColorGroup === entry.name && (
+                    <div className="management-group-expand">
+                      {GROUP_PALETTE.map((color) => {
+                        const usedElsewhere =
+                          usedColors.includes(color) && entry.color !== color;
+                        return (
+                          <button
+                            key={color}
+                            type="button"
+                            className={`palette-swatch${usedElsewhere ? ' used-elsewhere' : ''}`}
+                            style={{ background: color }}
+                            title={`${color}${usedElsewhere ? ' · 被其他分组使用' : ''}`}
+                            onClick={() => void handleSetGroupColor(entry.name, color)}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

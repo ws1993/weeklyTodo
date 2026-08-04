@@ -236,6 +236,38 @@ pub async fn delete_tag(id: i64) -> Result<(), String> {
     domain::delete_tag(&conn, id)
 }
 
+/// All group color mappings (name -> color).
+#[tauri::command]
+pub async fn list_group_colors() -> Result<Vec<domain::GroupColor>, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    domain::list_group_colors(&conn)
+}
+
+/// Get a group's color, auto-assigning the first unused palette color when missing.
+#[tauri::command]
+pub async fn ensure_group_color(name: String) -> Result<domain::GroupColor, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    domain::ensure_group_color(&conn, &name)
+}
+
+/// Manually set a group's color.
+#[tauri::command]
+pub async fn set_group_color(name: String, color: String) -> Result<domain::GroupColor, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    domain::set_group_color(&conn, &name, &color)
+}
+
+/// Re-auto-assign a group's color, clearing the manual override flag.
+#[tauri::command]
+pub async fn reset_group_color(name: String) -> Result<domain::GroupColor, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    domain::reset_group_color(&conn, &name)
+}
+
 #[tauri::command]
 pub async fn close_task(week_id: String, task_id: i64) -> Result<domain::Task, String> {
     let config = resolve_storage()?;

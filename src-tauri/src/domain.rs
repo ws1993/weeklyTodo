@@ -60,6 +60,23 @@ pub struct Tag {
     pub name: String,
 }
 
+/// A color mapping for one root task (group). Auto-assigned from the palette
+/// on first appearance, overridable by the user (is_manual).
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GroupColor {
+    pub name: String,
+    pub color: String,
+    pub is_manual: bool,
+}
+
+/// High-distinction palette used for group color auto-assignment.
+/// Must stay in sync with `GROUP_PALETTE` in `src/utils/groupColors.ts`.
+pub const GROUP_COLOR_PALETTE: [&str; 12] = [
+    "#E05A3E", "#E0A03D", "#A9B84A", "#4F9E5A", "#2E9E7C", "#2AA5A0",
+    "#3B8FBF", "#4A6FD1", "#5A5FC0", "#7A5FC0", "#C05FA0", "#C0557A",
+];
+
 /// Format a date as `YYYYMMDD`.
 fn date_key(date: NaiveDate) -> String {
     date.format("%Y%m%d").to_string()
@@ -398,6 +415,130 @@ pub fn delete_tag(conn: &Connection, id: i64) -> Result<(), String> {
         return Err("标签不存在".to_string());
     }
     Ok(())
+}
+
+fn group_color_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<GroupColor> {
+    Ok(GroupColor {
+        name: row.get(0)?,
+        color: row.get(1)?,
+        is_manual: row.get::<_, i64>(2)? != 0,
+    })
+}
+
+fn read_group_color(conn: &Connection, name: &str) -> Result<Option<GroupColor>, String> {
+    conn.query_row(
+        "SELECT name, color, is_manual FROM group_colors WHERE name = ?1",
+        params![name],
+        group_color_from_row,
+    )
+    .optional()
+    .map_err(|error| format!("读取分组颜色失败：{error}"))
+}
+
+/// First palette color not yet used by any stored mapping.
+fn first_unused_palette_color(conn: &Connection) -> Result<&'static str, String> {
+    let mut stmt = conn
+        .prepare("SELECT color FROM group_colors")
+        .map_err(|error| format!("查询分组颜色失败：{error}"))?;
+    let used = stmt
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|error| format!("遍历分组颜色失败：{error}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("读取分组颜色失败：{error}"))?;
+    GROUP_COLOR_PALETTE
+        .iter()
+        .copied()
+        .find(|color| !used.iter().any(|used_color| used_color.as_str() == *color))
+        .ok_or_else(|| "分组颜色已用尽，请手动选择".to_string())
+}
+
+/// All group color mappings (name -> color), ordered by name.
+pub fn list_group_colors(conn: &Connection) -> Result<Vec<GroupColor>, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT name, color, is_manual FROM group_colors
+             ORDER BY name COLLATE NOCASE, rowid",
+        )
+        .map_err(|error| format!("查询分组颜色列表失败：{error}"))?;
+    let colors = stmt
+        .query_map([], group_color_from_row)
+        .map_err(|error| format!("遍历分组颜色列表失败：{error}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("读取分组颜色列表失败：{error}"))?;
+    Ok(colors)
+}
+
+/// Get the color for a group, auto-assigning the first unused palette color
+/// when the mapping does not exist yet.
+pub fn ensure_group_color(conn: &Connection, name: &str) -> Result<GroupColor, String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err("分组名称不能为空".to_string());
+    }
+    if let Some(existing) = read_group_color(conn, trimmed)? {
+        return Ok(existing);
+    }
+    let color = first_unused_palette_color(conn)?;
+    conn.execute(
+        "INSERT INTO group_colors (name, color, is_manual) VALUES (?1, ?2, 0)",
+        params![trimmed, color],
+    )
+    .map_err(|error| format!("写入分组颜色失败：{error}"))?;
+    read_group_color(conn, trimmed)?.ok_or_else(|| "读取新建分组颜色失败".to_string())
+}
+
+/// Manually set a group's color.
+pub fn set_group_color(conn: &Connection, name: &str, color: &str) -> Result<GroupColor, String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err("分组名称不能为空".to_string());
+    }
+    conn.execute(
+        "INSERT INTO group_colors (name, color, is_manual) VALUES (?1, ?2, 1)
+         ON CONFLICT(name) DO UPDATE SET color = excluded.color, is_manual = 1",
+        params![trimmed, color],
+    )
+    .map_err(|error| format!("设置分组颜色失败：{error}"))?;
+    read_group_color(conn, trimmed)?.ok_or_else(|| "读取分组颜色失败".to_string())
+}
+
+/// Re-auto-assign a group's color (first unused palette color), clearing the
+/// manual override flag.
+pub fn reset_group_color(conn: &Connection, name: &str) -> Result<GroupColor, String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err("分组名称不能为空".to_string());
+    }
+    let current = read_group_color(conn, trimmed)?
+        .ok_or_else(|| "分组颜色不存在".to_string())?;
+    let color = first_unused_palette_color_excluding(conn, &current.color)?;
+    conn.execute(
+        "UPDATE group_colors SET color = ?1, is_manual = 0 WHERE name = ?2",
+        params![color, trimmed],
+    )
+    .map_err(|error| format!("重置分组颜色失败：{error}"))?;
+    read_group_color(conn, trimmed)?.ok_or_else(|| "读取分组颜色失败".to_string())
+}
+
+/// First palette color not used by any *other* mapping, so the group keeps its
+/// current color when it is already the only user of it.
+fn first_unused_palette_color_excluding(
+    conn: &Connection,
+    current_color: &str,
+) -> Result<&'static str, String> {
+    let mut stmt = conn
+        .prepare("SELECT color FROM group_colors")
+        .map_err(|error| format!("查询分组颜色失败：{error}"))?;
+    let used = stmt
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|error| format!("遍历分组颜色失败：{error}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("读取分组颜色失败：{error}"))?;
+    GROUP_COLOR_PALETTE
+        .iter()
+        .copied()
+        .find(|color| *color == current_color || !used.iter().any(|used_color| used_color.as_str() == *color))
+        .ok_or_else(|| "分组颜色已用尽，请手动选择".to_string())
 }
 
 fn has_week(conn: &Connection, week_id: &str) -> Result<bool, String> {
@@ -1304,6 +1445,46 @@ mod tests {
         .unwrap();
         assert_eq!(cleared.owner_name, None);
         assert!(cleared.tags.is_empty());
+    }
+
+    #[test]
+    fn group_colors_auto_assign_first_unused_palette_color() {
+        let conn = db::open_in_memory();
+
+        let first = ensure_group_color(&conn, "产品发布冲刺").unwrap();
+        assert_eq!(first.color, GROUP_COLOR_PALETTE[0]);
+        assert!(!first.is_manual);
+
+        let second = ensure_group_color(&conn, "团队管理").unwrap();
+        assert_eq!(second.color, GROUP_COLOR_PALETTE[1]);
+
+        // 已存在的分组保持原色不变。
+        let again = ensure_group_color(&conn, "产品发布冲刺").unwrap();
+        assert_eq!(again.color, first.color);
+
+        // 空名称拒绝。
+        assert!(ensure_group_color(&conn, "   ").is_err());
+    }
+
+    #[test]
+    fn group_colors_manual_override_and_reset() {
+        let conn = db::open_in_memory();
+        ensure_group_color(&conn, "产品发布冲刺").unwrap();
+        ensure_group_color(&conn, "团队管理").unwrap();
+
+        // 手动换色后标记为 manual。
+        let manual = set_group_color(&conn, "产品发布冲刺", "#C0557A").unwrap();
+        assert_eq!(manual.color, "#C0557A");
+        assert!(manual.is_manual);
+
+        // 恢复自动：取色板中第一个未被其他分组使用的颜色。
+        let reset = reset_group_color(&conn, "产品发布冲刺").unwrap();
+        assert_eq!(reset.color, GROUP_COLOR_PALETTE[0]);
+        assert!(!reset.is_manual);
+
+        // 列表包含全部映射。
+        let list = list_group_colors(&conn).unwrap();
+        assert_eq!(list.len(), 2);
     }
 
     #[test]

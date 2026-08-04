@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type {
   ExecutionMode,
+  GroupColor,
   Owner,
   Tag,
   Task,
@@ -17,6 +18,7 @@ interface AppState {
   allWeeks: Week[];
   owners: Owner[];
   tags: Tag[];
+  groupColors: GroupColor[];
   tree: WeekTreePayload | null;
   loading: boolean;
   error: string | null;
@@ -49,6 +51,9 @@ interface AppState {
   moveTask: (taskId: number, newParentId: number | null, newIndex: number) => Promise<void>;
   deleteTask: (taskId: number) => Promise<void>;
   createWeek: (mondayDate: string) => Promise<Week>;
+  ensureGroupColor: (name: string) => Promise<void>;
+  setGroupColor: (name: string, color: string) => Promise<void>;
+  resetGroupColor: (name: string) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -59,6 +64,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   allWeeks: [],
   owners: [],
   tags: [],
+  groupColors: [],
   tree: null,
   loading: true,
   error: null,
@@ -95,8 +101,36 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   refreshMetadata: async () => {
-    const [owners, tags] = await Promise.all([bridge.listOwners(), bridge.listTags()]);
-    set({ owners, tags });
+    const [owners, tags, groupColors] = await Promise.all([
+      bridge.listOwners(),
+      bridge.listTags(),
+      bridge.listGroupColors(),
+    ]);
+    set({ owners, tags, groupColors });
+  },
+
+  ensureGroupColor: async (name) => {
+    const entry = await bridge.ensureGroupColor(name);
+    set((state) => {
+      const rest = state.groupColors.filter((item) => item.name !== entry.name);
+      return { groupColors: [...rest, entry] };
+    });
+  },
+
+  setGroupColor: async (name, color) => {
+    const entry = await bridge.setGroupColor(name, color);
+    set((state) => {
+      const rest = state.groupColors.filter((item) => item.name !== entry.name);
+      return { groupColors: [...rest, entry] };
+    });
+  },
+
+  resetGroupColor: async (name) => {
+    const entry = await bridge.resetGroupColor(name);
+    set((state) => {
+      const rest = state.groupColors.filter((item) => item.name !== entry.name);
+      return { groupColors: [...rest, entry] };
+    });
   },
 
   selectWeek: async (weekId) => {

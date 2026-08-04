@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Task } from '../shared/contracts/types';
 import { useAppStore } from '../store/appStore';
-import { computeDrop, sortedChildren, subtreeSize } from '../utils/tree';
+import { computeDrop, descendantIds, sortedChildren, subtreeSize } from '../utils/tree';
 import type { DropPosition } from '../utils/tree';
 import {
   CheckIcon,
@@ -18,6 +18,8 @@ interface TaskTreeProps {
   tasks: Task[];
   /** 每次变化都视为一次「新建任务」请求，打开根级新建输入行。 */
   newTaskRequest?: number;
+  /** 定位请求：滚动到该任务并高亮，同时展开其祖先节点。 */
+  locateRequest?: { taskId: number; nonce: number } | null;
 }
 
 interface DropIndicator {
@@ -36,9 +38,10 @@ interface TreeDragProps {
   suppressNextClick: () => boolean;
 }
 
-export function TaskTree({ tasks, newTaskRequest = 0 }: TaskTreeProps) {
+export function TaskTree({ tasks, newTaskRequest = 0, locateRequest = null }: TaskTreeProps) {
   const addTask = useAppStore((state) => state.addTask);
   const moveTask = useAppStore((state) => state.moveTask);
+  const treeRef = useRef<HTMLDivElement | null>(null);
   const [addingParentId, setAddingParentId] = useState<number | 'root' | null>(null);
   const [draftTitle, setDraftTitle] = useState('');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -51,6 +54,25 @@ export function TaskTree({ tasks, newTaskRequest = 0 }: TaskTreeProps) {
   const draggingIdRef = useRef<number | null>(null);
 
   const rootTasks = useMemo(() => sortedChildren(tasks, null), [tasks]);
+
+  const locateTargetId = locateRequest?.taskId ?? null;
+
+  useEffect(() => {
+    if (!locateRequest) {
+      return;
+    }
+    // 等待祖先节点展开与 DOM 更新完成后再滚动。
+    const timer = window.setTimeout(() => {
+      const node = treeRef.current?.querySelector(`[data-node="${locateRequest.taskId}"]`);
+      const row = node?.querySelector<HTMLElement>('.tree-row');
+      if (row) {
+        row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        row.classList.add('locate-flash');
+        window.setTimeout(() => row.classList.remove('locate-flash'), 1800);
+      }
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [locateRequest]);
 
   useEffect(() => {
     if (newTaskRequest > 0) {
@@ -142,7 +164,7 @@ export function TaskTree({ tasks, newTaskRequest = 0 }: TaskTreeProps) {
   }
 
   return (
-    <div>
+    <div ref={treeRef}>
       {rootTasks.map((task) => (
         <TaskNode
           key={task.id}
@@ -150,6 +172,7 @@ export function TaskTree({ tasks, newTaskRequest = 0 }: TaskTreeProps) {
           allTasks={tasks}
           isTop
           depth={0}
+          expandTargetId={locateTargetId}
           onOpenSettings={setSelectedTask}
           drag={dragProps}
         />
@@ -210,6 +233,8 @@ interface TaskNodeProps {
   allTasks: Task[];
   isTop?: boolean;
   depth?: number;
+  /** 定位目标任务 id：若在该节点的子树中，则自动展开。 */
+  expandTargetId?: number | null;
   onOpenSettings: (task: Task) => void;
   drag: TreeDragProps;
 }
@@ -219,6 +244,7 @@ function TaskNode({
   allTasks,
   isTop = false,
   depth = 0,
+  expandTargetId = null,
   onOpenSettings,
   drag,
 }: TaskNodeProps) {
@@ -236,6 +262,13 @@ function TaskNode({
   const children = useMemo(() => sortedChildren(allTasks, task.id), [allTasks, task.id]);
   const hasChildren = children.length > 0;
   const closed = task.status === 'closed';
+
+  // 定位目标位于本节点子树内时，强制展开以便目标可见。
+  useEffect(() => {
+    if (expandTargetId != null && descendantIds(allTasks, task.id).has(expandTargetId)) {
+      setExpanded(true);
+    }
+  }, [expandTargetId, allTasks, task.id]);
 
   const saveEdit = async () => {
     const title = draft.trim();

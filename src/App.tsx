@@ -46,6 +46,10 @@ export function App() {
   const [preloadedUpdate, setPreloadedUpdate] = useState<UpdateCheckResult | null>(null);
   // 每次点击「新建任务」递增，通知任务树打开根级新建输入行。
   const [newTaskRequest, setNewTaskRequest] = useState(0);
+  // 右侧「当前行动」点击某行动时，在任务树中定位并高亮。
+  const [locateRequest, setLocateRequest] = useState<{ taskId: number; nonce: number } | null>(
+    null,
+  );
 
   useEffect(() => {
     void initialize();
@@ -223,13 +227,24 @@ export function App() {
                   </button>
                 </div>
                 <div className="tree">
-                  {tree && <TaskTree tasks={tree.tasks} newTaskRequest={newTaskRequest} />}
+                  {tree && (
+                    <TaskTree
+                      tasks={tree.tasks}
+                      newTaskRequest={newTaskRequest}
+                      locateRequest={locateRequest}
+                    />
+                  )}
                 </div>
               </section>
             </>
           )}
         </main>
-        {tree && <CurrentActions tasks={tree.tasks} />}
+        {tree && (
+          <CurrentActions
+            tasks={tree.tasks}
+            onLocate={(taskId) => setLocateRequest({ taskId, nonce: Date.now() })}
+          />
+        )}
       </div>
 
       <QueryView

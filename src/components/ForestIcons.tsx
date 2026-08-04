@@ -150,6 +150,22 @@ export function BoltIcon({ size = 14 }: { size?: number }) {
   );
 }
 
+/** 定位：十字准星，用于在任务树中定位某任务。 */
+export function LocateIcon({ size = 14 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <circle cx="12" cy="12" r="6.5" stroke="currentColor" strokeWidth="1.7" />
+      <path
+        d="M12 2.5v3.5M12 18v3.5M2.5 12H6M18 12h3.5"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+    </Svg>
+  );
+}
+
 export function FolderIcon({ size = 15 }: { size?: number }) {
   return (
     <Svg size={size}>

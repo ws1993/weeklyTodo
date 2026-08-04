@@ -3,7 +3,7 @@ use std::path::Path;
 use rusqlite::Connection;
 
 pub const DB_FILE_NAME: &str = "weeklytodo.db";
-pub const SCHEMA_VERSION: i32 = 2;
+pub const SCHEMA_VERSION: i32 = 3;
 
 /// Open (or create) the SQLite database inside `data_dir` and run migrations.
 pub fn open_database(data_dir: &Path) -> Result<Connection, String> {
@@ -95,6 +95,24 @@ pub fn migrate(conn: &mut Connection) -> Result<(), String> {
         )
         .map_err(|error| format!("升级表结构失败：{error}"))?;
         tx.pragma_update(None, "user_version", 2)
+            .map_err(|error| format!("写入数据库版本失败：{error}"))?;
+        tx.commit()
+            .map_err(|error| format!("提交迁移失败：{error}"))?;
+    }
+
+    if version < 3 {
+        let tx = conn
+            .transaction()
+            .map_err(|error| format!("开启迁移事务失败：{error}"))?;
+        tx.execute_batch(
+            "CREATE TABLE IF NOT EXISTS group_colors (
+                name TEXT PRIMARY KEY,
+                color TEXT NOT NULL,
+                is_manual INTEGER NOT NULL DEFAULT 0
+            );",
+        )
+        .map_err(|error| format!("创建分组颜色表失败：{error}"))?;
+        tx.pragma_update(None, "user_version", 3)
             .map_err(|error| format!("写入数据库版本失败：{error}"))?;
         tx.commit()
             .map_err(|error| format!("提交迁移失败：{error}"))?;

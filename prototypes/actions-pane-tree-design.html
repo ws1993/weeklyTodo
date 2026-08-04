@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>当前行动面板 · 树结构重设计（原型）</title>
+<style>
+:root{
+  --bg:#F2F6FA;
+  --surface:#FFFFFF;
+  --surface-2:#F7F9FC;
+  --text-1:#172033;
+  --text-2:#647086;
+  --text-3:#8B95A7;
+  --text-4:#A8B2C1;
+  --brand:#1557D0;
+  --brand-soft:#EAF1FF;
+  --brand-border:#C9DBF7;
+  --success:#167354;
+  --success-soft:#E8F4EF;
+  --warning:#9B5D00;
+  --border:#E1E7F0;
+  --border-strong:#CDD7E6;
+  --radius:3px;
+  --font:"Segoe UI Variable","Microsoft YaHei UI",-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC","Hiragino Sans GB",sans-serif;
+  --mono:"Cascadia Mono","Cascadia Code",Consolas,"JetBrains Mono",monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--font);font-size:13px;color:var(--text-1);
+  background-color:var(--bg);
+  background-image:
+    linear-gradient(rgba(21,87,208,.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(21,87,208,.028) 1px, transparent 1px);
+  background-size:24px 24px;
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;color:inherit;cursor:pointer}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#C9D3E2;border-radius:999px;border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- 原型舞台 ---------- */
+.stage{display:grid;grid-template-rows:auto minmax(0,1fr) auto;height:100vh;min-width:1180px}
+.proto-head{
+  display:flex;align-items:center;gap:28px;padding:12px 20px;
+  background:var(--surface);border-bottom:1px solid var(--border);z-index:6;
+}
+.proto-title .kicker{font-size:10px;letter-spacing:2px;color:var(--brand);font-weight:600}
+.proto-title h1{font-size:16px;font-weight:600;letter-spacing:.4px;margin-top:2px}
+.proto-title p{font-size:11px;color:var(--text-3);margin-top:3px}
+.tabs{display:flex;gap:6px;margin-left:auto;flex:none}
+.tabs-sep{width:1px;height:22px;background:var(--border);flex:none;margin:0 2px}
+.tab{
+  border:1px solid var(--border);background:var(--surface);color:var(--text-2);
+  border-radius:var(--radius);height:34px;padding:0 14px;font-size:12.5px;
+  display:inline-flex;align-items:center;gap:6px;transition:all .12s;
+}
+.tab:hover{border-color:var(--brand-border);color:var(--brand);background:var(--brand-soft)}
+.tab.active{border-color:var(--brand);background:var(--brand);color:#fff;box-shadow:0 2px 8px rgba(21,87,208,.28)}
+.tab .tag-mini{font-size:10px;opacity:.75}
+.tab.ghost{background:transparent;border-style:dashed}
+.tab.ghost:hover{border-style:solid}
+
+/* ---------- App 壳 ---------- */
+.app-frame{
+  display:grid;grid-template-columns:300px minmax(0,1fr) 288px;
+  min-height:0;min-width:1180px;
+}
+.rail{
+  background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;min-height:0;
+}
+.rail-title{padding:12px 14px 8px;font-size:11px;color:var(--text-3);letter-spacing:1px;flex:none}
+.week-item{
+  display:flex;align-items:center;gap:8px;padding:9px 14px;font-size:12.5px;color:var(--text-2);
+  border-left:3px solid transparent;cursor:default;
+}
+.week-item .w-id{font-family:var(--mono);font-size:11px;color:var(--text-3)}
+.week-item.now{background:var(--brand-soft);border-left-color:var(--brand);color:var(--brand);font-weight:600}
+.week-item.now .w-id{color:var(--brand)}
+.week-item.dim{opacity:.55}
+.rail-note{margin-top:auto;padding:10px 14px;font-size:10.5px;color:var(--text-4);border-top:1px solid var(--border);line-height:1.7}
+
+.center{display:flex;flex-direction:column;min-height:0;min-width:0;gap:12px;padding:14px 16px;overflow-y:auto}
+.week-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex:none;
+}
+.week-id{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--text-1)}
+.chip{border-radius:999px;padding:1px 9px;font-size:11px;line-height:18px;border:1px solid var(--success-border);background:var(--success-soft);color:var(--success)}
+.badge-now{font-size:11px;color:var(--brand);background:var(--brand-soft);border:1px solid var(--brand-border);border-radius:999px;padding:1px 8px;line-height:18px}
+.week-range{font-size:11.5px;color:var(--text-3);margin-top:3px}
+.week-stats{font-size:11.5px;color:var(--text-2)}
+.week-stats b{font-weight:600;color:var(--text-1)}
+.week-progress{width:180px;height:4px;background:var(--surface-2);border-radius:999px;margin-top:6px;overflow:hidden}
+.week-progress i{display:block;height:100%;background:var(--brand);border-radius:999px}
+
+.tree-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;display:flex;flex-direction:column;min-height:0}
+.tree-toolbar{
+  display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border);flex:none;
+}
+.tree-title{font-size:13px;font-weight:600}
+.tree-hint{font-size:11px;color:var(--text-3)}
+.tree{flex:1;overflow-y:auto;padding:6px 0}
+.tree-row{
+  display:flex;align-items:center;gap:8px;padding:6px 14px 6px 0;font-size:13px;
+  border-radius:3px;transition:background .1s;
+}
+.tree-row:hover{background:var(--surface-2)}
+.tree-row.flash{background:var(--warning-soft);outline:1px solid var(--warning-border)}
+.tr-indent{flex:none}
+.tr-arrow{width:16px;height:16px;flex:none;display:grid;place-items:center;color:var(--text-3)}
+.tr-check{
+  width:15px;height:15px;border:1.4px solid var(--border-strong);border-radius:3px;flex:none;
+  display:grid;place-items:center;background:var(--surface);
+}
+.tr-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.tr-title.root{font-weight:600}
+.tag{
+  flex:none;font-size:10px;line-height:16px;border-radius:999px;padding:0 7px;
+  border:1px solid var(--border);color:var(--text-3);background:var(--surface-2);
+}
+.tag.p1{border-color:var(--danger-border);color:var(--danger);background:var(--danger-soft)}
+.tag.p2{border-color:var(--warning-border);color:var(--warning);background:var(--warning-soft)}
+.tag.follow{border-color:var(--brand-border);color:var(--brand);background:var(--brand-soft)}
+.tag.owner{border-color:var(--success-border);color:var(--success);background:var(--success-soft)}
+.row-spacer{flex:1}
+
+/* ---------- 右侧面板 ---------- */
+.pane{
+  background:var(--surface);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;min-height:0;
+}
+.lane-head{
+  display:flex;align-items:center;gap:8px;padding:11px 12px 11px 14px;
+  border-bottom:1px solid var(--border);flex:none;
+}
+.lane-glyph{display:flex;align-items:center;color:var(--brand);flex:none}
+.pane-title{font-size:13px;font-weight:600;color:var(--text-1);white-space:nowrap}
+.lane-count{
+  font-size:11px;color:var(--brand);background:var(--brand-soft);
+  border:1px solid var(--brand-border);border-radius:999px;padding:0 7px;line-height:18px;white-space:nowrap;
+}
+.lane-sub{font-size:10.5px;color:var(--text-4);margin-left:2px;flex:1;text-align:right}
+.action-list{flex:1;overflow-y:auto;min-height:0}
+.panel-foot{
+  padding:9px 14px;border-top:1px solid var(--border);font-size:11px;
+  color:var(--text-3);flex:none;background:var(--surface-2);
+}
+
+/* ============ 方向 A：路径面包屑 ============ */
+.leaf-card{
+  display:flex;align-items:center;gap:10px;padding:9px 14px;
+  border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;
+}
+.leaf-card:hover{background:var(--brand-soft)}
+.leaf-ic{color:var(--brand);display:flex;align-items:center;flex:none}
+.leaf-body{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+.leaf-title{font-size:12.5px;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.leaf-path{
+  font-size:10.5px;color:var(--text-4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  display:flex;align-items:center;gap:4px;
+}
+.leaf-path .seg{color:var(--text-3)}
+.leaf-path .sep{opacity:.55}
+.pick-btn{
+  flex:none;font-size:11px;color:var(--brand);background:var(--brand-soft);
+  border:1px solid var(--brand-border);border-radius:3px;padding:3px 9px;
+  transition:background .12s,color .12s;
+}
+.pick-btn:hover{background:var(--brand);color:#fff}
+
+/* ============ 方向 B：树形分组 ============ */
+.group-head{
+  display:flex;align-items:center;gap:7px;padding:9px 14px;
+  border-bottom:1px solid var(--border);background:var(--surface-2);
+  cursor:pointer;user-select:none;
+}
+.group-head:hover{background:#EEF2F8}
+.group-head .gh-arrow{color:var(--text-3);display:flex;transition:transform .15s}
+.group-head.collapsed .gh-arrow{transform:rotate(-90deg)}
+.group-head .gh-name{font-size:12.5px;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.group-head .gh-count{
+  margin-left:auto;font-size:10.5px;color:var(--text-3);background:var(--surface);
+  border:1px solid var(--border);border-radius:999px;padding:0 7px;line-height:17px;flex:none;
+}
+.group-body{border-bottom:1px solid var(--border)}
+.group-body.hidden{display:none}
+.mid-head{
+  padding:7px 14px 3px 26px;font-size:11px;font-weight:500;color:var(--text-3);
+  display:flex;align-items:center;gap:5px;
+}
+.mid-head::after{content:"";flex:1;height:1px;background:var(--border)}
+.b-leaf{
+  display:flex;align-items:center;gap:9px;padding:7px 14px 7px 30px;cursor:pointer;
+  position:relative;transition:background .12s;
+}
+.b-leaf:hover{background:var(--brand-soft)}
+.b-leaf::before{
+  content:"";position:absolute;left:19px;top:0;bottom:0;width:1px;background:var(--border);
+}
+.b-leaf:first-child::before{top:50%}
+.b-leaf:last-child::before{bottom:50%}
+.b-leaf.no-mid::before{display:none}
+.b-ic{color:var(--brand);display:flex;align-items:center;flex:none}
+.b-name{font-size:12.5px;min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.b-prio{flex:none;font-size:10px;border-radius:999px;padding:0 6px;line-height:16px;border:1px solid var(--warning-border);color:var(--warning);background:var(--warning-soft)}
+.b-prio.p1{border-color:var(--danger-border);color:var(--danger);background:var(--danger-soft)}
+
+/* ============ 方向 C：组色编码 + 定位 ============ */
+.group-chips{display:flex;gap:5px;padding:9px 12px;border-bottom:1px solid var(--border);flex-wrap:wrap;flex:none}
+.g-chip{
+  display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 9px;border-radius:999px;
+  font-size:11px;color:var(--text-2);border:1px solid var(--border);background:var(--surface);transition:all .12s;
+}
+.g-chip .dot{width:7px;height:7px;border-radius:50%;flex:none}
+.g-chip:hover{border-color:var(--border-strong)}
+.g-chip.active{color:var(--text-1);border-color:var(--border-strong);background:var(--surface-2);font-weight:600}
+.g-chip.active .dot{box-shadow:0 0 0 2px rgba(0,0,0,.05)}
+.c-leaf{
+  display:flex;align-items:center;gap:9px;padding:9px 14px;border-bottom:1px solid var(--border);
+  cursor:pointer;transition:background .12s;
+}
+.c-leaf:hover{background:var(--brand-soft)}
+.c-dot{width:8px;height:8px;border-radius:50%;flex:none;box-shadow:0 0 0 3px color-mix(in srgb,currentColor 14%,transparent)}
+.c-body{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+.c-title{font-size:12.5px;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c-path{font-size:10.5px;color:var(--text-4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.locate-btn{
+  flex:none;width:24px;height:24px;border-radius:3px;border:1px solid transparent;
+  background:transparent;color:var(--text-4);display:grid;place-items:center;
+  opacity:.65;transition:all .12s;
+}
+.c-leaf:hover .locate-btn{opacity:1}
+.locate-btn:hover{color:var(--brand);background:var(--brand-soft);border-color:var(--brand-border)}
+
+/* ---------- 底部说明 ---------- */
+.proto-foot{
+  background:var(--surface);border-top:1px solid var(--border);
+  padding:10px 20px;display:flex;gap:36px;align-items:stretch;z-index:6;
+}
+.foot-card{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}
+.foot-card .fc-tag{font-size:10px;letter-spacing:1.5px;font-weight:600;color:var(--brand)}
+.foot-card .fc-name{font-size:12.5px;font-weight:600}
+.foot-card .fc-desc{font-size:11.5px;color:var(--text-2);line-height:1.7}
+.foot-card .fc-tradeoff{font-size:11px;color:var(--text-3);line-height:1.7}
+.foot-card .fc-tradeoff b{color:var(--warning);font-weight:500}
+.foot-card:not(.active){opacity:.45}
+
+/* ---------- 色码维护演示浮层 ---------- */
+.color-modal{
+  position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;
+  background:rgba(23,32,51,.38);backdrop-filter:blur(2px);
+}
+.color-modal[hidden]{display:none}
+.color-dialog{
+  width:560px;max-width:94vw;max-height:86vh;overflow-y:auto;
+  background:var(--surface);border:1px solid var(--border-strong);border-radius:6px;
+  box-shadow:0 18px 50px -12px rgba(23,32,51,.25);padding:0 0 18px;
+}
+.color-dialog-head{
+  display:flex;align-items:center;gap:10px;padding:14px 18px 0;position:sticky;top:0;background:var(--surface);
+}
+.color-dialog-head h3{font-size:15px;font-weight:600;letter-spacing:.3px}
+.color-dialog-close{
+  margin-left:auto;width:28px;height:28px;display:grid;place-items:center;border-radius:3px;
+  border:1px solid transparent;background:transparent;color:var(--text-3);cursor:pointer;
+}
+.color-dialog-close:hover{color:var(--text-1);background:var(--surface-2);border-color:var(--border)}
+.color-dialog-desc{font-size:12px;color:var(--text-2);line-height:1.8;padding:8px 18px 0}
+.color-dialog-desc b{color:var(--text-1);font-weight:600}
+.color-dialog-sec{padding:14px 18px 0}
+.color-dialog-sec .sec-label{font-size:11px;color:var(--text-3);letter-spacing:1px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.color-dialog-sec .sec-label::after{content:"";flex:1;height:1px;background:var(--border)}
+.palette-row{display:flex;gap:8px;flex-wrap:wrap}
+.palette-swatch{
+  width:26px;height:26px;border-radius:50%;border:1px solid rgba(0,0,0,.08);cursor:pointer;
+  transition:transform .1s, box-shadow .1s;
+}
+.palette-swatch:hover{transform:scale(1.15);box-shadow:0 2px 8px rgba(23,32,51,.25)}
+.palette-swatch.inuse{outline:2px solid var(--border-strong);outline-offset:2px;cursor:default}
+.palette-swatch.inuse:hover{transform:none;box-shadow:none}
+.group-color-list{border:1px solid var(--border);border-radius:5px;overflow:hidden}
+.gcr{
+  display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);
+  background:var(--surface);
+}
+.gcr:last-child{border-bottom:none}
+.gcr:hover{background:var(--surface-2)}
+.gcr .gcr-dot{width:12px;height:12px;border-radius:50%;flex:none}
+.gcr .gcr-name{font-size:13px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gcr .gcr-badge{font-size:10px;color:var(--text-4);border:1px solid var(--border);border-radius:999px;padding:0 6px;line-height:16px;flex:none}
+.gcr .gcr-badge.auto{color:var(--success);border-color:var(--success-border);background:var(--success-soft)}
+.gcr .gcr-actions{margin-left:auto;display:flex;gap:6px;flex:none}
+.gcr .gcr-btn{
+  font-size:11px;height:24px;padding:0 9px;border-radius:3px;cursor:pointer;
+  border:1px solid var(--border);background:var(--surface);color:var(--text-2);
+}
+.gcr .gcr-btn:hover{color:var(--brand);border-color:var(--brand-border);background:var(--brand-soft)}
+.gcr-expand{border-bottom:1px solid var(--border);padding:0 12px 10px 34px;background:var(--surface-2);display:flex;gap:7px;flex-wrap:wrap}
+.gcr-expand .palette-swatch{width:22px;height:22px}
+.gcr-expand .palette-swatch.inuse{border-style:dashed;opacity:.35}
+.add-group-row{display:flex;gap:8px;margin-top:12px}
+.add-group-row input{
+  flex:1;min-width:0;height:30px;border:1px solid var(--border-strong);border-radius:3px;
+  padding:0 10px;font-family:inherit;font-size:13px;outline:none;color:var(--text-1);
+}
+.add-group-row input:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(21,87,208,.12)}
+.color-modal-note{font-size:11px;color:var(--text-3);line-height:1.7;padding:12px 18px 0}
+.color-modal-note code{font-family:var(--mono);font-size:10.5px;color:var(--brand)}
+</style>
+</head>
+<body>
+<div class="stage">
+  <header class="proto-head">
+    <div class="proto-title">
+      <div class="kicker">PROTOTYPE · 3 DIRECTIONS</div>
+      <h1>当前行动面板 — 带上任务树结构</h1>
+      <p>假设：树只渲染到「与行动相关的祖先路径」，不做完整树；完成/折叠/定位保持现有交互逻辑。数据为演示样例。</p>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-dir="a"><span class="tag-mini">A</span>路径面包屑</button>
+      <button class="tab" data-dir="b"><span class="tag-mini">B</span>树形分组</button>
+      <button class="tab" data-dir="c"><span class="tag-mini">C</span>组色定位</button>
+      <span class="tabs-sep"></span>
+      <button class="tab ghost" id="openColorModal" title="演示：分组色码的自动分配与维护">色码维护演示</button>
+    </nav>
+  </header>
+
+  <div class="app-frame">
+    <aside class="rail">
+      <div class="rail-title">周导航</div>
+      <div class="week-item dim"><span class="w-id">2026-W30</span>07-20 ~ 07-26</div>
+      <div class="week-item dim"><span class="w-id">2026-W31</span>07-27 ~ 08-02</div>
+      <div class="week-item now"><span class="w-id">2026-W32</span>08-03 ~ 08-09<span class="badge-now">本周</span></div>
+      <div class="week-item"><span class="w-id">2026-W33</span>08-10 ~ 08-16</div>
+      <div class="rail-note">原型：右侧面板为当前行动列表。<br>中间为对应周的任务树（点击 C 方向的行可定位到树）。</div>
+    </aside>
+
+    <main class="center">
+      <section class="week-card">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="week-id">2026-W32</span>
+            <span class="chip">进行中</span>
+            <span class="badge-now">本周</span>
+          </div>
+          <div class="week-range">2026-08-03 ~ 08-09 · 承接自 2026-W31</div>
+        </div>
+        <div class="week-stats">
+          <b>16</b> 项任务 · <b>6</b> 已完成 · <b>10</b> 进行中
+          <div class="week-progress"><i style="width:37%"></i></div>
+        </div>
+      </section>
+
+      <section class="tree-card">
+        <div class="tree-toolbar">
+          <span class="tree-title">任务树</span>
+          <span class="tree-hint">点击复选框切换完成 · 拖拽调整层级</span>
+        </div>
+        <div class="tree" id="tree"></div>
+      </section>
+    </main>
+
+    <aside class="pane">
+      <div class="lane-head">
+        <span class="lane-glyph" id="laneGlyph"></span>
+        <span class="pane-title">当前行动</span>
+        <span class="lane-count" id="laneCount">10</span>
+        <span class="lane-sub" id="laneSub"></span>
+      </div>
+      <div class="action-list" id="actionList"></div>
+      <div class="panel-foot" id="panelFoot"></div>
+    </aside>
+  </div>
+
+  <footer class="proto-foot" id="protoFoot"></footer>
+</div>
+
+<!-- 色码维护演示浮层（模拟 设置 › 管理 › 分组颜色） -->
+<div class="color-modal" id="colorModal" hidden>
+  <div class="color-dialog" role="dialog" aria-modal="true" aria-label="分组颜色维护">
+    <div class="color-dialog-head">
+      <h3>分组颜色</h3>
+      <span class="lane-sub" style="flex:none;margin-left:8px">设置 › 管理 › 分组颜色</span>
+      <button class="color-dialog-close" id="closeColorModal" title="关闭" aria-label="关闭">✕</button>
+    </div>
+    <p class="color-dialog-desc">
+      <b>自动分配：</b>每个根任务（=分组）首次出现时，自动取用色板中第一个未使用的颜色，并记住该「标题 → 颜色」映射。
+      标题不变时下周带入仍保持同色；也可随时手动覆盖。
+    </p>
+    <div class="color-dialog-sec">
+      <div class="sec-label">色板 · 12 色（高区分度，避开品牌蓝与语义色）</div>
+      <div class="palette-row" id="paletteRow"></div>
+    </div>
+    <div class="color-dialog-sec">
+      <div class="sec-label">当前分组映射</div>
+      <div class="group-color-list" id="groupColorList"></div>
+    </div>
+    <div class="color-dialog-sec">
+      <div class="add-group-row">
+        <input id="newGroupName" type="text" placeholder="输入新根任务标题，演示自动分配色码…" />
+        <button class="btn btn-primary btn-sm" id="addGroupBtn">自动分配并添加</button>
+      </div>
+    </div>
+    <p class="color-modal-note">
+      原型演示自动分配 + 手动覆盖两种维护方式。真实实现时映射存
+      <code>SQLite group_colors</code>（随 WebDAV 同步），而非 localStorage（不同步）。
+    </p>
+  </div>
+</div>
+
+<script>
+/* ================= 演示数据（模拟 2026-W32 任务树） ================= */
+/* 分组 = 根任务。色码不写死在组上，而是运行时自动分配并"持久化"到
+   groupColors 映射（真实实现存 SQLite group_colors 表，随 WebDAV 同步）。 */
+const GROUPS = [
+  { id: 'launch', name: '产品发布冲刺' },
+  { id: 'team',   name: '团队管理' },
+  { id: 'review', name: '季度复盘' },
+  { id: 'growth', name: '个人成长' },
+];
+
+/* 12 色色板：色相均匀分布、高区分度，避开品牌蓝(#1557D0)与语义色。 */
+const PALETTE = [
+  '#E05A3E', // 橙红
+  '#E0A03D', // 琥珀
+  '#A9B84A', // 黄绿
+  '#4F9E5A', // 绿
+  '#2E9E7C', // 翠绿
+  '#2AA5A0', // 青
+  '#3B8FBF', // 天蓝
+  '#4A6FD1', // 蓝
+  '#5A5FC0', // 靛
+  '#7A5FC0', // 紫
+  '#C05FA0', // 洋红
+  '#C0557A', // 玫红
+];
+
+const groupColors = {};      // groupId -> color（模拟持久化映射）
+const groupColorSource = {}; // groupId -> 'auto' | 'manual'
+let expandedGroup = null;    // 管理浮层中正在换色的行
+
+function ensureGroupColor(groupId) {
+  if (groupColors[groupId]) {
+    return;
+  }
+  const used = Object.values(groupColors);
+  const next = PALETTE.find((color) => !used.includes(color)) ?? PALETTE[0];
+  groupColors[groupId] = next;
+  groupColorSource[groupId] = 'auto';
+}
+
+function groupColor(groupId) {
+  return groupColors[groupId];
+}
+
+/* 首次加载：模拟数据库里已有的映射（按组顺序自动分配）。 */
+GROUPS.forEach((group) => ensureGroupColor(group.id));
+
+const TREE = [
+  { group: 'launch', name: '产品发布冲刺', children: [
+    { name: '竞品调研', children: [
+      { id: 't1', name: '整理竞品功能对比表', prio: 1 },
+      { id: 't2', name: '输出调研结论文档',   prio: 1 },
+    ]},
+    { name: '新版首页改版', children: [
+      { id: 't3', name: '设计首页信息架构', prio: 1 },
+      { id: 't4', name: '开发响应式布局',   prio: 2 },
+    ]},
+    { name: '发布排期沟通', children: [
+      { id: 't5', name: '确认发布窗口与责任人', prio: 1, follow: true, owner: '李晨' },
+    ]},
+  ]},
+  { group: 'team', name: '团队管理', children: [
+    { id: 't6', name: '周会材料准备',     prio: 2 },
+    { id: 't7', name: '1对1 面谈（3 人）', prio: 1 },
+  ]},
+  { group: 'review', name: '季度复盘', children: [
+    { id: 't8', name: '收集各业务线数据', prio: 2 },
+    { id: 't9', name: '起草复盘大纲',     prio: 1, follow: true, owner: '王敏' },
+  ]},
+  { group: 'growth', name: '个人成长', children: [
+    { id: 't10', name: '读完《设计心理学》', prio: 2 },
+  ]},
+];
+
+/* 展开为带路径的叶子列表 */
+const LEAVES = [];
+function walk(node, groupId, path) {
+  const nextPath = [...path, node.name];
+  if (node.children) {
+    node.children.forEach((child) => walk(child, groupId, nextPath));
+  } else {
+    const group = GROUPS.find((g) => g.id === groupId);
+    LEAVES.push({ ...node, groupId, groupName: group.name, color: groupColor(groupId), path: nextPath });
+  }
+}
+TREE.forEach((root) => walk(root, root.group, []));
+
+/* 新增分组（演示自动分配色码）：同时加一棵占位子树，让树和面板都能看到。 */
+function addGroup(name) {
+  const id = 'g' + Date.now().toString(36);
+  GROUPS.push({ id, name });
+  ensureGroupColor(id);
+  TREE.push({ group: id, name, children: [
+    { id: id + '-task', name: '（新分组的首个行动）', prio: 2 },
+  ]});
+  LEAVES.length = 0;
+  TREE.forEach((root) => walk(root, root.group, []));
+}
+
+const groupOf = (leaf) => GROUPS.find((g) => g.id === leaf.groupId);
+const boltSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M13 2.5 5.5 13.5H11l-1 8 7.5-11H12l1-8z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>';
+const chevronSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="m9 6 6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const locateSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="1.7"/><path d="M15.5 15.5 21 21M10.5 7.5v6M7.5 10.5h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+
+/* ================= 中间任务树渲染 ================= */
+function renderTree() {
+  const tree = document.getElementById('tree');
+  let html = '';
+  TREE.forEach((root) => {
+    renderNode(root, 0, true);
+  });
+  function renderNode(node, depth, isRoot) {
+    html += `<div class="tree-row" id="tree-${node.id || ''}" data-id="${node.id || ''}">
+      <span class="tr-indent" style="width:${depth * 20}px"></span>
+      <span class="tr-arrow">${node.children ? chevronSvg : ''}</span>
+      <span class="tr-check"></span>
+      <span class="tr-title ${isRoot ? 'root' : ''}">${node.name}</span>
+      ${renderTags(node)}
+      <span class="row-spacer"></span>
+    </div>`;
+    if (node.children) {
+      node.children.forEach((child) => renderNode(child, depth + 1, false));
+    }
+  }
+  function renderTags(node) {
+    if (!node.children) {
+      return `<span class="tag ${node.prio === 1 ? 'p1' : 'p2'}">P${node.prio}</span>
+        ${node.follow ? '<span class="tag follow">跟进</span>' : '<span class="tag">自己</span>'}
+        ${node.owner ? `<span class="tag owner">${node.owner}</span>` : ''}`;
+    }
+    return '';
+  }
+  tree.innerHTML = html;
+}
+
+/* 定位：树中高亮并滚动到对应行 */
+function locateTo(taskId) {
+  const row = document.getElementById(`tree-${taskId}`);
+  if (!row) return;
+  row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  row.classList.add('flash');
+  setTimeout(() => row.classList.remove('flash'), 1800);
+}
+
+/* ================= 方向 A：路径面包屑 ================= */
+function renderDirA() {
+  return LEAVES.map((leaf) => `
+    <div class="leaf-card" title="${leaf.path.join(' › ')}">
+      <span class="leaf-ic">${boltSvg}</span>
+      <span class="leaf-body">
+        <span class="leaf-title">${leaf.name}</span>
+        <span class="leaf-path">
+          ${leaf.path.slice(0, -1).map((seg, i) =>
+            `<span class="seg">${seg}</span><span class="sep">›</span>`).join('')}
+        </span>
+      </span>
+      <button class="pick-btn">完成</button>
+    </div>`).join('');
+}
+
+/* ================= 方向 B：树形分组 ================= */
+function renderDirB() {
+  const items = [];
+  TREE.forEach((root) => {
+    const leaves = [];
+    collect(root, root.children, 1);
+    function collect(ownerNode, children, depth) {
+      children.forEach((child) => {
+        if (child.children) {
+          leaves.push({ type: 'mid', name: child.name, depth });
+          collect(child, child.children, depth + 1);
+        } else {
+          leaves.push({ type: 'leaf', leaf: child, depth });
+        }
+      });
+    }
+    const group = GROUPS.find((g) => g.id === root.group);
+    items.push({ rootName: root.name, group, leaves });
+  });
+
+  return items.map((item) => `
+    <button class="group-head" data-group="${item.group.id}" title="折叠 / 展开此组">
+      <span class="gh-arrow">${chevronSvg}</span>
+      <span class="gh-name">${item.rootName}</span>
+      <span class="gh-count">${item.leaves.filter((l) => l.type === 'leaf').length}</span>
+    </button>
+    <div class="group-body" data-body="${item.group.id}">
+      ${item.leaves.map((row) => row.type === 'mid'
+        ? `<div class="mid-head">${row.name}</div>`
+        : `<div class="b-leaf" data-id="${row.leaf.id}">
+             <span class="b-ic">${boltSvg}</span>
+             <span class="b-name">${row.leaf.name}</span>
+             <span class="b-prio ${row.leaf.prio === 1 ? 'p1' : ''}">P${row.leaf.prio}</span>
+             <button class="pick-btn">完成</button>
+           </div>`).join('')}
+    </div>`).join('');
+}
+
+/* ================= 方向 C：组色编码 + 定位 ================= */
+let activeGroupFilter = 'all';
+function renderDirC() {
+  const chips = `<div class="group-chips">
+    <button class="g-chip ${activeGroupFilter === 'all' ? 'active' : ''}" data-filter="all">
+      <span class="dot" style="background:#8B95A7"></span>全部
+    </button>
+    ${GROUPS.map((g) => `
+      <button class="g-chip ${activeGroupFilter === g.id ? 'active' : ''}" data-filter="${g.id}">
+        <span class="dot" style="background:${groupColor(g.id)}"></span>${g.name}
+      </button>`).join('')}
+  </div>`;
+  const filtered = activeGroupFilter === 'all'
+    ? LEAVES
+    : LEAVES.filter((leaf) => leaf.groupId === activeGroupFilter);
+  const rows = filtered.map((leaf) => `
+    <div class="c-leaf" data-id="${leaf.id}" data-group="${leaf.groupId}" style="color:${leaf.color}">
+      <span class="c-dot"></span>
+      <span class="c-body">
+        <span class="c-title">${leaf.name}</span>
+        <span class="c-path">${leaf.path.slice(0, -1).join(' › ') || leaf.groupName}</span>
+      </span>
+      <button class="locate-btn" title="在任务树中定位">${locateSvg}</button>
+      <button class="pick-btn">完成</button>
+    </div>`).join('');
+  return chips + rows;
+}
+
+/* ================= 面板状态 ================= */
+let direction = 'a';
+const laneSubMap = {
+  a: '每项带祖先路径',
+  b: '按目标分组',
+  c: '组色 + 可定位',
+};
+
+function renderPane() {
+  const list = document.getElementById('actionList');
+  const laneGlyph = document.getElementById('laneGlyph');
+  const laneSub = document.getElementById('laneSub');
+  const pane = list.closest('.pane');
+  laneGlyph.innerHTML = boltSvg;
+  laneSub.textContent = laneSubMap[direction];
+  list.className = `action-list dir-${direction}`;
+  if (direction === 'a') list.innerHTML = renderDirA();
+  if (direction === 'b') list.innerHTML = renderDirB();
+  if (direction === 'c') list.innerHTML = renderDirC();
+  document.getElementById('panelFoot').textContent = `共 ${LEAVES.length} 项待办 · 原型 ${direction.toUpperCase()}`;
+
+  /* 面板内的行交互委托 */
+  list.querySelectorAll('.b-leaf, .c-leaf, .leaf-card').forEach((row) => {
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('.pick-btn')) return;
+      const id = row.dataset.id;
+      if (id) locateTo(id);
+    });
+  });
+  list.querySelectorAll('.pick-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      btn.textContent = '✓';
+      btn.style.color = 'var(--success)';
+      btn.style.borderColor = 'var(--success-border)';
+      btn.style.background = 'var(--success-soft)';
+    });
+  });
+  if (direction === 'b') {
+    list.querySelectorAll('.group-head').forEach((head) => {
+      head.addEventListener('click', () => {
+        const body = list.querySelector(`[data-body="${head.dataset.group}"]`);
+        const collapsed = head.classList.toggle('collapsed');
+        body.classList.toggle('hidden', collapsed);
+      });
+    });
+  }
+  if (direction === 'c') {
+    list.querySelectorAll('.g-chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        activeGroupFilter = chip.dataset.filter;
+        renderPane();
+      });
+    });
+  }
+  pane.scrollTop = 0;
+}
+
+/* ================= 底部说明 ================= */
+const DIR_INFO = {
+  a: {
+    name: 'A · 路径面包屑',
+    desc: '每张行动卡在标题下补一行 10.5px 灰色祖先路径（父任务 › 中间层）。不改变现有列表的扫描节奏，信息完整、改动最小。',
+    tradeoff: '取舍：路径超过两段时占双行；顶层结构不可折叠，长列表仍需上下扫。',
+  },
+  b: {
+    name: 'B · 树形分组',
+    desc: '按顶层目标分组，组头可折叠；组内用缩进 + 引导线还原「目标 → 环节 → 行动」的层级骨架，大脑按大任务批量处理。',
+    tradeoff: '取舍：纵向占用更多，叶子多时滚动变长；深层级靠引导线，最深处信息仍偏弱。',
+  },
+  c: {
+    name: 'C · 组色编码 + 定位',
+    desc: '每个行动挂上所属目标组的色点，顶部组 chips 可一键过滤；点任意行可在左侧任务树中定位并高亮。扫色即知归属，复杂树也不迷路。',
+    tradeoff: '取舍：色码可自动分配 + 手动覆盖（见「色码维护演示」）；首次使用要适应色码；「全部」视图仍是平铺。',
+  },
+};
+function renderFoot() {
+  document.getElementById('protoFoot').innerHTML = ['a', 'b', 'c'].map((key) => {
+    const info = DIR_INFO[key];
+    return `<div class="foot-card ${key === direction ? 'active' : ''}">
+      <span class="fc-tag">DIRECTION ${key.toUpperCase()}</span>
+      <span class="fc-name">${info.name}</span>
+      <span class="fc-desc">${info.desc}</span>
+      <span class="fc-tradeoff"><b>取舍</b>：${info.tradeoff}</span>
+    </div>`;
+  }).join('');
+}
+
+/* ================= 色码维护浮层 ================= */
+function renderColorModal() {
+  const paletteRow = document.getElementById('paletteRow');
+  const groupColorList = document.getElementById('groupColorList');
+  const usedColors = Object.values(groupColors);
+
+  paletteRow.innerHTML = PALETTE.map((color) => {
+    const inUse = usedColors.includes(color);
+    return `<button type="button" class="palette-swatch ${inUse ? 'inuse' : ''}"
+      style="background:${color}" title="${color}${inUse ? ' · 已使用' : ' · 未使用'}"
+      data-color="${color}" ${inUse ? 'disabled' : ''}></button>`;
+  }).join('');
+
+  groupColorList.innerHTML = GROUPS.map((group) => {
+    const source = groupColorSource[group.id];
+    const expanded = expandedGroup === group.id;
+    const rowExpander = expanded
+      ? `<div class="gcr-expand" data-group="${group.id}">
+          ${PALETTE.map((color) => {
+            const usedElsewhere = usedColors.includes(color) && groupColors[group.id] !== color;
+            return `<button type="button" class="palette-swatch ${usedElsewhere ? 'inuse' : ''}"
+              style="background:${color}" title="${color}${usedElsewhere ? ' · 被其他分组使用' : ''}"
+              data-color="${color}"></button>`;
+          }).join('')}
+        </div>`
+      : '';
+    return `
+      <div class="gcr" data-group="${group.id}">
+        <span class="gcr-dot" style="background:${groupColor(group.id)}"></span>
+        <span class="gcr-name">${group.name}</span>
+        <span class="gcr-badge ${source === 'auto' ? 'auto' : ''}">
+          ${source === 'auto' ? '自动' : '手动'}
+        </span>
+        <span class="gcr-actions">
+          <button type="button" class="gcr-btn" data-action="pick">
+            ${expanded ? '收起' : '换色'}
+          </button>
+          ${source === 'manual'
+            ? `<button type="button" class="gcr-btn" data-action="reset">恢复自动</button>`
+            : ''}
+        </span>
+      </div>
+      ${rowExpander}`;
+  }).join('');
+}
+
+function openColorModal() {
+  document.getElementById('colorModal').hidden = false;
+  renderColorModal();
+}
+
+function closeColorModal() {
+  document.getElementById('colorModal').hidden = true;
+  expandedGroup = null;
+}
+
+/* ================= 事件 ================= */
+document.getElementById('tabs').addEventListener('click', (e) => {
+  const tab = e.target.closest('.tab');
+  if (!tab || !tab.dataset.dir) return;
+  direction = tab.dataset.dir;
+  document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t === tab));
+  renderPane();
+  renderFoot();
+});
+
+document.getElementById('openColorModal').addEventListener('click', openColorModal);
+document.getElementById('closeColorModal').addEventListener('click', closeColorModal);
+document.getElementById('colorModal').addEventListener('click', (e) => {
+  if (e.target.id === 'colorModal') {
+    closeColorModal();
+  }
+});
+
+/* 新增分组：自动分配色板上第一个未使用色，联动树与面板。 */
+document.getElementById('addGroupBtn').addEventListener('click', () => {
+  const input = document.getElementById('newGroupName');
+  const name = input.value.trim();
+  if (!name) return;
+  if (GROUPS.some((group) => group.name === name)) {
+    input.value = '';
+    return;
+  }
+  addGroup(name);
+  input.value = '';
+  renderTree();
+  renderPane();
+  renderFoot();
+  renderColorModal();
+});
+
+document.getElementById('groupColorList').addEventListener('click', (e) => {
+  const pick = e.target.closest('[data-action="pick"]');
+  if (pick) {
+    const groupId = pick.closest('.gcr').dataset.group;
+    expandedGroup = expandedGroup === groupId ? null : groupId;
+    renderColorModal();
+    return;
+  }
+  const reset = e.target.closest('[data-action="reset"]');
+  if (reset) {
+    const groupId = reset.closest('.gcr').dataset.group;
+    const usedByOthers = GROUPS
+      .filter((group) => group.id !== groupId)
+      .map((group) => groupColors[group.id]);
+    const next = PALETTE.find((color) => !usedByOthers.includes(color)) ?? groupColors[groupId];
+    groupColors[groupId] = next;
+    groupColorSource[groupId] = 'auto';
+    expandedGroup = null;
+    renderColorModal();
+    renderPane();
+    return;
+  }
+  const swatch = e.target.closest('.gcr-expand .palette-swatch');
+  if (swatch) {
+    const groupId = swatch.closest('.gcr-expand').dataset.group;
+    groupColors[groupId] = swatch.dataset.color;
+    groupColorSource[groupId] = 'manual';
+    expandedGroup = null;
+    renderColorModal();
+    renderPane();
+  }
+});
+
+renderTree();
+renderPane();
+renderFoot();
+</script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 import type {
   AppStatePayload,
   ExecutionMode,
+  GroupColor,
   MigrateResult,
   Owner,
   ProxyConfigPayload,
@@ -129,6 +130,22 @@ export async function renameTag(id: number, name: string): Promise<Tag> {
 
 export async function deleteTag(id: number): Promise<void> {
   return invokeCommand<void>('delete_tag', { id });
+}
+
+export async function listGroupColors(): Promise<GroupColor[]> {
+  return invokeCommand<GroupColor[]>('list_group_colors');
+}
+
+export async function ensureGroupColor(name: string): Promise<GroupColor> {
+  return invokeCommand<GroupColor>('ensure_group_color', { name });
+}
+
+export async function setGroupColor(name: string, color: string): Promise<GroupColor> {
+  return invokeCommand<GroupColor>('set_group_color', { name, color });
+}
+
+export async function resetGroupColor(name: string): Promise<GroupColor> {
+  return invokeCommand<GroupColor>('reset_group_color', { name });
 }
 
 export async function closeTask(weekId: string, taskId: number): Promise<Task> {

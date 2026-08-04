@@ -19,6 +19,13 @@ export interface Tag {
   name: string;
 }
 
+/** Color mapping for one root task (group), keyed by the root task title. */
+export interface GroupColor {
+  name: string;
+  color: string;
+  isManual: boolean;
+}
+
 export interface Task {
   id: number;
   weekId: string;
