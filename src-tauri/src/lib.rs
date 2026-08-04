@@ -63,6 +63,7 @@ pub fn run() {
             commands::migrate_storage_to,
             commands::check_for_app_update,
             commands::download_and_install_update,
+            commands::exit_app_for_update,
             commands::open_release_page,
             commands::webdav_test_connection,
             commands::webdav_save_credentials,

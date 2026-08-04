@@ -56,6 +56,14 @@ fn build_client(proxy: Option<&ProxyConfig>) -> Result<reqwest::Client, String> 
         .map_err(|error| format!("创建 HTTP 客户端失败：{error}"))
 }
 
+/// Keep the progress bar below 100 until the file has been fully written and synced.
+fn calculate_download_percent(downloaded: u64, total: u64) -> u32 {
+    if total == 0 {
+        return 0;
+    }
+    ((downloaded as f64 / total as f64 * 100.0).floor() as u32).min(99)
+}
+
 /// Query GitHub for the latest release and compare against the running version.
 pub async fn check_for_update(proxy: Option<ProxyConfig>) -> Result<UpdateCheckResult, String> {
     let client = build_client(proxy.as_ref())?;
@@ -298,7 +306,7 @@ pub async fn download_and_install_update(
             .map_err(|error| format!("写入安装包失败：{error}"))?;
         downloaded += chunk.len() as u64;
         if total > 0 {
-            let percent = (downloaded as f64 / total as f64 * 100.0).round() as u32;
+            let percent = calculate_download_percent(downloaded, total);
             let _ = app.emit(
                 "update-download-progress",
                 serde_json::json!({
@@ -361,5 +369,12 @@ mod tests {
             compare_versions("1.2.3", "beta"),
             std::cmp::Ordering::Greater
         );
+    }
+
+    #[test]
+    fn download_progress_reaches_100_only_after_completion() {
+        assert_eq!(calculate_download_percent(99_500, 100_000), 99);
+        assert_eq!(calculate_download_percent(100_000, 100_000), 99);
+        assert_eq!(calculate_download_percent(0, 0), 0);
     }
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   checkForAppUpdate,
   downloadAndInstallUpdate,
+  exitAppForUpdate,
   openReleasePage,
   subscribeUpdateDownloadProgress,
 } from '../../api/nativeBridge';
@@ -17,9 +18,9 @@ interface UpdateModalProps {
 }
 
 export function UpdateModal({ open, onClose, preloaded }: UpdateModalProps) {
-  const [state, setState] = useState<'idle' | 'checking' | 'available' | 'downloading' | 'error'>(
-    'idle',
-  );
+  const [state, setState] = useState<
+    'idle' | 'checking' | 'available' | 'downloading' | 'readyToInstall' | 'error'
+  >('idle');
   const [version, setVersion] = useState('');
   const [body, setBody] = useState('');
   const [downloadUrl, setDownloadUrl] = useState('');
@@ -72,9 +73,19 @@ export function UpdateModal({ open, onClose, preloaded }: UpdateModalProps) {
     setPercent(0);
     try {
       await downloadAndInstallUpdate(downloadUrl, getSavedProxyConfig());
-      // The installer launches after app exit; the window may stay open briefly.
+      setPercent(100);
+      setState('readyToInstall');
     } catch (downloadError) {
       setError(String(downloadError));
+      setState('error');
+    }
+  };
+
+  const closeAndInstall = async () => {
+    try {
+      await exitAppForUpdate();
+    } catch (exitError) {
+      setError(String(exitError));
       setState('error');
     }
   };
@@ -137,6 +148,22 @@ export function UpdateModal({ open, onClose, preloaded }: UpdateModalProps) {
                     background: 'var(--brand)',
                   }}
                 />
+              </div>
+            </>
+          )}
+          {state === 'readyToInstall' && (
+            <>
+              <div className="modal-hint" style={{ fontSize: 14 }}>
+                更新包已下载
+              </div>
+              <div className="modal-hint" style={{ marginTop: 10 }}>
+                关闭应用后将自动开始安装。
+              </div>
+              <div className="modal-actions">
+                <button className="btn btn-ghost" onClick={onClose}>稍后关闭</button>
+                <button className="btn btn-primary" onClick={() => void closeAndInstall()}>
+                  立即关闭并安装
+                </button>
               </div>
             </>
           )}

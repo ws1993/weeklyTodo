@@ -358,6 +358,13 @@ pub async fn download_and_install_update(
     updater::download_and_install_update(app, download_url, proxy).await
 }
 
+/// Exit the current process so the detached updater helper can start NSIS.
+#[tauri::command]
+pub async fn exit_app_for_update(app: AppHandle) -> Result<(), String> {
+    app.exit(0);
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn open_release_page() -> Result<(), String> {
     updater::open_release_page().await

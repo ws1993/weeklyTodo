@@ -210,6 +210,13 @@ export async function downloadAndInstallUpdate(
   return invokeCommand<string>('download_and_install_update', { downloadUrl, proxy: proxy ?? null });
 }
 
+export async function exitAppForUpdate(): Promise<void> {
+  if (!isTauriRuntime()) {
+    throw new Error('当前不在桌面运行时中，无法退出应用安装更新');
+  }
+  await invokeCommand('exit_app_for_update');
+}
+
 export async function openReleasePage(): Promise<void> {
   if (!isTauriRuntime()) {
     window.open('https://github.com/ws1993/weeklytodo/releases/latest', '_blank');
