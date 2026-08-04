@@ -8,7 +8,7 @@ import { QueryView } from './components/QueryView';
 import { CreateWeekModal } from './components/CreateWeekModal';
 import { UpdateModal } from './features/update/UpdateModal';
 import { SettingsOverlay } from './features/settings/SettingsOverlay';
-import { syncWebDav } from './api/nativeBridge';
+import { checkForAppUpdate, syncWebDav } from './api/nativeBridge';
 import { PlusIcon, SettingsIcon, WorkbenchLogoIcon } from './components/ForestIcons';
 import {
   isSyncDue,
@@ -16,6 +16,8 @@ import {
   saveWebDavSettings,
   type WebDavSettings,
 } from './features/settings/webdavSettings';
+import { getSavedProxyConfig } from './features/settings/proxySettings';
+import type { UpdateCheckResult } from './shared/contracts/types';
 import {
   currentWeekId as currentWeekIdOf,
   formatCnRange,
@@ -41,12 +43,35 @@ export function App() {
   const [createOpen, setCreateOpen] = useState(false);
   const [updateOpen, setUpdateOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [preloadedUpdate, setPreloadedUpdate] = useState<UpdateCheckResult | null>(null);
   // 每次点击「新建任务」递增，通知任务树打开根级新建输入行。
   const [newTaskRequest, setNewTaskRequest] = useState(0);
 
   useEffect(() => {
     void initialize();
   }, [initialize]);
+
+  // 启动后静默检查更新：发现新版本时自动弹出更新提示。
+  useEffect(() => {
+    if (loading) {
+      return;
+    }
+    let cancelled = false;
+    void checkForAppUpdate(getSavedProxyConfig())
+      .then((result) => {
+        if (cancelled || !result.available || !result.version || !result.downloadUrl) {
+          return;
+        }
+        setPreloadedUpdate(result);
+        setUpdateOpen(true);
+      })
+      .catch(() => {
+        // 启动静默检查失败时保持静默，不打断用户。
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loading]);
 
   // 启动时同步一次，并按小时间隔轮询定时同步。
   useEffect(() => {
@@ -139,7 +164,13 @@ export function App() {
             >
               <SettingsIcon size={17} />
             </button>
-            <button className="btn btn-ghost btn-sm" onClick={() => setUpdateOpen(true)}>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                setPreloadedUpdate(null);
+                setUpdateOpen(true);
+              }}
+            >
               v{__APP_VERSION__}
             </button>
           </div>
@@ -212,10 +243,15 @@ export function App() {
         onClose={() => setSettingsOpen(false)}
         onCheckUpdate={() => {
           setSettingsOpen(false);
+          setPreloadedUpdate(null);
           setUpdateOpen(true);
         }}
       />
-      <UpdateModal open={updateOpen} onClose={() => setUpdateOpen(false)} />
+      <UpdateModal
+        open={updateOpen}
+        onClose={() => setUpdateOpen(false)}
+        preloaded={preloadedUpdate}
+      />
     </ConfigProvider>
   );
 }

@@ -107,6 +107,30 @@ export async function listTags(): Promise<Tag[]> {
   return invokeCommand<Tag[]>('list_tags');
 }
 
+export async function createOwner(name: string): Promise<Owner> {
+  return invokeCommand<Owner>('create_owner', { name });
+}
+
+export async function renameOwner(id: number, name: string): Promise<Owner> {
+  return invokeCommand<Owner>('rename_owner', { id, name });
+}
+
+export async function deleteOwner(id: number): Promise<void> {
+  return invokeCommand<void>('delete_owner', { id });
+}
+
+export async function createTag(name: string): Promise<Tag> {
+  return invokeCommand<Tag>('create_tag', { name });
+}
+
+export async function renameTag(id: number, name: string): Promise<Tag> {
+  return invokeCommand<Tag>('rename_tag', { id, name });
+}
+
+export async function deleteTag(id: number): Promise<void> {
+  return invokeCommand<void>('delete_tag', { id });
+}
+
 export async function closeTask(weekId: string, taskId: number): Promise<Task> {
   return invokeCommand<Task>('close_task', { weekId, taskId });
 }

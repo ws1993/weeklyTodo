@@ -166,6 +166,76 @@ pub async fn list_tags() -> Result<Vec<domain::Tag>, String> {
     domain::list_tags(&conn)
 }
 
+/// Create a new owner.
+#[tauri::command]
+pub async fn create_owner(name: String) -> Result<domain::Owner, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    let id = domain::ensure_owner(&conn, &name)?;
+    conn.query_row(
+        "SELECT id, name FROM owners WHERE id = ?1",
+        rusqlite::params![id],
+        |row| {
+            Ok(domain::Owner {
+                id: row.get(0)?,
+                name: row.get(1)?,
+            })
+        },
+    )
+    .map_err(|error| format!("读取新建负责人失败:{error}"))
+}
+
+/// Rename an existing owner.
+#[tauri::command]
+pub async fn rename_owner(id: i64, name: String) -> Result<domain::Owner, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    domain::rename_owner(&conn, id, &name)
+}
+
+/// Delete an owner. Tasks referencing it get owner_id cleared.
+#[tauri::command]
+pub async fn delete_owner(id: i64) -> Result<(), String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    domain::delete_owner(&conn, id)
+}
+
+/// Create a new tag.
+#[tauri::command]
+pub async fn create_tag(name: String) -> Result<domain::Tag, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    let id = domain::ensure_tag(&conn, &name)?;
+    conn.query_row(
+        "SELECT id, name FROM tags WHERE id = ?1",
+        rusqlite::params![id],
+        |row| {
+            Ok(domain::Tag {
+                id: row.get(0)?,
+                name: row.get(1)?,
+            })
+        },
+    )
+    .map_err(|error| format!("读取新建标签失败:{error}"))
+}
+
+/// Rename an existing tag.
+#[tauri::command]
+pub async fn rename_tag(id: i64, name: String) -> Result<domain::Tag, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    domain::rename_tag(&conn, id, &name)
+}
+
+/// Delete a tag. Tag-task associations cascade delete.
+#[tauri::command]
+pub async fn delete_tag(id: i64) -> Result<(), String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    domain::delete_tag(&conn, id)
+}
+
 #[tauri::command]
 pub async fn close_task(week_id: String, task_id: i64) -> Result<domain::Task, String> {
     let config = resolve_storage()?;

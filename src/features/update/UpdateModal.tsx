@@ -7,13 +7,16 @@ import {
 } from '../../api/nativeBridge';
 import { CrossIcon } from '../../components/ForestIcons';
 import { getSavedProxyConfig } from '../settings/proxySettings';
+import type { UpdateCheckResult } from '../../shared/contracts/types';
 
 interface UpdateModalProps {
   open: boolean;
   onClose: () => void;
+  /** 启动时已静默检查拿到结果则直接展示，避免弹窗重复请求网络。 */
+  preloaded?: UpdateCheckResult | null;
 }
 
-export function UpdateModal({ open, onClose }: UpdateModalProps) {
+export function UpdateModal({ open, onClose, preloaded }: UpdateModalProps) {
   const [state, setState] = useState<'idle' | 'checking' | 'available' | 'downloading' | 'error'>(
     'idle',
   );
@@ -27,24 +30,29 @@ export function UpdateModal({ open, onClose }: UpdateModalProps) {
     if (!open) {
       return;
     }
-    setState('checking');
     setError('');
+    const applyCheckResult = (result: UpdateCheckResult) => {
+      if (result.available && result.version && result.downloadUrl) {
+        setVersion(result.version);
+        setBody(result.body ?? '');
+        setDownloadUrl(result.downloadUrl);
+        setState('available');
+      } else {
+        setState('idle');
+      }
+    };
+    if (preloaded) {
+      applyCheckResult(preloaded);
+      return;
+    }
+    setState('checking');
     void checkForAppUpdate(getSavedProxyConfig())
-      .then((result) => {
-        if (result.available && result.version && result.downloadUrl) {
-          setVersion(result.version);
-          setBody(result.body ?? '');
-          setDownloadUrl(result.downloadUrl);
-          setState('available');
-        } else {
-          setState('idle');
-        }
-      })
+      .then(applyCheckResult)
       .catch((checkError) => {
         setError(String(checkError));
         setState('error');
       });
-  }, [open]);
+  }, [open, preloaded]);
 
   useEffect(() => {
     if (!open) {

@@ -317,6 +317,89 @@ pub fn list_tags(conn: &Connection) -> Result<Vec<Tag>, String> {
     Ok(tags)
 }
 
+/// Rename an owner. Returns the updated owner.
+pub fn rename_owner(conn: &Connection, id: i64, new_name: &str) -> Result<Owner, String> {
+    let trimmed = new_name.trim();
+    if trimmed.is_empty() {
+        return Err("负责人名称不能为空".to_string());
+    }
+    let affected = conn
+        .execute(
+            "UPDATE owners SET name = ?1 WHERE id = ?2",
+            params![trimmed, id],
+        )
+        .map_err(|error| format!("重命名负责人失败:{error}"))?;
+    if affected == 0 {
+        return Err("负责人不存在".to_string());
+    }
+    conn.query_row(
+        "SELECT id, name FROM owners WHERE id = ?1",
+        params![id],
+        |row| {
+            Ok(Owner {
+                id: row.get(0)?,
+                name: row.get(1)?,
+            })
+        },
+    )
+    .map_err(|error| format!("读取重命名后的负责人失败:{error}"))
+}
+
+/// Rename a tag. Returns the updated tag.
+pub fn rename_tag(conn: &Connection, id: i64, new_name: &str) -> Result<Tag, String> {
+    let trimmed = new_name.trim();
+    if trimmed.is_empty() {
+        return Err("标签名称不能为空".to_string());
+    }
+    let affected = conn
+        .execute(
+            "UPDATE tags SET name = ?1 WHERE id = ?2",
+            params![trimmed, id],
+        )
+        .map_err(|error| format!("重命名标签失败:{error}"))?;
+    if affected == 0 {
+        return Err("标签不存在".to_string());
+    }
+    conn.query_row(
+        "SELECT id, name FROM tags WHERE id = ?1",
+        params![id],
+        |row| {
+            Ok(Tag {
+                id: row.get(0)?,
+                name: row.get(1)?,
+            })
+        },
+    )
+    .map_err(|error| format!("读取重命名后的标签失败:{error}"))
+}
+
+/// Delete an owner by id. Sets owner_id to NULL on all referencing tasks.
+pub fn delete_owner(conn: &Connection, id: i64) -> Result<(), String> {
+    conn.execute(
+        "UPDATE tasks SET owner_id = NULL WHERE owner_id = ?1",
+        params![id],
+    )
+    .map_err(|error| format!("清除任务负责人引用失败:{error}"))?;
+    let affected = conn
+        .execute("DELETE FROM owners WHERE id = ?1", params![id])
+        .map_err(|error| format!("删除负责人失败:{error}"))?;
+    if affected == 0 {
+        return Err("负责人不存在".to_string());
+    }
+    Ok(())
+}
+
+/// Delete a tag by id. Tag-task associations cascade delete.
+pub fn delete_tag(conn: &Connection, id: i64) -> Result<(), String> {
+    let affected = conn
+        .execute("DELETE FROM tags WHERE id = ?1", params![id])
+        .map_err(|error| format!("删除标签失败:{error}"))?;
+    if affected == 0 {
+        return Err("标签不存在".to_string());
+    }
+    Ok(())
+}
+
 fn has_week(conn: &Connection, week_id: &str) -> Result<bool, String> {
     conn.query_row(
         "SELECT EXISTS(SELECT 1 FROM weeks WHERE id = ?1)",

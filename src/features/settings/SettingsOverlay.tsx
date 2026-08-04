@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { pickAndMigrateStorage } from '../../api/nativeBridge';
 import { CrossIcon, LogoIcon, SettingsIcon } from '../../components/ForestIcons';
 import { useAppStore } from '../../store/appStore';
+import { ManagementPanel } from './ManagementPanel';
 import { ProxySettingsPanel } from './ProxySettingsPanel';
 import type { ProxySettings } from './proxySettings';
 import { loadProxySettings, saveProxySettings } from './proxySettings';
@@ -9,7 +10,7 @@ import { WebDavSyncPanel } from './WebDavSyncPanel';
 import type { WebDavSettings } from './webdavSettings';
 import { loadWebDavSettings, saveWebDavSettings } from './webdavSettings';
 
-type SettingsTab = 'network' | 'storage' | 'sync' | 'about';
+type SettingsTab = 'network' | 'storage' | 'sync' | 'management' | 'about';
 
 interface SettingsTabMeta {
   id: SettingsTab;
@@ -22,7 +23,8 @@ const settingsTabs: SettingsTabMeta[] = [
   { id: 'network', index: '01', label: '网络', caption: '代理与更新' },
   { id: 'storage', index: '02', label: '存储', caption: '数据目录' },
   { id: 'sync', index: '03', label: '同步', caption: 'WebDAV' },
-  { id: 'about', index: '04', label: '关于', caption: '版本信息' },
+  { id: 'management', index: '04', label: '管理', caption: '负责人与标签' },
+  { id: 'about', index: '05', label: '关于', caption: '版本信息' },
 ];
 
 interface SettingsOverlayProps {
@@ -171,6 +173,18 @@ export function SettingsOverlay({ open, onClose, onCheckUpdate }: SettingsOverla
                 </p>
               </header>
               <WebDavSyncPanel settings={webdavSettings} onChange={updateWebDavSettings} />
+            </section>
+          )}
+
+          {activeTab === 'management' && (
+            <section className="settings-page">
+              <header className="settings-page-head">
+                <h2 className="settings-page-title">管理</h2>
+                <p className="settings-page-sub">
+                  管理所有任务中使用的负责人和标签。修改后会自动同步到任务编辑中。
+                </p>
+              </header>
+              <ManagementPanel />
             </section>
           )}
 
