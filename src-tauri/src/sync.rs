@@ -59,9 +59,8 @@ pub fn decide_direction(local_modified_utc: i64, remote_modified_utc: i64) -> Op
 
 /// Run one sync against the configured WebDAV directory.
 pub async fn sync_now(data_dir: &str, url: &str, username: &str) -> Result<SyncResult, String> {
-    let password = credentials::load_password(username)?.ok_or_else(|| {
-        "尚未保存该账号的密码，请在同步设置中填写密码后重试".to_string()
-    })?;
+    let password = credentials::load_password(username)?
+        .ok_or_else(|| "尚未保存该账号的密码，请在同步设置中填写密码后重试".to_string())?;
     sync_now_with_password(data_dir, url, username, &password).await
 }
 
@@ -110,20 +109,17 @@ pub async fn sync_now_with_password(
                     let backup_url = format!("{base_url}{backup_name}");
                     let remote_bytes =
                         webdav::fetch_remote_bytes(&client, &file_url, username, password).await?;
-                    webdav::upload_bytes(
-                        &client,
-                        &backup_url,
-                        &remote_bytes,
-                        username,
-                        password,
-                    )
-                    .await?;
+                    webdav::upload_bytes(&client, &backup_url, &remote_bytes, username, password)
+                        .await?;
                     backup_files.push(backup_name);
                     webdav::upload_file(&client, &file_url, &local_path, username, password)
                         .await?;
                     sync_local_mtime_to_remote(&client, &file_url, &local_path, username, password)
                         .await;
-                    ("upload", "本地版本更新，已将远端旧版本备份后上传".to_string())
+                    (
+                        "upload",
+                        "本地版本更新，已将远端旧版本备份后上传".to_string(),
+                    )
                 }
                 Some(false) => {
                     // 远端更新：先把本地旧版备份到远端，再下载覆盖本地。
@@ -136,7 +132,10 @@ pub async fn sync_now_with_password(
                         .await?;
                     sync_local_mtime_to_remote(&client, &file_url, &local_path, username, password)
                         .await;
-                    ("download", "远端版本更新，本地旧版已备份并下载新版本".to_string())
+                    (
+                        "download",
+                        "远端版本更新，本地旧版已备份并下载新版本".to_string(),
+                    )
                 }
             }
         }
@@ -205,67 +204,53 @@ mod tests {
 
         // 1) 首次同步：空远端 -> 上传。
         let url = server.base_url("weeklytodo");
-        let first = sync_now_with_password(
-            data_dir.to_str().unwrap(),
-            &url,
-            "alice",
-            "secret",
-        )
-        .await
-        .unwrap();
+        let first = sync_now_with_password(data_dir.to_str().unwrap(), &url, "alice", "secret")
+            .await
+            .unwrap();
         assert_eq!(first.direction, "upload");
         assert!(server.file_exists("weeklytodo/weeklytodo.db"));
         let uploaded = server.read_file("weeklytodo/weeklytodo.db");
         assert_eq!(&uploaded[..16], b"SQLite format 3\0");
 
         // 2) 立即再次同步：无任何改动 -> noop（验证不会反复翻转）。
-        let idle = sync_now_with_password(
-            data_dir.to_str().unwrap(),
-            &url,
-            "alice",
-            "secret",
-        )
-        .await
-        .unwrap();
+        let idle = sync_now_with_password(data_dir.to_str().unwrap(), &url, "alice", "secret")
+            .await
+            .unwrap();
         assert_eq!(idle.direction, "noop");
 
         // 3) 本地新增数据并稍等，再同步：本地较新 -> 上传并备份远端旧版。
         std::thread::sleep(std::time::Duration::from_millis(1100));
         add_sample_task(&data_dir);
-        let local = sync_now_with_password(
-            data_dir.to_str().unwrap(),
-            &url,
-            "alice",
-            "secret",
-        )
-        .await
-        .unwrap();
+        let local = sync_now_with_password(data_dir.to_str().unwrap(), &url, "alice", "secret")
+            .await
+            .unwrap();
         assert_eq!(local.direction, "upload");
         assert_eq!(local.backup_files.len(), 1);
         let backup_name = &local.backup_files[0];
         assert!(server.file_exists(&format!("weeklytodo/{backup_name}")));
         // 备份内容应等于上一次上传的远端版本。
-        assert_eq!(server.read_file(&format!("weeklytodo/{backup_name}")), uploaded);
+        assert_eq!(
+            server.read_file(&format!("weeklytodo/{backup_name}")),
+            uploaded
+        );
 
         // 4) 模拟另一台设备更新远端，再同步：远端较新 -> 下载并备份本地旧版。
         std::thread::sleep(std::time::Duration::from_millis(1100));
         let local_before = std::fs::read(data_dir.join(db::DB_FILE_NAME)).unwrap();
         let remote_edit: Vec<u8> = b"SQLite format 3\0".to_vec(); // 仅校验下载方向，不校验内容有效性
         server.put_file("weeklytodo/weeklytodo.db", remote_edit.clone());
-        let remote = sync_now_with_password(
-            data_dir.to_str().unwrap(),
-            &url,
-            "alice",
-            "secret",
-        )
-        .await
-        .unwrap();
+        let remote = sync_now_with_password(data_dir.to_str().unwrap(), &url, "alice", "secret")
+            .await
+            .unwrap();
         assert_eq!(remote.direction, "download");
         assert_eq!(remote.backup_files.len(), 1);
         let backup_name = &remote.backup_files[0];
         assert!(server.file_exists(&format!("weeklytodo/{backup_name}")));
         // 本地旧版被备份到远端。
-        assert_eq!(server.read_file(&format!("weeklytodo/{backup_name}")), local_before);
+        assert_eq!(
+            server.read_file(&format!("weeklytodo/{backup_name}")),
+            local_before
+        );
 
         let _ = std::fs::remove_dir_all(&data_dir);
     }

@@ -1259,8 +1259,7 @@ mod tests {
 
         let root = create_plain_task(&conn, "20260803-20260809", "项目A", None);
         let child = create_plain_task(&conn, "20260803-20260809", "子任务1", Some(root.id));
-        let _grandchild =
-            create_plain_task(&conn, "20260803-20260809", "孙任务", Some(child.id));
+        let _grandchild = create_plain_task(&conn, "20260803-20260809", "孙任务", Some(child.id));
         let sibling = create_plain_task(&conn, "20260803-20260809", "任务B", None);
         create_task(
             &conn,
@@ -1324,8 +1323,6 @@ mod tests {
         // Moving a task under itself is rejected.
         assert!(move_task(&conn, "20260803-20260809", root.id, Some(root.id), 0.0).is_err());
         // Moving a parent under its own child would create a cycle.
-        assert!(
-            move_task(&conn, "20260803-20260809", root.id, Some(child.id), 0.0).is_err()
-        );
+        assert!(move_task(&conn, "20260803-20260809", root.id, Some(child.id), 0.0).is_err());
     }
 }

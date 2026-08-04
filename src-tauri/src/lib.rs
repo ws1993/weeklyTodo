@@ -1,6 +1,6 @@
-pub mod credentials;
 pub mod commands;
 pub mod contracts;
+pub mod credentials;
 pub mod db;
 pub mod domain;
 pub mod queries;

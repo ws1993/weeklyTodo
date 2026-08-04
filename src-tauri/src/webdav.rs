@@ -71,10 +71,7 @@ pub async fn ensure_dir(
     } else if probe.status().is_success() {
         Ok(())
     } else {
-        Err(format!(
-            "访问 WebDAV 目录失败：HTTP {}",
-            probe.status()
-        ))
+        Err(format!("访问 WebDAV 目录失败：HTTP {}", probe.status()))
     }
 }
 
@@ -122,10 +119,10 @@ pub async fn probe_file(
         return Ok(None);
     }
 
-    let last_modified = extract_prop(&body, "getlastmodified")
-        .and_then(parse_http_date_to_utc_seconds);
-    let size = extract_prop(&body, "getcontentlength")
-        .and_then(|value| value.trim().parse::<u64>().ok());
+    let last_modified =
+        extract_prop(&body, "getlastmodified").and_then(parse_http_date_to_utc_seconds);
+    let size =
+        extract_prop(&body, "getcontentlength").and_then(|value| value.trim().parse::<u64>().ok());
 
     match last_modified {
         Some(last_modified_utc) => Ok(Some(RemoteFileInfo {
@@ -144,8 +141,8 @@ pub async fn upload_file(
     username: &str,
     password: &str,
 ) -> Result<(), String> {
-    let content = std::fs::read(local_path)
-        .map_err(|error| format!("读取待上传文件失败：{error}"))?;
+    let content =
+        std::fs::read(local_path).map_err(|error| format!("读取待上传文件失败：{error}"))?;
     let response = client
         .put(url)
         .basic_auth(username, Some(password))
@@ -220,8 +217,8 @@ pub async fn download_file(
         .ok_or_else(|| "无法确定数据库文件名".to_string())?;
     let temp_path = dest_path.with_file_name(format!("{file_name}.synctmp"));
 
-    let mut temp_file = std::fs::File::create(&temp_path)
-        .map_err(|error| format!("创建临时文件失败：{error}"))?;
+    let mut temp_file =
+        std::fs::File::create(&temp_path).map_err(|error| format!("创建临时文件失败：{error}"))?;
     temp_file
         .write_all(&bytes)
         .map_err(|error| format!("写入临时文件失败：{error}"))?;
@@ -391,9 +388,10 @@ pub mod test_server {
                     return multistatus_response(path, None);
                 }
                 match std::fs::metadata(&fs_path) {
-                    Ok(metadata) if metadata.is_file() => {
-                        multistatus_response(path, Some((metadata.modified().unwrap(), metadata.len())))
-                    }
+                    Ok(metadata) if metadata.is_file() => multistatus_response(
+                        path,
+                        Some((metadata.modified().unwrap(), metadata.len())),
+                    ),
                     _ => not_found(),
                 }
             }
@@ -462,6 +460,10 @@ pub mod test_server {
         };
         tiny_http::Response::from_data(xml.into_bytes())
             .with_status_code(207)
-            .with_header("Content-Type: application/xml".parse::<tiny_http::Header>().unwrap())
+            .with_header(
+                "Content-Type: application/xml"
+                    .parse::<tiny_http::Header>()
+                    .unwrap(),
+            )
     }
 }
