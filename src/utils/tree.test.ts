@@ -4,6 +4,7 @@ import {
   appendIndex,
   computeDrop,
   descendantIds,
+  incompleteOnlyVisibleIds,
   sortedChildren,
   subtreeSize,
   taskPath,
@@ -120,5 +121,50 @@ describe('taskPath', () => {
   it('joins ancestor titles from root to task', () => {
     expect(taskPath(buildForest(), 3)).toBe('根A / 子A1 / 孙A1');
     expect(taskPath(buildForest(), 4)).toBe('根B');
+  });
+});
+
+describe('incompleteOnlyVisibleIds', () => {
+  it('keeps incomplete tasks and completed ancestors that still contain incomplete descendants', () => {
+    const tasks = [
+      makeTask({ id: 1, title: '根', parentId: null }),
+      makeTask({ id: 2, title: '已完成分组', parentId: 1, status: 'closed' }),
+      makeTask({ id: 3, title: '未完成子任务', parentId: 2 }),
+      makeTask({ id: 4, title: '已完成叶子', parentId: 2, status: 'closed' }),
+    ];
+    expect([...incompleteOnlyVisibleIds(tasks)].sort()).toEqual([1, 2, 3]);
+  });
+
+  it('hides fully completed subtrees and completed leaves', () => {
+    const tasks = [
+      makeTask({ id: 1, title: '已完成根', parentId: null, status: 'closed' }),
+      makeTask({ id: 2, title: '已完成子', parentId: 1, status: 'closed' }),
+      makeTask({ id: 3, title: '未完成根', parentId: null }),
+    ];
+    expect([...incompleteOnlyVisibleIds(tasks)].sort()).toEqual([3]);
+  });
+
+  it('keeps incomplete nodes even when all of their children are completed', () => {
+    const tasks = [
+      makeTask({ id: 1, title: '未完成根', parentId: null }),
+      makeTask({ id: 2, title: '已完成子', parentId: 1, status: 'closed' }),
+    ];
+    expect([...incompleteOnlyVisibleIds(tasks)].sort()).toEqual([1]);
+  });
+
+  it('marks every incomplete sibling, not only the first one', () => {
+    const tasks = [
+      makeTask({ id: 1, title: '根A', parentId: null }),
+      makeTask({ id: 2, title: '子A1', parentId: 1 }),
+      makeTask({ id: 3, title: '子A2', parentId: 1 }),
+      makeTask({ id: 4, title: '根B', parentId: null }),
+      makeTask({ id: 5, title: '子B1', parentId: 4 }),
+      makeTask({ id: 6, title: '子B2', parentId: 4 }),
+    ];
+    expect([...incompleteOnlyVisibleIds(tasks)].sort()).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  it('returns an empty set when there are no tasks', () => {
+    expect(incompleteOnlyVisibleIds([]).size).toBe(0);
   });
 });

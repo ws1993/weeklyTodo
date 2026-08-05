@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Task } from '../shared/contracts/types';
 import { useAppStore } from '../store/appStore';
-import { computeDrop, descendantIds, sortedChildren, subtreeSize } from '../utils/tree';
+import {
+  computeDrop,
+  descendantIds,
+  incompleteOnlyVisibleIds,
+  sortedChildren,
+  subtreeSize,
+} from '../utils/tree';
 import type { DropPosition } from '../utils/tree';
 import {
   CheckIcon,
@@ -20,6 +26,8 @@ interface TaskTreeProps {
   newTaskRequest?: number;
   /** 定位请求：滚动到该任务并高亮，同时展开其祖先节点。 */
   locateRequest?: { taskId: number; nonce: number } | null;
+  /** 勾选后仅渲染未完成的任务；已完成的父节点保留为骨架以展示其未完成子任务。 */
+  showIncompleteOnly?: boolean;
 }
 
 interface DropIndicator {
@@ -38,7 +46,12 @@ interface TreeDragProps {
   suppressNextClick: () => boolean;
 }
 
-export function TaskTree({ tasks, newTaskRequest = 0, locateRequest = null }: TaskTreeProps) {
+export function TaskTree({
+  tasks,
+  newTaskRequest = 0,
+  locateRequest = null,
+  showIncompleteOnly = false,
+}: TaskTreeProps) {
   const addTask = useAppStore((state) => state.addTask);
   const moveTask = useAppStore((state) => state.moveTask);
   const treeRef = useRef<HTMLDivElement | null>(null);
@@ -53,7 +66,15 @@ export function TaskTree({ tasks, newTaskRequest = 0, locateRequest = null }: Ta
   // (setState inside dragstart is async), so mirror the dragged id in a ref.
   const draggingIdRef = useRef<number | null>(null);
 
-  const rootTasks = useMemo(() => sortedChildren(tasks, null), [tasks]);
+  const visibleTaskIds = useMemo(
+    () => (showIncompleteOnly ? incompleteOnlyVisibleIds(tasks) : null),
+    [showIncompleteOnly, tasks],
+  );
+
+  const rootTasks = useMemo(() => {
+    const roots = sortedChildren(tasks, null);
+    return visibleTaskIds ? roots.filter((task) => visibleTaskIds.has(task.id)) : roots;
+  }, [tasks, visibleTaskIds]);
 
   const locateTargetId = locateRequest?.taskId ?? null;
 
@@ -175,8 +196,16 @@ export function TaskTree({ tasks, newTaskRequest = 0, locateRequest = null }: Ta
           expandTargetId={locateTargetId}
           onOpenSettings={setSelectedTask}
           drag={dragProps}
+          visibleTaskIds={visibleTaskIds}
         />
       ))}
+
+      {visibleTaskIds && rootTasks.length === 0 && (
+        <div className="empty-forest">
+          <p>没有未完成的任务</p>
+          <p className="empty-sub">关闭「仅看未完成」即可查看全部任务</p>
+        </div>
+      )}
 
       {addingParentId === null ? (
         <div className="add-inline" style={{ marginTop: 10, paddingLeft: 14 }}>
@@ -237,6 +266,8 @@ interface TaskNodeProps {
   expandTargetId?: number | null;
   onOpenSettings: (task: Task) => void;
   drag: TreeDragProps;
+  /** 过滤开启时，仅这些任务参与渲染；null 表示不过滤。 */
+  visibleTaskIds?: Set<number> | null;
 }
 
 function TaskNode({
@@ -247,6 +278,7 @@ function TaskNode({
   expandTargetId = null,
   onOpenSettings,
   drag,
+  visibleTaskIds = null,
 }: TaskNodeProps) {
   const toggleTask = useAppStore((state) => state.toggleTask);
   const editTask = useAppStore((state) => state.editTask);
@@ -259,7 +291,12 @@ function TaskNode({
   const [inlineDraft, setInlineDraft] = useState('');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  const children = useMemo(() => sortedChildren(allTasks, task.id), [allTasks, task.id]);
+  const children = useMemo(() => {
+    const allChildren = sortedChildren(allTasks, task.id);
+    return visibleTaskIds
+      ? allChildren.filter((child) => visibleTaskIds.has(child.id))
+      : allChildren;
+  }, [allTasks, task.id, visibleTaskIds]);
   const hasChildren = children.length > 0;
   const closed = task.status === 'closed';
 
@@ -535,6 +572,7 @@ function TaskNode({
               onOpenSettings={onOpenSettings}
               depth={depth + 1}
               drag={drag}
+              visibleTaskIds={visibleTaskIds}
             />
           ))}
         </div>

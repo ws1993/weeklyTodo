@@ -5,6 +5,7 @@ import { WeekRail } from './components/WeekRail';
 import { TaskTree } from './components/TaskTree';
 import { CurrentActions } from './components/CurrentActions';
 import { QueryView } from './components/QueryView';
+import { ToggleSwitch } from './components/QueryControls';
 import { CreateWeekModal } from './components/CreateWeekModal';
 import { UpdateModal } from './features/update/UpdateModal';
 import { SettingsOverlay } from './features/settings/SettingsOverlay';
@@ -48,6 +49,8 @@ export function App() {
   const [locateRequest, setLocateRequest] = useState<{ taskId: number; nonce: number } | null>(
     null,
   );
+  // 勾选后任务树仅显示未完成的任务（当前会话内有效）。
+  const [showIncompleteOnly, setShowIncompleteOnly] = useState(false);
 
   useEffect(() => {
     void initialize();
@@ -220,6 +223,11 @@ export function App() {
                 <div className="tree-toolbar">
                   <span className="tree-title">任务树</span>
                   <span className="tree-hint">点击复选框切换完成状态 · 拖拽行调整层级与顺序 · 悬停行查看操作</span>
+                  <ToggleSwitch
+                    label="仅看未完成"
+                    checked={showIncompleteOnly}
+                    onChange={setShowIncompleteOnly}
+                  />
                   <button
                     className="btn btn-primary"
                     title="新建任务"
@@ -235,6 +243,7 @@ export function App() {
                       tasks={tree.tasks}
                       newTaskRequest={newTaskRequest}
                       locateRequest={locateRequest}
+                      showIncompleteOnly={showIncompleteOnly}
                     />
                   )}
                 </div>

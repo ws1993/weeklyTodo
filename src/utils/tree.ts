@@ -23,6 +23,46 @@ export function descendantIds(tasks: Task[], rootId: number): Set<number> {
   return result;
 }
 
+/**
+ * Ids of tasks to render when the tree is filtered to incomplete tasks only.
+ * Incomplete tasks are always visible; completed tasks are kept only as
+ * structural parents when they still have an incomplete descendant.
+ */
+export function incompleteOnlyVisibleIds(tasks: Task[]): Set<number> {
+  const childrenByParent = new Map<number | null, Task[]>();
+  for (const task of tasks) {
+    const siblings = childrenByParent.get(task.parentId);
+    if (siblings) {
+      siblings.push(task);
+    } else {
+      childrenByParent.set(task.parentId, [task]);
+    }
+  }
+
+  const visible = new Set<number>();
+
+  const markSubtreeIfVisible = (task: Task): boolean => {
+    const children = childrenByParent.get(task.id) ?? [];
+    // 不能用 Array.some 短路：一旦提前返回，剩余的同级子任务就不会被标记。
+    let subtreeHasIncomplete = false;
+    for (const child of children) {
+      if (markSubtreeIfVisible(child)) {
+        subtreeHasIncomplete = true;
+      }
+    }
+    if (subtreeHasIncomplete || task.status === 'in_progress') {
+      visible.add(task.id);
+      return true;
+    }
+    return false;
+  };
+
+  for (const root of childrenByParent.get(null) ?? []) {
+    markSubtreeIfVisible(root);
+  }
+  return visible;
+}
+
 /** Number of tasks in the subtree rooted at `rootId`, including the root itself. */
 export function subtreeSize(tasks: Task[], rootId: number): number {
   return 1 + descendantIds(tasks, rootId).size;
