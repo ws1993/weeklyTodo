@@ -365,6 +365,20 @@ pub async fn exit_app_for_update(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Hide the main window into the system tray without exiting the app.
+#[tauri::command]
+pub async fn hide_main_window(app: AppHandle) -> Result<(), String> {
+    crate::tray::hide_main_window(&app);
+    Ok(())
+}
+
+/// Exit the app entirely (used when the user chooses "exit" on close).
+#[tauri::command]
+pub async fn exit_app(app: AppHandle) -> Result<(), String> {
+    app.exit(0);
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn open_release_page() -> Result<(), String> {
     updater::open_release_page().await

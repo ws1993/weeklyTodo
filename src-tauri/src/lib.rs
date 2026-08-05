@@ -6,6 +6,7 @@ pub mod domain;
 pub mod queries;
 pub mod storage;
 pub mod sync;
+pub mod tray;
 pub mod updater;
 pub mod webdav;
 
@@ -15,9 +16,8 @@ use tauri::Manager;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.set_focus();
-            }
+            // 再次启动（如双击桌面快捷方式）时唤醒后台运行的主窗口。
+            tray::show_main_window(app);
         }))
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
@@ -28,6 +28,8 @@ pub fn run() {
                     tauri::image::Image::from_bytes(include_bytes!("../icons/icon.ico"))
                         .expect("Failed to load icon"),
                 )?;
+                tray::create_tray(app.handle())?;
+                tray::intercept_close_request(app.handle(), &window);
             }
             Ok(())
         })
@@ -64,6 +66,8 @@ pub fn run() {
             commands::check_for_app_update,
             commands::download_and_install_update,
             commands::exit_app_for_update,
+            commands::hide_main_window,
+            commands::exit_app,
             commands::open_release_page,
             commands::webdav_test_connection,
             commands::webdav_save_credentials,

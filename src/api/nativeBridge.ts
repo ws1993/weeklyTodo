@@ -217,6 +217,52 @@ export async function exitAppForUpdate(): Promise<void> {
   await invokeCommand('exit_app_for_update');
 }
 
+/** 隐藏主窗口到系统托盘，应用继续在后台运行。 */
+export async function hideMainWindow(): Promise<void> {
+  if (!isTauriRuntime()) {
+    return;
+  }
+  await invokeCommand('hide_main_window');
+}
+
+/** 彻底退出应用（跳过关闭询问逻辑，直接结束进程）。 */
+export async function exitApp(): Promise<void> {
+  if (!isTauriRuntime()) {
+    return;
+  }
+  await invokeCommand('exit_app');
+}
+
+/** 订阅窗口关闭按钮请求事件（点击右上角 × 时触发），返回取消订阅函数。 */
+export function onCloseRequested(callback: () => void): () => void {
+  if (!isTauriRuntime()) {
+    return () => undefined;
+  }
+
+  let disposed = false;
+  let unlisten: (() => void) | undefined;
+
+  void import('@tauri-apps/api/event').then(({ listen }) => {
+    if (disposed) {
+      return;
+    }
+    void listen<void>('app-close-requested', () => {
+      callback();
+    }).then((stop) => {
+      if (disposed) {
+        stop();
+        return;
+      }
+      unlisten = stop;
+    });
+  });
+
+  return () => {
+    disposed = true;
+    unlisten?.();
+  };
+}
+
 export async function openReleasePage(): Promise<void> {
   if (!isTauriRuntime()) {
     window.open('https://github.com/ws1993/weeklytodo/releases/latest', '_blank');

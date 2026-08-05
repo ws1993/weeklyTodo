@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { pickAndMigrateStorage } from '../../api/nativeBridge';
 import { CrossIcon, LogoIcon, SettingsIcon } from '../../components/ForestIcons';
 import { useAppStore } from '../../store/appStore';
+import type { CloseBehaviorSettings } from './closeBehavior';
+import { loadCloseBehaviorSettings, saveCloseBehaviorSettings } from './closeBehavior';
+import { CloseBehaviorPanel } from './CloseBehaviorPanel';
 import { ManagementPanel } from './ManagementPanel';
 import { ProxySettingsPanel } from './ProxySettingsPanel';
 import type { ProxySettings } from './proxySettings';
@@ -10,7 +13,7 @@ import { WebDavSyncPanel } from './WebDavSyncPanel';
 import type { WebDavSettings } from './webdavSettings';
 import { loadWebDavSettings, saveWebDavSettings } from './webdavSettings';
 
-type SettingsTab = 'network' | 'storage' | 'sync' | 'management' | 'about';
+type SettingsTab = 'network' | 'storage' | 'sync' | 'general' | 'management' | 'about';
 
 interface SettingsTabMeta {
   id: SettingsTab;
@@ -23,8 +26,9 @@ const settingsTabs: SettingsTabMeta[] = [
   { id: 'network', index: '01', label: '网络', caption: '代理与更新' },
   { id: 'storage', index: '02', label: '存储', caption: '数据目录' },
   { id: 'sync', index: '03', label: '同步', caption: 'WebDAV' },
-  { id: 'management', index: '04', label: '管理', caption: '负责人与标签' },
-  { id: 'about', index: '05', label: '关于', caption: '版本信息' },
+  { id: 'general', index: '04', label: '通用', caption: '关闭行为' },
+  { id: 'management', index: '05', label: '管理', caption: '负责人与标签' },
+  { id: 'about', index: '06', label: '关于', caption: '版本信息' },
 ];
 
 interface SettingsOverlayProps {
@@ -45,6 +49,9 @@ export function SettingsOverlay({
   const storageDir = useAppStore((state) => state.storageDir);
   const [activeTab, setActiveTab] = useState<SettingsTab>('network');
   const [proxySettings, setProxySettings] = useState<ProxySettings>(() => loadProxySettings());
+  const [closeBehaviorSettings, setCloseBehaviorSettings] = useState<CloseBehaviorSettings>(() =>
+    loadCloseBehaviorSettings(),
+  );
   const [webdavSettings, setWebdavSettings] = useState<WebDavSettings>(() =>
     loadWebDavSettings(),
   );
@@ -57,6 +64,7 @@ export function SettingsOverlay({
       return;
     }
     setProxySettings(loadProxySettings());
+    setCloseBehaviorSettings(loadCloseBehaviorSettings());
     setWebdavSettings(loadWebDavSettings());
     setMessage(null);
     setError(null);
@@ -74,6 +82,11 @@ export function SettingsOverlay({
   const updateWebDavSettings = (next: WebDavSettings) => {
     setWebdavSettings(next);
     saveWebDavSettings(next);
+  };
+
+  const updateCloseBehaviorSettings = (next: CloseBehaviorSettings) => {
+    setCloseBehaviorSettings(next);
+    saveCloseBehaviorSettings(next);
   };
 
   const runMigration = async () => {
@@ -183,6 +196,19 @@ export function SettingsOverlay({
                 settings={webdavSettings}
                 onChange={updateWebDavSettings}
                 onDatabaseRestored={onDatabaseRestored}
+              />
+            </section>
+          )}
+
+          {activeTab === 'general' && (
+            <section className="settings-page">
+              <header className="settings-page-head">
+                <h2 className="settings-page-title">通用</h2>
+                <p className="settings-page-sub">设置点击关闭按钮（×）时应用的处理方式。</p>
+              </header>
+              <CloseBehaviorPanel
+                settings={closeBehaviorSettings}
+                onChange={updateCloseBehaviorSettings}
               />
             </section>
           )}

@@ -9,7 +9,14 @@ import { ToggleSwitch } from './components/QueryControls';
 import { CreateWeekModal } from './components/CreateWeekModal';
 import { UpdateModal } from './features/update/UpdateModal';
 import { SettingsOverlay } from './features/settings/SettingsOverlay';
-import { checkForAppUpdate, syncWebDavAutomatically } from './api/nativeBridge';
+import { CloseBehaviorModal } from './components/CloseBehaviorModal';
+import {
+  checkForAppUpdate,
+  exitApp,
+  hideMainWindow,
+  onCloseRequested,
+  syncWebDavAutomatically,
+} from './api/nativeBridge';
 import { LogoIcon, PlusIcon, SettingsIcon } from './components/ForestIcons';
 import {
   isSyncDue,
@@ -18,6 +25,7 @@ import {
   type WebDavSettings,
 } from './features/settings/webdavSettings';
 import { getSavedProxyConfig } from './features/settings/proxySettings';
+import { loadCloseBehaviorSettings } from './features/settings/closeBehavior';
 import type { UpdateCheckResult } from './shared/contracts/types';
 import {
   currentWeekId as currentWeekIdOf,
@@ -42,6 +50,7 @@ export function App() {
   const [createOpen, setCreateOpen] = useState(false);
   const [updateOpen, setUpdateOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [closeAskOpen, setCloseAskOpen] = useState(false);
   const [preloadedUpdate, setPreloadedUpdate] = useState<UpdateCheckResult | null>(null);
   // 每次点击「新建任务」递增，通知任务树打开根级新建输入行。
   const [newTaskRequest, setNewTaskRequest] = useState(0);
@@ -51,6 +60,22 @@ export function App() {
   );
   // 勾选后任务树仅显示未完成的任务（当前会话内有效）。
   const [showIncompleteOnly, setShowIncompleteOnly] = useState(false);
+
+  // 点击关闭按钮（×）时，按设置处理：询问 / 最小化到托盘 / 退出。
+  useEffect(() => {
+    return onCloseRequested(() => {
+      const { behavior } = loadCloseBehaviorSettings();
+      if (behavior === 'minimize-to-tray') {
+        void hideMainWindow();
+        return;
+      }
+      if (behavior === 'exit') {
+        void exitApp();
+        return;
+      }
+      setCloseAskOpen(true);
+    });
+  }, []);
 
   useEffect(() => {
     void initialize();
@@ -280,6 +305,7 @@ export function App() {
         onClose={() => setUpdateOpen(false)}
         preloaded={preloadedUpdate}
       />
+      <CloseBehaviorModal open={closeAskOpen} onClose={() => setCloseAskOpen(false)} />
     </ConfigProvider>
   );
 }

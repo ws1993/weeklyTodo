@@ -512,6 +512,15 @@ button{font-family:inherit;color:inherit}
   font-family:var(--mono);color:var(--text-2);background:var(--surface-2);
   border:1px solid var(--border);border-radius:3px;padding:1px 6px;
 }
+.close-behavior-modal-hint{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:11px 12px;background:var(--surface-2);
+  border:1px solid var(--border);border-radius:var(--radius);
+  font-size:12px;color:var(--text-2);line-height:1.7;
+}
+.close-behavior-modal-logo{
+  width:32px;height:32px;flex:none;display:grid;place-items:center;border-radius:6px;
+}
 .detail-textarea{resize:vertical;min-height:76px}
 .action-spacer{flex:1}
 .task-detail .modal-body{max-height:calc(92vh - 120px);overflow-y:auto;padding-right:4px}
