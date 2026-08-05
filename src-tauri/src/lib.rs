@@ -60,6 +60,7 @@ pub fn run() {
             commands::delete_task,
             commands::query_all_tasks,
             commands::week_summaries,
+            commands::statistics_overview,
             commands::get_storage_dir,
             commands::pick_and_migrate_storage,
             commands::migrate_storage_to,

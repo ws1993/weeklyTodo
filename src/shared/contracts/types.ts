@@ -77,6 +77,41 @@ export interface QueryTaskRow {
 /** Row returned by `week_summaries`: [weekId, total, open]. */
 export type WeekSummary = [string, number, number];
 
+/** 单周趋势：总量 / 完成 / 进行中 / 带入（含带入完成数）。 */
+export interface WeekTrendStat {
+  weekId: string;
+  total: number;
+  done: number;
+  open: number;
+  carried: number;
+  carriedDone: number;
+}
+
+/** 名称 + 计数（标签 / 负责人分布用）。 */
+export interface NamedCount {
+  name: string;
+  count: number;
+}
+
+/** 某优先级下的任务数与完成数。 */
+export interface PriorityStat {
+  priority: number;
+  count: number;
+  done: number;
+}
+
+/** 历史统计 / 复盘视图的一次性聚合结果。 */
+export interface StatisticsOverview {
+  weeks: WeekTrendStat[];
+  totalTasks: number;
+  totalDone: number;
+  totalOpen: number;
+  totalCarried: number;
+  byPriority: PriorityStat[];
+  byTag: NamedCount[];
+  byOwner: NamedCount[];
+}
+
 export interface MigrateResult {
   dataDir: string;
   message: string;

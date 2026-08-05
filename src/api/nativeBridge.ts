@@ -9,6 +9,7 @@ import type {
   QueryTaskRow,
   RemoteDatabaseVersion,
   RestoreDatabaseVersionResult,
+  StatisticsOverview,
   Tag,
   Task,
   UpdateCheckResult,
@@ -177,6 +178,11 @@ export async function queryAllTasks(filter: QueryFilter): Promise<QueryTaskRow[]
 
 export async function weekSummaries(): Promise<WeekSummary[]> {
   return invokeCommand<WeekSummary[]>('week_summaries');
+}
+
+/** 历史统计 / 复盘视图的一次性聚合数据（近 N 周趋势 + 各维度分布）。 */
+export async function statisticsOverview(limit?: number): Promise<StatisticsOverview> {
+  return invokeCommand<StatisticsOverview>('statistics_overview', { limit: limit ?? 12 });
 }
 
 export async function getStorageDir(): Promise<string> {

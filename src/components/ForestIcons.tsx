@@ -218,6 +218,16 @@ export function TagIcon({ size = 15 }: { size?: number }) {
   );
 }
 
+/** 统计：三根柱子的柱状图。 */
+export function ChartIcon({ size = 15 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <path d="M5 20V9M12 20V4M19 20v-7" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+      <path d="M3 20h18" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 /** 工作台四宫格 Logo：蓝色方块。 */
 export function WorkbenchLogoIcon({ size = 15 }: { size?: number }) {
   return (

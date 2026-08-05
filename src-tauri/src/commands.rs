@@ -5,8 +5,8 @@ use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
 
 use crate::contracts::{
-    AppStatePayload, MigrateResult, ProxyConfig, QueryFilter, QueryTaskRow, SyncResult,
-    UpdateCheckResult, WeekTreePayload,
+    AppStatePayload, MigrateResult, ProxyConfig, QueryFilter, QueryTaskRow, StatisticsOverview,
+    SyncResult, UpdateCheckResult, WeekTreePayload,
 };
 use crate::credentials;
 use crate::db;
@@ -315,6 +315,14 @@ pub async fn week_summaries() -> Result<Vec<(String, i64, i64)>, String> {
     let config = resolve_storage()?;
     let conn = open_conn(&config)?;
     queries::week_summaries(&conn)
+}
+
+/// 历史统计 / 复盘视图的一次性聚合数据（近 N 周趋势 + 各维度分布）。
+#[tauri::command]
+pub async fn statistics_overview(limit: Option<i64>) -> Result<StatisticsOverview, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    queries::statistics_overview(&conn, limit.unwrap_or(12))
 }
 
 /// Current storage directory.

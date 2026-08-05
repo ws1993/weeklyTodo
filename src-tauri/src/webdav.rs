@@ -470,9 +470,9 @@ mod tests {
     fn parses_current_database_and_valid_backups_from_directory_listing() {
         let xml = r#"<D:multistatus xmlns:D="DAV:">
           <D:response><D:href>/weeklytodo/</D:href><D:propstat><D:prop><D:resourcetype><D:collection/></D:resourcetype></D:prop></D:propstat></D:response>
-          <D:response><D:href>/weeklytodo/weeklytodo.db.20260804-133200.bak</D:href><D:propstat><D:prop><D:getlastmodified>Mon, 04 Aug 2026 13:32:00 GMT</D:getlastmodified><D:getcontentlength>65536</D:getcontentlength></D:prop></D:propstat></D:response>
-          <D:response><D:href>/weeklytodo/unrelated.txt</D:href><D:propstat><D:prop><D:getlastmodified>Mon, 04 Aug 2026 13:33:00 GMT</D:getlastmodified></D:prop></D:propstat></D:response>
-          <D:response><D:href>/weeklytodo/weeklytodo.db</D:href><D:propstat><D:prop><D:getlastmodified>Mon, 04 Aug 2026 13:34:00 GMT</D:getlastmodified><D:getcontentlength>73728</D:getcontentlength></D:prop></D:propstat></D:response>
+          <D:response><D:href>/weeklytodo/weeklytodo.db.20260804-133200.bak</D:href><D:propstat><D:prop><D:getlastmodified>Tue, 04 Aug 2026 13:32:00 GMT</D:getlastmodified><D:getcontentlength>65536</D:getcontentlength></D:prop></D:propstat></D:response>
+          <D:response><D:href>/weeklytodo/unrelated.txt</D:href><D:propstat><D:prop><D:getlastmodified>Tue, 04 Aug 2026 13:33:00 GMT</D:getlastmodified></D:prop></D:propstat></D:response>
+          <D:response><D:href>/weeklytodo/weeklytodo.db</D:href><D:propstat><D:prop><D:getlastmodified>Tue, 04 Aug 2026 13:34:00 GMT</D:getlastmodified><D:getcontentlength>73728</D:getcontentlength></D:prop></D:propstat></D:response>
         </D:multistatus>"#;
 
         let versions = parse_database_versions(xml);

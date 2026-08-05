@@ -5,6 +5,7 @@ import { WeekRail } from './components/WeekRail';
 import { TaskTree } from './components/TaskTree';
 import { CurrentActions } from './components/CurrentActions';
 import { QueryView } from './components/QueryView';
+import { StatisticsView } from './components/StatisticsView';
 import { ToggleSwitch } from './components/QueryControls';
 import { CreateWeekModal } from './components/CreateWeekModal';
 import { UpdateModal } from './features/update/UpdateModal';
@@ -17,7 +18,7 @@ import {
   onCloseRequested,
   syncWebDavAutomatically,
 } from './api/nativeBridge';
-import { LogoIcon, PlusIcon, SettingsIcon } from './components/ForestIcons';
+import { ChartIcon, LogoIcon, PlusIcon, SettingsIcon } from './components/ForestIcons';
 import {
   isSyncDue,
   loadWebDavSettings,
@@ -47,6 +48,7 @@ export function App() {
   const selectWeek = useAppStore((state) => state.selectWeek);
 
   const [queryOpen, setQueryOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [updateOpen, setUpdateOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -192,6 +194,14 @@ export function App() {
             <span className="today-sep" />
             <span className="now-week">{currentWeek} · 本周</span>
             <button
+              className="btn btn-ghost btn-sm"
+              title="统计 / 复盘"
+              onClick={() => setStatsOpen(true)}
+            >
+              <ChartIcon size={15} />
+              统计
+            </button>
+            <button
               className="btn btn-ghost btn-sm icon-btn"
               title="设置"
               aria-label="打开设置"
@@ -290,6 +300,7 @@ export function App() {
         onClose={() => setQueryOpen(false)}
         onNavigate={(weekId) => void selectWeek(weekId)}
       />
+      <StatisticsView open={statsOpen} onClose={() => setStatsOpen(false)} />
       <CreateWeekModal open={createOpen} onClose={() => setCreateOpen(false)} />
       <SettingsOverlay
         open={settingsOpen}

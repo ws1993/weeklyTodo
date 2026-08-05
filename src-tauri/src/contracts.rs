@@ -38,6 +38,50 @@ pub struct QueryFilter {
     pub tag_id: Option<i64>,
 }
 
+/// 单周趋势：总量 / 完成 / 进行中 / 带入（含带入完成数）。
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WeekTrendStat {
+    pub week_id: String,
+    pub total: i64,
+    pub done: i64,
+    pub open: i64,
+    pub carried: i64,
+    pub carried_done: i64,
+}
+
+/// 名称 + 计数（标签 / 负责人分布用）。
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NamedCount {
+    pub name: String,
+    pub count: i64,
+}
+
+/// 某优先级下的任务数与完成数。
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PriorityStat {
+    pub priority: i64,
+    pub count: i64,
+    pub done: i64,
+}
+
+/// 历史统计 / 复盘视图的一次性聚合结果。
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatisticsOverview {
+    /// 最近 N 周趋势（新 → 旧）。
+    pub weeks: Vec<WeekTrendStat>,
+    pub total_tasks: i64,
+    pub total_done: i64,
+    pub total_open: i64,
+    pub total_carried: i64,
+    pub by_priority: Vec<PriorityStat>,
+    pub by_tag: Vec<NamedCount>,
+    pub by_owner: Vec<NamedCount>,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateCheckResult {

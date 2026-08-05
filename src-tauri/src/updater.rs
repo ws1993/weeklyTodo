@@ -39,11 +39,8 @@ fn build_client(proxy: Option<&ProxyConfig>) -> Result<reqwest::Client, String> 
             if let Some(custom_url) = &config.custom_proxy_url {
                 let mut proxy = reqwest::Proxy::all(custom_url)
                     .map_err(|error| format!("创建自定义代理失败：{error}"))?;
-                match (&config.username, &config.password) {
-                    (Some(user), Some(password)) => {
-                        proxy = proxy.basic_auth(user.as_str(), password.as_str());
-                    }
-                    _ => {}
+                if let (Some(user), Some(password)) = (&config.username, &config.password) {
+                    proxy = proxy.basic_auth(user.as_str(), password.as_str());
                 }
                 builder = builder.proxy(proxy);
             } else {
