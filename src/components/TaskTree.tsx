@@ -486,18 +486,33 @@ function TaskNode({
           )}
         </span>
 
-        {task.carriedFromTaskId != null && <span className="tag tag-carry">带入</span>}
-        {closed && <span className="tag tag-closed">已完成</span>}
-        <span className={`tag tag-priority p${task.priority}`}>P{task.priority}</span>
-        {task.executionMode === 'self' && <span className="tag tag-self">自己</span>}
-        {task.executionMode === 'follow_up' && <span className="tag tag-follow">跟进</span>}
-        {task.executionMode === 'follow_up' && task.ownerName && (
-          <span className="tag tag-owner">{task.ownerName}</span>
-        )}
-        {visibleTags.map((tag) => (
-          <span key={tag} className="tag tag-label">{tag}</span>
-        ))}
-        {extraTagCount > 0 && <span className="tag tag-extra">+{extraTagCount}</span>}
+        <span
+          className="node-meta"
+          title="双击打开任务详情"
+          onClick={(event) => {
+            // 单击也拦截：既避免误触行的折叠/展开，也让真双击的两次 click 不引起闪烁。
+            event.stopPropagation();
+          }}
+          onDoubleClick={(event) => {
+            // 徽章区是独立的双击热区：单击不参与行的折叠/展开，
+            // 否则双击会先触发两次 click 导致子树先折叠再展开、产生闪烁。
+            event.stopPropagation();
+            onOpenSettings(task);
+          }}
+        >
+          {task.carriedFromTaskId != null && <span className="tag tag-carry">带入</span>}
+          {closed && <span className="tag tag-closed">已完成</span>}
+          <span className={`tag tag-priority p${task.priority}`}>P{task.priority}</span>
+          {task.executionMode === 'self' && <span className="tag tag-self">自己</span>}
+          {task.executionMode === 'follow_up' && <span className="tag tag-follow">跟进</span>}
+          {task.executionMode === 'follow_up' && task.ownerName && (
+            <span className="tag tag-owner">{task.ownerName}</span>
+          )}
+          {visibleTags.map((tag) => (
+            <span key={tag} className="tag tag-label">{tag}</span>
+          ))}
+          {extraTagCount > 0 && <span className="tag tag-extra">+{extraTagCount}</span>}
+        </span>
 
         <span className="row-spacer" />
         <span className="task-actions">
