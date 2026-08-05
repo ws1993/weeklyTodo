@@ -307,7 +307,7 @@ button{font-family:inherit;color:inherit}
   100%{transform:scale(1)}
 }
 .node-glyph{display:none}
-.node-title-wrap{flex:1;min-width:0;display:flex;align-items:center}
+.node-title-wrap{flex:1;min-width:0;display:flex;align-items:center;gap:6px}
 .node-title{
   position:relative;font-size:13px;white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis;min-width:0;line-height:1.5;
@@ -400,7 +400,7 @@ button{font-family:inherit;color:inherit}
 
 /* ---------- 轨道式分组 (Rail-style group roots) ---------- */
 .tree-node.group-root{
-  margin-bottom:2px;
+  margin-bottom:12px;
   border-left:3px solid var(--gcolor,var(--border));
   border-radius:0 4px 4px 0;
   background:color-mix(in srgb,var(--gcolor,transparent) 4%,transparent);
