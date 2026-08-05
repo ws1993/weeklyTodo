@@ -175,6 +175,16 @@ button{font-family:inherit;color:inherit}
   display:flex;flex-direction:column;gap:14px;
   min-width:0;min-height:0;overflow:auto;
 }
+/* 周内容区：切换周（周数据变化）时淡入，表达“进入新的一周”。 */
+.main-content{
+  display:flex;flex-direction:column;gap:14px;
+  flex:1;min-height:0;
+  animation:main-fade-in .24s ease-out;
+}
+@keyframes main-fade-in{
+  from{opacity:0;transform:translateY(6px)}
+  to{opacity:1;transform:translateY(0)}
+}
 .week-card{
   background:var(--surface);border:1px solid var(--border);border-radius:4px;
   padding:14px 18px;display:flex;align-items:center;justify-content:space-between;
@@ -237,7 +247,7 @@ button{font-family:inherit;color:inherit}
 .tree-row:not(.collapsible){cursor:default}
 .tree-row.top{background:rgba(21,87,208,.018)}
 .tree-row.top:hover{background:var(--brand-soft)}
-.tree-row.closed .node-title{color:var(--text-3);text-decoration:line-through;text-decoration-color:#C4CDDC;font-weight:400}
+.tree-row.closed .node-title{color:var(--text-3);font-weight:400}
 .tree-children{position:relative}
 .tree-children .tree-row{padding-left:52px}
 .tree-children .tree-row::before{
@@ -278,15 +288,38 @@ button{font-family:inherit;color:inherit}
   width:18px;height:18px;border-radius:3px;border:1.5px solid #B9C4D8;
   background:var(--surface);display:grid;place-items:center;cursor:pointer;
   flex:none;color:#fff;padding:0;
-  transition:border-color .12s,background .12s,color .12s;
+  transition:border-color .15s,background .15s,color .15s,transform .15s;
 }
 .task-check:hover{border-color:var(--brand)}
-.task-check svg{width:12px;height:12px;opacity:0;transition:opacity .1s}
-.task-check.done{background:var(--success);border-color:var(--success)}
-.task-check.done svg{opacity:1}
+.task-check:active{transform:scale(.88)}
+.task-check svg{
+  width:12px;height:12px;opacity:0;transform:scale(.3);
+  transition:opacity .14s ease,transform .2s ease-out;
+}
+.task-check.done{
+  background:var(--success);border-color:var(--success);
+  animation:check-pop .26s ease-out;
+}
+.task-check.done svg{opacity:1;transform:scale(1)}
+@keyframes check-pop{
+  0%{transform:scale(.88)}
+  55%{transform:scale(1.14)}
+  100%{transform:scale(1)}
+}
 .node-glyph{display:none}
 .node-title-wrap{flex:1;min-width:0;display:flex;align-items:center}
-.node-title{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;line-height:1.5}
+.node-title{
+  position:relative;font-size:13px;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;min-width:0;line-height:1.5;
+  transition:color .2s ease;
+}
+/* 完成时从左到右“画”出一条删除线，取代瞬时的 text-decoration。 */
+.node-title::after{
+  content:"";position:absolute;left:0;top:50%;width:100%;height:1.5px;
+  background:var(--text-3);transform:scaleX(0);transform-origin:left center;
+  transition:transform .22s ease-out;
+}
+.tree-row.closed .node-title::after{transform:scaleX(1)}
 .tree-row.top .node-title{font-size:13px;font-weight:600}
 .task-title-input{
   flex:1;min-width:0;height:26px;border:1px solid var(--brand);border-radius:3px;
@@ -426,9 +459,15 @@ button{font-family:inherit;color:inherit}
 /* 行动卡片：色点 + 标题 + 祖先路径 */
 .leaf-card{
   display:flex;align-items:center;gap:10px;padding:9px 14px;
-  border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;
+  border-bottom:1px solid var(--border);cursor:pointer;
+  transition:background .12s,opacity .2s ease-in,transform .2s ease-in;
 }
 .leaf-card:hover{background:var(--brand-soft)}
+/* 完成时的淡出状态：由 CurrentActions 延迟到动画播完后再真正关闭任务。 */
+.leaf-card.leaving{
+  opacity:0;transform:translateX(14px);
+  pointer-events:none;
+}
 .leaf-dot{
   width:8px;height:8px;border-radius:50%;flex:none;
   box-shadow:0 0 0 3px rgba(23,32,51,.05);
@@ -1258,4 +1297,16 @@ button{font-family:inherit;color:inherit}
   }
   .actions-pane{display:none}
   .today{display:none}
+}
+
+/* 尊重系统的“减少动态效果”偏好：动画/过渡几乎瞬时完成，交互不变。 */
+@media (prefers-reduced-motion: reduce){
+  *,
+  *::before,
+  *::after{
+    animation-duration:.01ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+    scroll-behavior:auto !important;
+  }
 }

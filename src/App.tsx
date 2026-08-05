@@ -216,7 +216,8 @@ export function App() {
         <main className="main">
           {error && <div className="error-state">{error}</div>}
           {!error && (
-            <>
+            // key 跟随当前周数据变化：切换周时重新挂载内容区并播放淡入动画。
+            <div className="main-content" key={tree?.week.id ?? activeWeekId}>
               <section className="week-card">
                 <div className="week-header-title">
                   <div className="week-line1">
@@ -273,7 +274,7 @@ export function App() {
                   )}
                 </div>
               </section>
-            </>
+            </div>
           )}
         </main>
         {tree && (

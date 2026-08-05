@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Task } from '../shared/contracts/types';
 import { activeLeaves, useAppStore } from '../store/appStore';
 import { BoltIcon, ChevronRightIcon, LocateIcon } from './ForestIcons';
 import { GROUP_COLOR_PENDING, groupColorMap } from '../utils/groupColors';
+
+/** 完成按钮触发后，条目淡出动画的时长（毫秒）。 */
+const COMPLETE_FADE_MS = 220;
 
 interface CurrentActionsProps {
   tasks: Task[];
@@ -44,6 +47,16 @@ export function CurrentActions({ tasks, onLocate }: CurrentActionsProps) {
   const ensureGroupColor = useAppStore((state) => state.ensureGroupColor);
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
+  // 正在播放完成淡出动画的任务 id（卡片先淡出，再真正关闭）。
+  const [leavingIds, setLeavingIds] = useState<Set<number>>(new Set());
+  const leavingIdsRef = useRef<Set<number>>(new Set());
+  const fadeTimersRef = useRef<number[]>([]);
+
+  // 组件卸载时清理尚未触发的淡出定时器。
+  useEffect(() => {
+    const timers = fadeTimersRef.current;
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, []);
 
   const entries = useMemo(() => buildLeafEntries(tasks), [tasks]);
   const colorMap = useMemo(() => groupColorMap(groupColors), [groupColors]);
@@ -95,6 +108,32 @@ export function CurrentActions({ tasks, onLocate }: CurrentActionsProps) {
       cancelled = true;
     };
   }, [groups, colorMap, ensureGroupColor]);
+
+  /**
+   * 标记完成：先让卡片播放淡出动画，动画播完后再真正关闭任务，
+   * 避免条目内容瞬间跳走。若用户已在动画期间切换周，则不误关其他周的任务。
+   */
+  const handleComplete = (taskId: number) => {
+    if (leavingIdsRef.current.has(taskId)) {
+      return;
+    }
+    leavingIdsRef.current.add(taskId);
+    setLeavingIds(new Set(leavingIdsRef.current));
+    const weekIdAtClick = useAppStore.getState().activeWeekId;
+
+    const timer = window.setTimeout(() => {
+      fadeTimersRef.current = fadeTimersRef.current.filter((id) => id !== timer);
+      // 动画已播完，无论关闭结果如何都恢复该卡片，
+      // 避免任务被重新打开后带着「leaving」状态不可见。
+      leavingIdsRef.current.delete(taskId);
+      setLeavingIds(new Set(leavingIdsRef.current));
+      if (useAppStore.getState().activeWeekId !== weekIdAtClick) {
+        return;
+      }
+      void toggleTask(taskId);
+    }, COMPLETE_FADE_MS);
+    fadeTimersRef.current.push(timer);
+  };
 
   if (collapsed) {
     return (
@@ -159,7 +198,7 @@ export function CurrentActions({ tasks, onLocate }: CurrentActionsProps) {
           return (
             <div
               key={entry.task.id}
-              className="leaf-card"
+              className={`leaf-card${leavingIds.has(entry.task.id) ? ' leaving' : ''}`}
               onClick={() => onLocate(entry.task.id)}
               title={fullPath.join(' › ')}
             >
@@ -192,7 +231,7 @@ export function CurrentActions({ tasks, onLocate }: CurrentActionsProps) {
                 title="标记完成"
                 onClick={(event) => {
                   event.stopPropagation();
-                  void toggleTask(entry.task.id);
+                  handleComplete(entry.task.id);
                 }}
               >
                 完成
