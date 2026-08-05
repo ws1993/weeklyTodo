@@ -43,6 +43,7 @@ export function App() {
   const loading = useAppStore((state) => state.loading);
   const error = useAppStore((state) => state.error);
   const tree = useAppStore((state) => state.tree);
+  const groupColors = useAppStore((state) => state.groupColors);
   const activeWeekId = useAppStore((state) => state.activeWeekId);
   const currentWeekId = useAppStore((state) => state.currentWeekId);
   const selectWeek = useAppStore((state) => state.selectWeek);
@@ -280,6 +281,7 @@ export function App() {
                       newTaskRequest={newTaskRequest}
                       locateRequest={locateRequest}
                       showIncompleteOnly={showIncompleteOnly}
+                      groupColors={groupColors}
                     />
                   )}
                 </div>

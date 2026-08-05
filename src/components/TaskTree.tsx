@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Task } from '../shared/contracts/types';
+import type { GroupColor, Task } from '../shared/contracts/types';
 import { useAppStore } from '../store/appStore';
 import {
   computeDrop,
@@ -9,6 +9,7 @@ import {
   subtreeSize,
 } from '../utils/tree';
 import type { DropPosition } from '../utils/tree';
+import { groupColorMap } from '../utils/groupColors';
 import { EmptyState } from './EmptyState';
 import {
   CheckIcon,
@@ -29,6 +30,8 @@ interface TaskTreeProps {
   locateRequest?: { taskId: number; nonce: number } | null;
   /** 勾选后仅渲染未完成的任务；已完成的父节点保留为骨架以展示其未完成子任务。 */
   showIncompleteOnly?: boolean;
+  /** 分组颜色映射，用于轨道式分组的彩色左边框。 */
+  groupColors?: GroupColor[];
 }
 
 interface DropIndicator {
@@ -52,6 +55,7 @@ export function TaskTree({
   newTaskRequest = 0,
   locateRequest = null,
   showIncompleteOnly = false,
+  groupColors = [],
 }: TaskTreeProps) {
   const addTask = useAppStore((state) => state.addTask);
   const moveTask = useAppStore((state) => state.moveTask);
@@ -71,6 +75,8 @@ export function TaskTree({
     () => (showIncompleteOnly ? incompleteOnlyVisibleIds(tasks) : null),
     [showIncompleteOnly, tasks],
   );
+
+  const colorMap = useMemo(() => groupColorMap(groupColors), [groupColors]);
 
   const rootTasks = useMemo(() => {
     const roots = sortedChildren(tasks, null);
@@ -195,6 +201,7 @@ export function TaskTree({
           onOpenSettings={setSelectedTask}
           drag={dragProps}
           visibleTaskIds={visibleTaskIds}
+          groupColor={colorMap.get(task.title)}
         />
       ))}
 
@@ -268,6 +275,8 @@ interface TaskNodeProps {
   drag: TreeDragProps;
   /** 过滤开启时，仅这些任务参与渲染；null 表示不过滤。 */
   visibleTaskIds?: Set<number> | null;
+  /** 该任务所属分组的颜色（仅根任务传递）。 */
+  groupColor?: string;
 }
 
 function TaskNode({
@@ -279,6 +288,7 @@ function TaskNode({
   onOpenSettings,
   drag,
   visibleTaskIds = null,
+  groupColor,
 }: TaskNodeProps) {
   const toggleTask = useAppStore((state) => state.toggleTask);
   const editTask = useAppStore((state) => state.editTask);
@@ -298,6 +308,7 @@ function TaskNode({
       : allChildren;
   }, [allTasks, task.id, visibleTaskIds]);
   const hasChildren = children.length > 0;
+  const isLeaf = !hasChildren;
   const closed = task.status === 'closed';
 
   // 定位目标位于本节点子树内时，强制展开以便目标可见。
@@ -335,6 +346,7 @@ function TaskNode({
   const depthClass = depth > 0 ? `depth-${Math.min(depth, 5)}` : '';
   const nodeClass = [
     'tree-node',
+    isTop ? 'group-root' : '',
     closed ? 'closed' : '',
     depthClass,
   ]
@@ -348,6 +360,7 @@ function TaskNode({
     isDragging ? 'dragging' : '',
     drop ? `drop-${drop}` : '',
     hasChildren ? 'collapsible' : '',
+    !closed && isLeaf ? 'leaf-active' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -405,8 +418,12 @@ function TaskNode({
 
   const deleteSubtreeSize = subtreeSize(allTasks, task.id);
 
+  const nodeStyle = groupColor
+    ? ({ '--gcolor': groupColor } as React.CSSProperties)
+    : undefined;
+
   return (
-    <div className={nodeClass} data-node={task.id}>
+    <div className={nodeClass} data-node={task.id} style={nodeStyle}>
       <div
         className={rowClass}
         onClick={() => {
@@ -463,6 +480,7 @@ function TaskNode({
             }
           }}
         >
+          {!closed && isLeaf && <span className="leaf-dot" />}
           {editing ? (
             <input
               autoFocus

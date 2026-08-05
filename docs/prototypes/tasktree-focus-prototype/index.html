@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-variant="rail" data-leaf="strong" data-color="on" data-anno="on">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>weeklyTodo · 任务树轨道式强化原型</title>
+<!--
+  ============================================================
+  weeklyTodo 任务树 · 层级聚焦原型（结合项目现状）
+  ============================================================
+  我的假设（Junior Designer 汇报）：
+  - 一级任务 = 本周的「目标/分组」。现状只有 2% 透明度的浅蓝底色 + 600 字重，
+    与子任务几乎同高同宽，长周列表里分不出「哪些是我的目标」。
+  - 叶子节点 = 没有子任务的原子任务，是用户真正要去「执行」的单元。
+    现状完全没有标记——用户无法一眼扫出本周的「可执行面」。
+  - 方案：两条设计轴、可独立调节、方便横向对比——
+      轴 1 · 一级分隔机制：现状 / 章节式(排版+间距) / 卡片式(容器) / 轨道式(分组色)
+      轴 2 · 叶子凸显强度：仅圆点 / 圆点+底色+字重
+    + 分组色开关：验证「配色方案 vs 纯排版方案」哪种更耐看。
+  - 设计约束：
+      1) 已完成(closed)叶子自动撤下强调，回归弱化只读，不污染未完成面的可扫性；
+      2) 叶子标记不改变行高、不增加交互复杂度（复用原 arrow 槽位）；
+      3) 第 4 层起缩进步长 24px→18px，避免深层挤压标题；
+      4) 全部颜色/字号/间距取自 src/styles.css 真实 token；分组色取自 GROUP_PALETTE。
+  - 数据为模拟数据；展开/折叠/勾选可交互，仅用于感受层级呈现。
+  ============================================================
+-->
+<style>
+/* ===================== 项目真实设计 token（取自 src/styles.css） ===================== */
+:root{
+  --bg:#F2F6FA;
+  --surface:#FFFFFF;
+  --surface-2:#F7F9FC;
+  --text-1:#172033;
+  --text-2:#647086;
+  --text-3:#8B95A7;
+  --text-4:#A8B2C1;
+  --brand:#1557D0;
+  --brand-hover:#0B43AC;
+  --brand-soft:#EAF1FF;
+  --brand-border:#C9DBF7;
+  --success:#167354;
+  --success-soft:#E8F4EF;
+  --success-border:#C9E3D6;
+  --warning:#9B5D00;
+  --warning-soft:#FFF6E0;
+  --warning-border:#F0DFB8;
+  --danger:#B42333;
+  --danger-soft:#FDEBEC;
+  --danger-border:#F3C9CD;
+  --border:#E1E7F0;
+  --border-strong:#CDD7E6;
+  --radius:3px;
+  --font:"Segoe UI Variable","Microsoft YaHei UI",-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC","Hiragino Sans GB",sans-serif;
+  --mono:"Cascadia Mono","Cascadia Code",Consolas,"JetBrains Mono",monospace;
+  --t-1:140ms;
+  --t-2:240ms;
+  --ease:cubic-bezier(.16,1,.3,1);
+  /* 未分配分组色时的中性占位色（GROUP_COLOR_PENDING） */
+  --pending:#8B95A7;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--font);
+  font-size:13px;
+  color:var(--text-1);
+  background:#E7EBF1;
+  background-image:
+    linear-gradient(rgba(23,32,51,.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(23,32,51,.03) 1px,transparent 1px);
+  background-size:22px 22px;
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;color:inherit}
+::selection{background:var(--brand-soft)}
+
+/* ===================== 原型工作台（非应用部分） ===================== */
+.docbar{
+  position:fixed;top:0;left:0;right:0;height:54px;z-index:900;
+  display:flex;align-items:center;gap:12px;padding:0 16px;
+  background:rgba(255,255,255,.92);
+  backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--border);
+}
+.docbar-title{font-size:14px;font-weight:700;letter-spacing:.3px;white-space:nowrap}
+.docbar-title span{color:var(--text-3);font-weight:500;margin-left:8px}
+.docbar-sep{width:1px;height:26px;background:var(--border);flex:none}
+.seg{
+  display:flex;align-items:center;background:var(--surface-2);
+  border:1px solid var(--border);border-radius:7px;padding:2px;gap:2px;flex:none;
+}
+.seg-label{font-size:11px;color:var(--text-3);margin-right:6px;white-space:nowrap}
+.seg button{
+  border:none;background:transparent;padding:5px 12px;border-radius:5px;
+  font-size:12px;color:var(--text-2);cursor:pointer;white-space:nowrap;
+  transition:background .12s,color .12s;
+}
+.seg button:hover{color:var(--text-1)}
+.seg button.active{background:#fff;color:var(--text-1);box-shadow:0 1px 2px rgba(23,32,51,.12);font-weight:600}
+.chk{
+  display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);
+  cursor:pointer;padding:5px 10px;border:1px solid var(--border);border-radius:7px;
+  background:#fff;white-space:nowrap;user-select:none;
+}
+.chk input{accent-color:var(--brand);width:14px;height:14px}
+.chk.off{opacity:.55}
+.btn-mini{
+  border:1px solid var(--border);background:#fff;color:var(--text-2);
+  padding:5px 12px;border-radius:7px;font-size:12px;cursor:pointer;white-space:nowrap;
+}
+.btn-mini:hover{color:var(--brand);border-color:var(--brand-border);background:var(--brand-soft)}
+.docbar-spacer{flex:1}
+.docbar-hint{font-size:11px;color:var(--text-4);white-space:nowrap}
+
+/* 标注图例（编号说明） */
+.legend{
+  position:fixed;top:62px;right:16px;width:320px;z-index:950;
+  background:#fff;border:1px solid var(--border);border-radius:10px;
+  box-shadow:0 10px 30px rgba(23,32,51,.14);
+  padding:14px 16px;display:none;
+}
+[data-anno="on"] .legend{display:block}
+.legend-title{font-size:12px;font-weight:700;margin-bottom:10px;color:var(--text-1)}
+.legend-item{display:flex;gap:10px;align-items:flex-start;margin-bottom:9px;font-size:12px;line-height:1.55;color:var(--text-2)}
+.legend-item:last-child{margin-bottom:0}
+.legend-num{
+  flex:none;width:18px;height:18px;border-radius:999px;background:var(--brand);
+  color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;margin-top:1px;
+}
+
+/* ===================== 应用窗口模拟（套壳） ===================== */
+.stage{
+  height:100vh;padding:66px 24px 20px;
+  display:flex;align-items:stretch;justify-content:center;
+}
+.appwin{
+  width:1280px;max-width:100%;height:100%;
+  display:flex;flex-direction:column;
+  background:var(--bg);
+  border:1px solid var(--border-strong);
+  border-radius:12px;overflow:hidden;
+  box-shadow:0 12px 40px rgba(23,32,51,.12);
+}
+.topbar{
+  display:flex;align-items:center;gap:12px;height:52px;flex:none;
+  padding:0 16px;background:var(--surface);border-bottom:1px solid var(--border);
+}
+.logo{display:flex;align-items:center;gap:9px}
+.logo-mark{
+  width:26px;height:26px;border-radius:7px;background:var(--brand);
+  display:grid;place-items:center;color:#fff;flex:none;
+}
+.logo-name{font-size:14px;font-weight:700;letter-spacing:.3px}
+.topbar-sub{font-size:11px;color:var(--text-3);margin-top:1px}
+.topbar-spacer{flex:1}
+.btn{
+  display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 13px;
+  border-radius:6px;border:1px solid var(--border);background:#fff;
+  font-size:12px;color:var(--text-2);cursor:pointer;white-space:nowrap;
+}
+.btn:hover{color:var(--brand);border-color:var(--brand-border);background:var(--brand-soft)}
+.btn-primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn-primary:hover{background:var(--brand-hover);color:#fff}
+
+.appbody{flex:1;min-height:0;display:flex}
+.rail{
+  width:248px;flex:none;background:var(--surface-2);
+  border-right:1px solid var(--border);padding:12px 8px;overflow:auto;
+}
+.rail-title{font-size:11px;color:var(--text-3);padding:2px 10px 8px;letter-spacing:.4px}
+.week-item{
+  display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;
+  cursor:pointer;font-size:12px;color:var(--text-2);margin-bottom:2px;
+}
+.week-item:hover{background:var(--surface)}
+.week-item.active{background:var(--brand-soft);color:var(--brand);font-weight:600;box-shadow:inset 2px 0 0 0 var(--brand)}
+.week-item .week-range{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.week-item .week-badge{font-size:10px;color:var(--brand);border:1px solid var(--brand-border);background:#fff;border-radius:999px;padding:0 6px;line-height:16px}
+.rail-new{margin-top:8px;display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:7px;color:var(--text-3);font-size:12px;cursor:pointer}
+.rail-new:hover{background:var(--surface);color:var(--brand)}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.tree-toolbar{
+  display:flex;align-items:center;gap:10px;padding:9px 14px;flex:none;
+  border-bottom:1px solid var(--border);background:var(--surface);
+}
+.tree-title{font-size:13px;font-weight:600;white-space:nowrap}
+.tree-hint{font-size:11px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tree-toolbar .btn{margin-left:auto}
+
+/* ===================== 任务树 · 基础行（跨变体共享） ===================== */
+.tree{flex:1;overflow:auto;min-height:0;padding:14px 12px 48px;background:var(--bg)}
+.group{position:relative}
+.tree-row{
+  --step:24px;
+  display:flex;align-items:center;gap:10px;min-height:40px;
+  padding:2px 12px 2px calc(12px + var(--d)*var(--step));
+  border-radius:6px;cursor:pointer;position:relative;
+  -webkit-user-select:none;user-select:none;
+  transition:background .12s;
+}
+.tree-row[data-depth="4"],.tree-row[data-depth="5"],.tree-row[data-depth="6"]{--step:18px}
+.tree-row:hover{background:var(--surface-2)}
+.tree-row:not(.collapsible){cursor:default}
+.tree-row.closed .node-title{color:var(--text-3);font-weight:400}
+.tree-children .tree-row::before{
+  content:"";position:absolute;left:calc(20px + (var(--d) - 1)*var(--step));
+  top:0;bottom:0;width:1px;background:var(--border);
+}
+.tree-children .tree-row::after{
+  content:"";position:absolute;left:calc(20px + (var(--d) - 1)*var(--step));
+  top:50%;width:14px;height:1px;background:var(--border);
+}
+.task-toggle{
+  width:16px;height:16px;display:grid;place-items:center;color:var(--text-3);
+  background:none;border:none;padding:0;cursor:pointer;flex:none;
+}
+.task-toggle:hover{color:var(--brand)}
+.task-toggle svg{width:14px;height:14px;transition:transform .15s ease}
+.task-toggle.open svg{transform:rotate(90deg)}
+.task-toggle.leaf{pointer-events:none}
+.leaf-dot{
+  width:7px;height:7px;border-radius:999px;background:var(--gcolor,var(--pending));
+  transition:background .15s,transform .15s;
+}
+.task-check{
+  width:18px;height:18px;border-radius:4px;border:1.5px solid #B9C4D8;
+  background:var(--surface);display:grid;place-items:center;cursor:pointer;
+  flex:none;color:#fff;padding:0;
+  transition:border-color .15s,background .15s,color .15s,transform .15s;
+}
+.task-check:hover{border-color:var(--brand)}
+.task-check:active{transform:scale(.88)}
+.task-check svg{width:12px;height:12px;opacity:0;transform:scale(.3);transition:opacity .14s ease,transform .2s ease-out}
+.task-check.done{background:var(--success);border-color:var(--success)}
+.task-check.done svg{opacity:1;transform:scale(1)}
+.node-title-wrap{flex:1;min-width:0;display:flex;align-items:center}
+.node-title{
+  position:relative;font-size:13px;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;min-width:0;line-height:1.5;
+  transition:color .2s ease;
+}
+.node-title::after{
+  content:"";position:absolute;left:0;top:50%;width:100%;height:1.5px;
+  background:var(--text-3);transform:scaleX(0);transform-origin:left center;
+  transition:transform .22s ease-out;
+}
+.tree-row.closed .node-title::after{transform:scaleX(1)}
+.tag{
+  display:inline-flex;align-items:center;gap:4px;font-size:11px;line-height:18px;
+  padding:0 8px;border-radius:999px;white-space:nowrap;flex:none;
+}
+.tag-carry{color:var(--warning);background:var(--warning-soft);border:1px solid var(--warning-border)}
+.tag-closed{color:var(--success);background:var(--success-soft);border:1px solid var(--success-border)}
+.tag-priority{font-family:var(--mono);color:var(--text-3);border:1px solid var(--border);background:transparent;letter-spacing:.5px;font-size:10.5px}
+.tag-priority.p0{color:var(--danger);border-color:var(--danger-border);background:var(--danger-soft)}
+.tag-priority.p1{color:var(--warning);border-color:var(--warning-border);background:var(--warning-soft)}
+.tag-priority.p2{color:var(--brand);border-color:var(--brand-border);background:var(--brand-soft)}
+.tag-priority.p3{color:var(--text-3);border-color:var(--border);background:transparent}
+.tag-self{color:var(--text-2);border:1px solid var(--border);background:var(--surface-2);letter-spacing:.3px}
+.tag-follow{color:var(--warning);border-color:var(--warning-border);background:var(--warning-soft);letter-spacing:.3px}
+.tag-owner{color:var(--brand);border-color:var(--brand-border);background:var(--brand-soft);letter-spacing:.3px}
+.tag-label{color:var(--text-2);border:1px solid var(--border);background:var(--surface-2);letter-spacing:.3px}
+.node-meta{
+  display:inline-flex;align-items:center;gap:8px;flex:none;cursor:pointer;
+  padding:2px 6px;margin:-2px -6px;border-radius:999px;transition:background .12s;
+}
+.node-meta:hover{background:var(--brand-soft)}
+.row-spacer{flex:1}
+.task-actions{display:inline-flex;align-items:center;gap:3px;opacity:0;transition:opacity .12s;flex:none}
+.tree-row:hover .task-actions{opacity:1}
+.act-btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:26px;height:26px;border-radius:5px;border:1px solid transparent;
+  background:transparent;color:var(--text-3);cursor:pointer;
+}
+.act-btn:hover{color:var(--brand);background:var(--brand-soft);border-color:var(--brand-border)}
+.act-btn svg{width:13px;height:13px}
+.act-btn.danger:hover{color:var(--danger);background:var(--danger-soft);border-color:var(--danger-border)}
+
+/* ===================== 叶子凸显（轴 2） ===================== */
+/* 弱档：仅圆点（默认即显示，圆点用分组色） */
+[data-leaf="strong"] .tree-row.leaf-row{
+  background:var(--surface-2);
+}
+[data-leaf="strong"] .tree-row.leaf-row .node-title{font-weight:600}
+[data-leaf="strong"] .tree-row.leaf-row .leaf-dot{width:8px;height:8px}
+/* 已完成叶子：撤下所有强调，圆点回归中性灰 */
+.tree-row.leaf-row.closed{background:transparent}
+.tree-row.leaf-row.closed .node-title{font-weight:400}
+.tree-row.leaf-row.closed .leaf-dot{background:var(--text-4)}
+/* 现状变体：不展示叶子标记（诚实对照） */
+[data-variant="now"] .leaf-dot{display:none}
+
+/* ===================== 变体 · V0 现状（对照基准） ===================== */
+[data-variant="now"] .tree{padding:0 0 40px}
+[data-variant="now"] .tree-row{
+  border-radius:0;min-height:42px;border-bottom:1px solid var(--border);
+}
+[data-variant="now"] .tree-row:last-child{border-bottom:none}
+[data-variant="now"] .tree-row.top{background:rgba(21,87,208,.018)}
+[data-variant="now"] .tree-row.top:hover{background:var(--brand-soft)}
+[data-variant="now"] .tree-row.top .node-title{font-weight:600}
+
+/* ===================== 变体 · V1 章节式（排版 + 间距） ===================== */
+[data-variant="chapter"] .group + .group{padding-top:22px;margin-top:16px}
+[data-variant="chapter"] .group + .group::before{
+  content:"";position:absolute;top:10px;left:0;right:0;height:1px;
+  background:var(--border-strong);opacity:.55;
+}
+[data-variant="chapter"] .tree-row.top{
+  min-height:46px;padding-left:13px;background:transparent;border-radius:0 6px 6px 0;
+  border-left:3px solid var(--gcolor,var(--pending));
+}
+[data-variant="chapter"] .tree-row.top:hover{background:var(--surface-2)}
+[data-variant="chapter"] .tree-row.top .node-title{font-size:15px;font-weight:700;letter-spacing:.2px}
+[data-variant="chapter"] .tree-row.top .task-toggle{color:var(--gcolor,var(--pending))}
+[data-variant="chapter"] .tree-row.top.closed .node-title{font-size:15px}
+
+/* ===================== 变体 · V2 卡片式（容器） ===================== */
+[data-variant="card"] .group{
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  margin-bottom:16px;overflow:hidden;box-shadow:0 1px 3px rgba(23,32,51,.05);
+}
+[data-variant="card"] .group::before{
+  content:"";display:block;height:4px;background:var(--gcolor,var(--pending));
+}
+[data-variant="card"] .tree-row{background:transparent;border-radius:0}
+[data-variant="card"] .tree-row:hover{background:var(--surface-2)}
+[data-variant="card"] .tree-row.top{min-height:46px;padding-top:8px;padding-bottom:8px}
+[data-variant="card"] .tree-row.top .node-title{font-size:14px;font-weight:700}
+[data-variant="card"] .tree-children{padding-bottom:6px}
+[data-variant="card"] .tree-children .tree-row::before,
+[data-variant="card"] .tree-children .tree-row::after{display:none}
+
+/* ===================== 变体 · V3 轨道式（分组色） ===================== */
+[data-variant="rail"] .group{
+  margin-bottom:12px;background:var(--surface);
+  border:1px solid var(--border);border-left:4px solid var(--gcolor,var(--pending));
+  border-radius:8px;overflow:hidden;
+}
+[data-variant="rail"] .tree-row{background:transparent;border-radius:0}
+[data-variant="rail"] .tree-row:hover{background:var(--surface-2)}
+[data-variant="rail"] .tree-row.top{
+  min-height:44px;background:var(--surface-2);
+  border-bottom:1px solid var(--border);
+}
+[data-variant="rail"] .tree-row.top .node-title{font-size:14px;font-weight:700}
+[data-variant="rail"] .tree-row.top .task-toggle{color:var(--gcolor,var(--pending))}
+
+/* ===================== 设计标注角标 ===================== */
+.anno{
+  position:absolute;z-index:5;width:18px;height:18px;border-radius:999px;
+  background:var(--brand);color:#fff;font-size:11px;font-weight:700;
+  display:grid;place-items:center;cursor:help;
+  box-shadow:0 1px 3px rgba(21,87,208,.45);
+}
+[data-anno="off"] .anno{display:none}
+.tree-row .anno{right:6px;top:50%;transform:translateY(-50%)}
+
+/* 分组色开关：关闭时所有分组回退中性灰 */
+[data-color="off"] .group{--gcolor:var(--pending) !important}
+</style>
+</head>
+<body>
+<div class="docbar">
+  <div class="docbar-title">任务树 · 轨道式 + 强化<span>已选方案</span></div>
+  <div class="docbar-sep"></div>
+  <div class="seg" id="variantSeg">
+    <span class="seg-label">一级分隔</span>
+    <button data-variant="now">现状</button>
+    <button data-variant="chapter">章节式</button>
+    <button data-variant="card">卡片式</button>
+    <button data-variant="rail" class="active">轨道式</button>
+  </div>
+  <div class="seg" id="leafSeg">
+    <span class="seg-label">叶子凸显</span>
+    <button data-leaf="dot">仅圆点</button>
+    <button data-leaf="strong" class="active">强化</button>
+  </div>
+  <label class="chk" id="colorChk"><input type="checkbox" checked>分组色</label>
+  <label class="chk" id="annoChk"><input type="checkbox" checked>标注</label>
+  <button class="btn-mini" id="foldBtn">折叠全部</button>
+  <div class="docbar-spacer"></div>
+  <div class="docbar-hint">双击空白处无操作 · 单击行 = 折叠/展开 · 圆点 = 叶子</div>
+</div>
+
+<div class="legend">
+  <div class="legend-title">设计决策标注</div>
+  <div class="legend-item"><span class="legend-num">1</span>一级任务 = 「章节头」：每组独立分隔（间距+分隔线 / 卡片 / 色轨，视变体），一眼数出本周目标数。</div>
+  <div class="legend-item"><span class="legend-num">2</span>分组色：一级任务绑定 12 色板专属色（与任务设置/统计一致）。可关闭对比「纯排版方案」。</div>
+  <div class="legend-item"><span class="legend-num">3</span>叶子圆点：无子任务的「原子任务」在箭头槽位获得圆点标记，复用原位置、零行高变化。</div>
+  <div class="legend-item"><span class="legend-num">4</span>强化档：圆点 + 浅底色 + 加粗标题，叶子成为可扫视的「执行面」。</div>
+  <div class="legend-item"><span class="legend-num">5</span>已完成叶子：强调自动撤下、圆点变灰，保持弱化只读，不污染未完成面的可扫性。</div>
+  <div class="legend-item"><span class="legend-num">6</span>深层嵌套：第 4 层起缩进步长 24px→18px，避免深层标题被挤压。</div>
+</div>
+
+<div class="stage">
+  <div class="appwin">
+    <div class="topbar">
+      <div class="logo">
+        <span class="logo-mark">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M14.6 1.4C8.9 2.1 4.6 6.2 4 11.3c-.1.9.3 1.5 1.1 1.45 5.4-.3 9.4-4.3 9.5-11.35z" fill="currentColor"/><path d="M5 13.5c1.3-3.7 4-6.6 7.5-8.6" stroke="rgba(255,255,255,.75)" stroke-width="1.1" stroke-linecap="round"/></svg>
+        </span>
+        <div>
+          <div class="logo-name">weeklyTodo</div>
+          <div class="topbar-sub">2026.08.03 — 08.09 · 本周</div>
+        </div>
+      </div>
+      <div class="topbar-spacer"></div>
+      <button class="btn">查询</button>
+      <button class="btn">统计</button>
+      <button class="btn">设置</button>
+      <button class="btn btn-primary">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        新建任务
+      </button>
+    </div>
+    <div class="appbody">
+      <div class="rail">
+        <div class="rail-title">周</div>
+        <div class="week-item"><span class="week-range">07.27 — 08.02</span></div>
+        <div class="week-item active"><span class="week-range">08.03 — 08.09</span><span class="week-badge">本周</span></div>
+        <div class="week-item"><span class="week-range">08.10 — 08.16</span></div>
+        <div class="rail-new">
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          新建周
+        </div>
+      </div>
+      <div class="main">
+        <div class="tree-toolbar">
+          <span class="tree-title">任务树</span>
+          <span class="tree-hint">单击行折叠/展开 · 勾选完成</span>
+          <button class="btn">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3.4 8.6l3 3 6.2-7.2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            仅看未完成
+          </button>
+        </div>
+        <div class="tree" id="tree"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===================== 模拟数据（与 Task 模型字段一致） ===================== */
+// 分组色：取自 GROUP_PALETTE（12 色），按根任务顺序分配。
+const GROUP_COLORS = {
+  1:'#E05A3E', 2:'#3B8FBF', 3:'#2E9E7C', 4:'#A9B84A',
+};
+
+// 扁平任务数组：id / parentId / title / status / priority / executionMode / ownerName / tags / carried
+const TASKS = [
+  {id:1,  parentId:null, title:'产品迭代 v1.1',                 status:'in_progress', priority:0, execution:'self',       owner:null,    tags:[]},
+  {id:2,  parentId:1,    title:'需求评审与排期',                 status:'in_progress', priority:1, execution:'self',       owner:null,    tags:[]},
+  {id:3,  parentId:1,    title:'功能开发',                       status:'in_progress', priority:0, execution:'self',       owner:null,    tags:[]},
+  {id:4,  parentId:3,    title:'任务树层级优化',                 status:'in_progress', priority:0, execution:'follow_up',  owner:'老周',   tags:[]},
+  {id:5,  parentId:3,    title:'同步冲突提示',                   status:'in_progress', priority:2, execution:'self',       owner:null,    tags:[]},
+  {id:6,  parentId:3,    title:'统计视图打磨',                   status:'in_progress', priority:1, execution:'follow_up',  owner:'小王',   tags:['视觉']},
+  {id:7,  parentId:3,    title:'回归测试',                       status:'in_progress', priority:2, execution:'self',       owner:null,    tags:[]},
+  {id:8,  parentId:7,    title:'WebDAV 回环测试',                status:'in_progress', priority:2, execution:'self',       owner:null,    tags:[]},
+  {id:9,  parentId:7,    title:'周带入边界用例',                 status:'closed',      priority:2, execution:'self',       owner:null,    tags:[]},
+  {id:10, parentId:1,    title:'打包发布 0.9.10',                status:'in_progress', priority:0, execution:'self',       owner:null,    tags:[], carried:true},
+  {id:11, parentId:null, title:'家庭事务',                       status:'in_progress', priority:0, execution:'self',       owner:null,    tags:[]},
+  {id:12, parentId:11,   title:'预约体检',                       status:'in_progress', priority:2, execution:'follow_up',  owner:'妈妈',   tags:['生活']},
+  {id:13, parentId:11,   title:'换季衣物整理',                   status:'in_progress', priority:2, execution:'self',       owner:null,    tags:[]},
+  {id:14, parentId:11,   title:'空调深度清洗',                   status:'in_progress', priority:3, execution:'self',       owner:null,    tags:['生活']},
+  {id:15, parentId:11,   title:'周末家庭聚餐',                   status:'in_progress', priority:1, execution:'self',       owner:null,    tags:[]},
+  {id:16, parentId:null, title:'学习计划',                       status:'in_progress', priority:0, execution:'self',       owner:null,    tags:[]},
+  {id:17, parentId:16,   title:'Rust 语言第 7 章',               status:'in_progress', priority:1, execution:'self',       owner:null,    tags:['技术']},
+  {id:18, parentId:16,   title:'Tauri 插件机制研究',             status:'in_progress', priority:2, execution:'self',       owner:null,    tags:['技术'], carried:true},
+  {id:19, parentId:16,   title:'读《深度工作》',                 status:'in_progress', priority:2, execution:'self',       owner:null,    tags:['阅读']},
+  {id:20, parentId:16,   title:'输出一篇学习笔记',               status:'in_progress', priority:1, execution:'follow_up',  owner:'老周',   tags:[]},
+  {id:21, parentId:null, title:'健康与运动',                     status:'in_progress', priority:0, execution:'self',       owner:null,    tags:[]},
+  {id:22, parentId:21,   title:'跑步 3 次',                      status:'in_progress', priority:2, execution:'self',       owner:null,    tags:['运动']},
+  {id:23, parentId:21,   title:'早睡打卡 5 天',                  status:'closed',      priority:3, execution:'self',       owner:null,    tags:[]},
+  {id:24, parentId:21,   title:'厨房整理',                       status:'in_progress', priority:3, execution:'self',       owner:null,    tags:[]},
+  {id:25, parentId:24,   title:'橱柜去油污',                     status:'in_progress', priority:3, execution:'follow_up',  owner:'妈妈',   tags:[]},
+  {id:26, parentId:24,   title:'冰箱清理',                       status:'closed',      priority:3, execution:'self',       owner:null,    tags:[]},
+];
+
+// 设计标注位置（编号见图例）
+const ANNOS = {
+  11:'<i class="anno" style="top:-10px;right:10px">1</i><i class="anno" style="top:12px;right:10px">2</i>',
+  12:'<i class="anno" style="right:6px">3</i>',
+  17:'<i class="anno" style="right:6px">4</i>',
+  23:'<i class="anno" style="right:6px">5</i>',
+  7: '<i class="anno" style="right:6px">6</i>',
+};
+
+const ICONS = {
+  chev:'<svg viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  check:'<svg viewBox="0 0 16 16" fill="none"><path d="M3.4 8.6l3 3 6.2-7.2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  plus:'<svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+  pen:'<svg viewBox="0 0 16 16" fill="none"><path d="M11.2 2.5l2.3 2.3L5.6 12.7 3 13.4l.7-2.6z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>',
+  gear:'<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M12.4 3.6L11 5M5 11l-1.4 1.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
+  trash:'<svg viewBox="0 0 16 16" fill="none"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M5 4.5l.6 8.5h4.8l.6-8.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+};
+
+/* ===================== 状态 ===================== */
+const state = {
+  closed:new Set(TASKS.filter(t=>t.status==='closed').map(t=>t.id)),
+  collapsed:new Set(),
+};
+
+function childrenOf(parentId){
+  return TASKS.filter(t=>t.parentId===parentId);
+}
+
+function metaHtml(t){
+  const out=[];
+  if(t.carried) out.push('<span class="tag tag-carry">带入</span>');
+  if(state.closed.has(t.id)) out.push('<span class="tag tag-closed">已完成</span>');
+  out.push(`<span class="tag tag-priority p${t.priority}">P${t.priority}</span>`);
+  if(t.execution==='self') out.push('<span class="tag tag-self">自己</span>');
+  if(t.execution==='follow_up') out.push('<span class="tag tag-follow">跟进</span>');
+  if(t.execution==='follow_up' && t.owner) out.push(`<span class="tag tag-owner">${t.owner}</span>`);
+  t.tags.forEach(tag=>out.push(`<span class="tag tag-label">${tag}</span>`));
+  return out.join('');
+}
+
+function rowHtml(t, depth){
+  const children = childrenOf(t.id);
+  const hasChildren = children.length>0;
+  const isClosed = state.closed.has(t.id);
+  const isCollapsed = state.collapsed.has(t.id);
+  const cls=['tree-row'];
+  if(depth===0) cls.push('top');
+  if(isClosed) cls.push('closed');
+  if(hasChildren){ cls.push('collapsible'); if(isCollapsed) cls.push('collapsed'); }
+  else cls.push('leaf-row');
+
+  const toggle = hasChildren
+    ? `<button class="task-toggle ${isCollapsed?'':'open'}" title="${isCollapsed?'展开':'折叠'}">${ICONS.chev}</button>`
+    : '<button class="task-toggle leaf"><span class="leaf-dot"></span></button>';
+
+  const check = `<button class="task-check ${isClosed?'done':''}" title="${isClosed?'重新打开':'标记完成'}">${ICONS.check}</button>`;
+
+  const anno = ANNOS[t.id] ? ANNOS[t.id] : '';
+
+  const actions = hasChildren
+    ? `${ICONS.plus ? '<button class="act-btn" title="添加子任务">'+ICONS.plus+'</button>':''}`
+    : '';
+  const actionsHtml =
+    actions +
+    `<button class="act-btn" title="重命名">${ICONS.pen}</button>` +
+    `<button class="act-btn" title="任务设置">${ICONS.gear}</button>` +
+    `<button class="act-btn danger" title="删除">${ICONS.trash}</button>`;
+
+  let html =
+    `<div class="${cls.join(' ')}" data-id="${t.id}" data-depth="${depth}" style="--d:${depth}">` +
+      toggle + check +
+      `<span class="node-title-wrap"><span class="node-title">${t.title}</span></span>` +
+      `<span class="node-meta">${metaHtml(t)}</span>` +
+      '<span class="row-spacer"></span>' +
+      `<span class="task-actions">${actionsHtml}</span>` +
+      anno +
+    '</div>';
+
+  if(hasChildren && !isCollapsed){
+    const kids = children.map(c=>rowHtml(c, depth+1)).join('');
+    html += `<div class="tree-children">${kids}</div>`;
+  }
+  return html;
+}
+
+function render(){
+  const roots = childrenOf(null);
+  const html = roots.map(root=>{
+    const color = GROUP_COLORS[root.id] || '#8B95A7';
+    return `<section class="group" style="--gcolor:${color}">${rowHtml(root,0)}</section>`;
+  }).join('');
+  document.getElementById('tree').innerHTML = html;
+}
+
+/* ===================== 交互 ===================== */
+document.getElementById('tree').addEventListener('click', (event)=>{
+  const checkBtn = event.target.closest('.task-check');
+  if(checkBtn){
+    const row = checkBtn.closest('.tree-row');
+    const id = Number(row.dataset.id);
+    if(state.closed.has(id)) state.closed.delete(id); else state.closed.add(id);
+    render();
+    return;
+  }
+  const row = event.target.closest('.tree-row');
+  if(!row) return;
+  if(!row.classList.contains('collapsible')) return;
+  const id = Number(row.dataset.id);
+  if(state.collapsed.has(id)) state.collapsed.delete(id); else state.collapsed.add(id);
+  render();
+});
+
+/* 变体 / 叶子档位 / 分组色 / 标注 */
+document.getElementById('variantSeg').addEventListener('click',(e)=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  document.documentElement.dataset.variant = btn.dataset.variant;
+  document.querySelectorAll('#variantSeg button').forEach(b=>b.classList.toggle('active',b===btn));
+});
+document.getElementById('leafSeg').addEventListener('click',(e)=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  document.documentElement.dataset.leaf = btn.dataset.leaf;
+  document.querySelectorAll('#leafSeg button').forEach(b=>b.classList.toggle('active',b===btn));
+});
+document.getElementById('colorChk').addEventListener('click',(e)=>{
+  const on = e.currentTarget.querySelector('input').checked;
+  document.documentElement.dataset.color = on ? 'on':'off';
+});
+document.getElementById('annoChk').addEventListener('click',(e)=>{
+  const on = e.currentTarget.querySelector('input').checked;
+  document.documentElement.dataset.anno = on ? 'on':'off';
+});
+
+/* 折叠全部 / 展开全部 */
+const foldBtn = document.getElementById('foldBtn');
+let allFolded = false;
+foldBtn.addEventListener('click',()=>{
+  allFolded = !allFolded;
+  state.collapsed.clear();
+  if(allFolded) TASKS.filter(t=>childrenOf(t.id).length>0).forEach(t=>state.collapsed.add(t.id));
+  foldBtn.textContent = allFolded ? '展开全部' : '折叠全部';
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
