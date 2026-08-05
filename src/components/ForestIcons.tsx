@@ -188,6 +188,36 @@ export function UpdateIcon({ size = 15 }: { size?: number }) {
   );
 }
 
+/** 负责人：人形头像（头部 + 肩部轮廓）。 */
+export function PersonIcon({ size = 15 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.7" />
+      <path
+        d="M4.5 20c1.2-3.4 4-5 7.5-5s6.3 1.6 7.5 5"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+/** 标签：圆角标签形。 */
+export function TagIcon({ size = 15 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <path
+        d="M3.5 11.8V5a1.5 1.5 0 0 1 1.5-1.5h6.8a1.5 1.5 0 0 1 1.06.44l6.7 6.7a1.5 1.5 0 0 1 0 2.12l-5.4 5.4a1.5 1.5 0 0 1-2.12 0l-6.7-6.7A1.5 1.5 0 0 1 3.5 11.8Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+      <circle cx="8" cy="8" r="1.2" fill="currentColor" />
+    </Svg>
+  );
+}
+
 /** 工作台四宫格 Logo：蓝色方块。 */
 export function WorkbenchLogoIcon({ size = 15 }: { size?: number }) {
   return (

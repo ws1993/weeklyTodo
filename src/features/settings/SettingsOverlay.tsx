@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { pickAndMigrateStorage } from '../../api/nativeBridge';
-import { CrossIcon, LogoIcon, SettingsIcon } from '../../components/ForestIcons';
+import { openDataDir, pickAndMigrateStorage } from '../../api/nativeBridge';
+import { CrossIcon, FolderIcon, LogoIcon, SettingsIcon } from '../../components/ForestIcons';
 import { useAppStore } from '../../store/appStore';
 import type { CloseBehaviorSettings } from './closeBehavior';
 import { loadCloseBehaviorSettings, saveCloseBehaviorSettings } from './closeBehavior';
@@ -100,6 +100,17 @@ export function SettingsOverlay({
       setError(String(migrationError));
     } finally {
       setMigrating(false);
+    }
+  };
+
+  const runOpenDataDir = async () => {
+    setMessage(null);
+    setError(null);
+    try {
+      const dir = await openDataDir();
+      setMessage(`已在文件管理器中打开数据目录：${dir}`);
+    } catch (openError) {
+      setError(String(openError));
     }
   };
 
@@ -251,13 +262,29 @@ export function SettingsOverlay({
                   <dt>数据存储</dt>
                   <dd>本地 SQLite · 数据仅保存在本机，不会上传</dd>
                 </div>
+                <div className="settings-info-row">
+                  <dt>数据目录</dt>
+                  <dd>
+                    <span className="settings-info-code">{storageDir || '…'}</span>
+                  </dd>
+                </div>
               </dl>
 
               <div className="settings-page-actions">
+                <button
+                  className="btn"
+                  title="在文件管理器中打开数据目录，便于手动备份"
+                  onClick={() => void runOpenDataDir()}
+                >
+                  <FolderIcon size={15} />
+                  打开数据目录
+                </button>
                 <button className="btn btn-primary" onClick={onCheckUpdate}>
                   检查更新
                 </button>
               </div>
+              {message && <div className="modal-message">{message}</div>}
+              {error && <div className="modal-error">{error}</div>}
             </section>
           )}
         </main>

@@ -271,6 +271,11 @@ export async function openReleasePage(): Promise<void> {
   await invokeCommand('open_release_page');
 }
 
+/** 在系统文件管理器中打开数据目录（Windows 上直接选中数据库文件，便于手动备份）。 */
+export async function openDataDir(): Promise<string> {
+  return invokeCommand<string>('open_data_dir');
+}
+
 /** 一次 WebDAV 同步的返回结果。 */
 export interface SyncResult {
   direction: 'upload' | 'download' | 'noop' | 'skipped';

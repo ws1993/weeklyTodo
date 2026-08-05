@@ -1,6 +1,7 @@
 import { useAppStore } from '../store/appStore';
 import { formatCnRange, isCurrentWeek, weekStatus } from '../utils/weekFormat';
-import { PlusIcon, SearchIcon } from './ForestIcons';
+import { EmptyState } from './EmptyState';
+import { CalendarIcon, PlusIcon, SearchIcon } from './ForestIcons';
 
 interface WeekRailProps {
   onOpenQuery: () => void;
@@ -39,7 +40,14 @@ export function WeekRail({ onOpenQuery, onCreateWeek }: WeekRailProps) {
             )}
           </button>
         ))}
-        {recentWeeks.length === 0 && <div className="muted" style={{ padding: 12 }}>暂无周数据</div>}
+        {recentWeeks.length === 0 && (
+          <EmptyState
+            compact
+            icon={<CalendarIcon size={18} />}
+            title="暂无周数据"
+            sub="启动应用后会自动创建本周"
+          />
+        )}
       </div>
       <div className="rail-footer">
         <button className="search-entry" type="button" onClick={onOpenQuery}>

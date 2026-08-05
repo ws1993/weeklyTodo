@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useState, type KeyboardEvent } from 'react';
-import { PlusIcon, TrashIcon, RenameIcon, CheckIcon, CrossIcon } from '../../components/ForestIcons';
+import { EmptyState } from '../../components/EmptyState';
+import {
+  CheckIcon,
+  CrossIcon,
+  PersonIcon,
+  PlusIcon,
+  RenameIcon,
+  TagIcon,
+  TrashIcon,
+  TrunkIcon,
+} from '../../components/ForestIcons';
 import { useAppStore } from '../../store/appStore';
 import type { Owner, Tag } from '../../shared/contracts/types';
 import * as bridge from '../../api/nativeBridge';
@@ -199,7 +209,12 @@ export function ManagementPanel() {
             </div>
 
             {owners.length === 0 && (
-              <p className="management-empty">暂无负责人,在任务中设置负责人后会自动创建。</p>
+              <EmptyState
+                compact
+                icon={<PersonIcon size={18} />}
+                title="暂无负责人"
+                sub="在任务中设置负责人后会自动创建"
+              />
             )}
 
             {owners.map((owner: Owner) => (
@@ -285,7 +300,12 @@ export function ManagementPanel() {
             </div>
 
             {tags.length === 0 && (
-              <p className="management-empty">暂无标签,在任务中设置标签后会自动创建。</p>
+              <EmptyState
+                compact
+                icon={<TagIcon size={18} />}
+                title="暂无标签"
+                sub="在任务中设置标签后会自动创建"
+              />
             )}
 
             {tags.map((tag: Tag) => (
@@ -367,9 +387,12 @@ export function ManagementPanel() {
             </div>
 
             {groupColors.length === 0 && (
-              <p className="management-empty">
-                暂无分组颜色。在任务树中新建根任务后，会在此自动分配颜色。
-              </p>
+              <EmptyState
+                compact
+                icon={<TrunkIcon size={18} />}
+                title="暂无分组颜色"
+                sub="在任务树中新建根任务后，会在此自动分配颜色"
+              />
             )}
 
             <div className="management-group-list">

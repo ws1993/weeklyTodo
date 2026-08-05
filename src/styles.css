@@ -365,13 +365,29 @@ button{font-family:inherit;color:inherit}
 .edit-btn.danger.armed{color:var(--danger);background:var(--danger-soft);border-color:var(--danger-border)}
 .tree-row.closed .add-btn{display:none}
 
-.empty-forest{
-  display:flex;flex-direction:column;align-items:center;gap:10px;
-  padding:48px 0;color:var(--text-3);font-size:12px;
+/* ---------- 统一空状态 ---------- */
+.empty-state{
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  padding:56px 24px;text-align:center;color:var(--text-3);
 }
-.empty-forest .empty-glyph{color:var(--brand);opacity:.4;width:32px;height:32px}
-.empty-forest p{font-size:13px;color:var(--text-3)}
-.empty-forest .empty-sub{font-size:11px;color:var(--text-4)}
+.empty-state-icon{
+  display:grid;place-items:center;width:46px;height:46px;margin-bottom:2px;
+  border-radius:14px;color:var(--brand);
+  background:var(--brand-soft);border:1px solid var(--brand-border);
+}
+.empty-state-icon svg{width:22px;height:22px}
+.empty-state-title{font-size:13.5px;font-weight:600;color:var(--text-2)}
+.empty-state-sub{font-size:12px;color:var(--text-4);line-height:1.7;max-width:280px}
+.empty-state-action{margin-top:4px}
+/* 紧凑模式：左侧窄栏 / 管理列表内嵌等小空间场景。 */
+.empty-state.compact{
+  padding:30px 16px;gap:6px;
+}
+.empty-state.compact .empty-state-icon{
+  width:38px;height:38px;border-radius:11px;margin-bottom:0;
+}
+.empty-state.compact .empty-state-icon svg{width:19px;height:19px}
+.empty-state.compact .empty-state-sub{font-size:11.5px;max-width:230px}
 .add-inline{
   display:flex;align-items:center;gap:8px;padding:6px 14px 6px 52px;
   border-bottom:1px solid var(--border);
@@ -426,12 +442,8 @@ button{font-family:inherit;color:inherit}
   transition:background .12s,color .12s;
 }
 .pick-btn:hover{background:var(--brand);color:#fff}
-.lane-empty{
-  display:flex;flex-direction:column;align-items:center;gap:12px;padding:44px 0;
-  color:var(--text-3);font-size:12px;text-align:center;
-}
-.lane-empty .empty-glyph{color:var(--brand);opacity:.35;width:32px;height:32px}
-.lane-empty p{line-height:1.9}
+/* 「当前行动」空状态在弹性面板中垂直居中。 */
+.action-list .empty-state{flex:1;justify-content:center}
 .panel-foot{
   padding:9px 14px;border-top:1px solid var(--border);font-size:11px;
   color:var(--text-3);flex:none;background:var(--surface-2);
@@ -899,10 +911,6 @@ button{font-family:inherit;color:inherit}
   background:transparent;color:var(--text-1);font-family:inherit;font-size:13px;
 }
 .management-add-input::placeholder{color:var(--text-4)}
-.management-empty{
-  padding:34px 10px;text-align:center;
-  font-size:12px;color:var(--text-3);line-height:1.8;
-}
 .management-item{
   display:flex;align-items:center;gap:10px;min-height:40px;
   padding:6px 10px;background:var(--surface);
@@ -1265,17 +1273,8 @@ button{font-family:inherit;color:inherit}
   background-size:200% 100%;animation:skeleton-shimmer 1.3s ease-in-out infinite;
 }
 @keyframes skeleton-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-.query-empty{
-  display:flex;flex-direction:column;align-items:center;gap:8px;
-  padding:72px 0;text-align:center;color:var(--text-3);
-}
-.query-empty-icon{
-  width:52px;height:52px;border-radius:14px;display:grid;place-items:center;
-  color:var(--text-4);background:var(--surface-2);border:1px solid var(--border);
-  margin-bottom:4px;
-}
-.query-empty-title{font-size:14px;font-weight:600;color:var(--text-2)}
-.query-empty-sub{font-size:12px;color:var(--text-4)}
+/* 查询结果空状态在结果区中垂直居中。 */
+.query-results .empty-state{min-height:320px;justify-content:center}
 
 /* ---------- States ---------- */
 .loading-state{

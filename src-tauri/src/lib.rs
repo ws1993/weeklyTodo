@@ -69,6 +69,7 @@ pub fn run() {
             commands::hide_main_window,
             commands::exit_app,
             commands::open_release_page,
+            commands::open_data_dir,
             commands::webdav_test_connection,
             commands::webdav_save_credentials,
             commands::webdav_has_credentials,

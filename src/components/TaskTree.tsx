@@ -9,6 +9,7 @@ import {
   subtreeSize,
 } from '../utils/tree';
 import type { DropPosition } from '../utils/tree';
+import { EmptyState } from './EmptyState';
 import {
   CheckIcon,
   ChevronRightIcon,
@@ -168,19 +169,16 @@ export function TaskTree({
 
   if (tasks.length === 0 && addingParentId === null) {
     return (
-      <div className="empty-forest">
-        <span className="empty-glyph"><PlusIcon size={28} /></span>
-        <p>本周还没有任务</p>
-        <p className="empty-sub">点击「新建任务」开始规划</p>
-        <button
-          className="btn btn-primary"
-          style={{ marginTop: 6 }}
-          onClick={() => setAddingParentId('root')}
-        >
+      <EmptyState
+        icon={<PlusIcon size={22} />}
+        title="本周还没有任务"
+        sub="点击「新建任务」开始规划"
+      >
+        <button className="btn btn-primary" onClick={() => setAddingParentId('root')}>
           <PlusIcon size={15} />
           新建任务
         </button>
-      </div>
+      </EmptyState>
     );
   }
 
@@ -201,10 +199,12 @@ export function TaskTree({
       ))}
 
       {visibleTaskIds && rootTasks.length === 0 && (
-        <div className="empty-forest">
-          <p>没有未完成的任务</p>
-          <p className="empty-sub">关闭「仅看未完成」即可查看全部任务</p>
-        </div>
+        <EmptyState
+          compact
+          icon={<CheckIcon size={19} />}
+          title="没有未完成的任务"
+          sub="关闭「仅看未完成」即可查看全部任务"
+        />
       )}
 
       {addingParentId === null ? (

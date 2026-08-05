@@ -3,6 +3,7 @@ import type { QueryTaskRow, Week, WeekSummary } from '../shared/contracts/types'
 import { queryAllTasks, weekSummaries } from '../api/nativeBridge';
 import { useAppStore } from '../store/appStore';
 import { formatCnRange, isCurrentWeek, weekStatus } from '../utils/weekFormat';
+import { EmptyState } from './EmptyState';
 import { CalendarIcon, ChevronRightIcon, CrossIcon, SearchIcon } from './ForestIcons';
 import { DropdownSelect, SearchField, SegmentedControl, ToggleSwitch } from './QueryControls';
 
@@ -254,13 +255,11 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
             )}
 
             {!loading && results.length === 0 && (
-              <div className="query-empty">
-                <span className="query-empty-icon">
-                  <SearchIcon size={26} />
-                </span>
-                <span className="query-empty-title">没有找到匹配的分支</span>
-                <span className="query-empty-sub">试试调整筛选条件，或清空关键词</span>
-              </div>
+              <EmptyState
+                icon={<SearchIcon size={24} />}
+                title="没有找到匹配的分支"
+                sub="试试调整筛选条件，或清空关键词"
+              />
             )}
 
             {!loading &&

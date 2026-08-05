@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Task } from '../shared/contracts/types';
 import { activeLeaves, useAppStore } from '../store/appStore';
+import { EmptyState } from './EmptyState';
 import { BoltIcon, ChevronRightIcon, LocateIcon } from './ForestIcons';
 import { GROUP_COLOR_PENDING, groupColorMap } from '../utils/groupColors';
 
@@ -187,10 +188,12 @@ export function CurrentActions({ tasks, onLocate }: CurrentActionsProps) {
       )}
       <div className="action-list">
         {entries.length === 0 && (
-          <div className="lane-empty">
-            <span className="empty-glyph"><BoltIcon size={30} /></span>
-            <p>本周没有待办行动</p>
-          </div>
+          <EmptyState
+            compact
+            icon={<BoltIcon size={19} />}
+            title="本周没有待办行动"
+            sub="在任务树中新建任务，或给已有分支添加子任务"
+          />
         )}
         {visibleEntries.map((entry) => {
           const color = colorMap.get(entry.rootTitle) ?? GROUP_COLOR_PENDING;

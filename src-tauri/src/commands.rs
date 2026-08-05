@@ -384,6 +384,31 @@ pub async fn open_release_page() -> Result<(), String> {
     updater::open_release_page().await
 }
 
+/// Open the data directory in the system file manager.
+/// On Windows the database file is selected directly, which makes manual
+/// backup / copy easy without hunting for the file inside the folder.
+#[tauri::command]
+pub async fn open_data_dir() -> Result<String, String> {
+    let config = resolve_storage()?;
+    let data_dir = std::path::Path::new(&config.data_dir);
+    if !data_dir.is_dir() {
+        return Err(format!("数据目录不存在：{}", data_dir.display()));
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let db_file = data_dir.join(db::DB_FILE_NAME);
+        if db_file.exists() {
+            let _ = std::process::Command::new("explorer")
+                .arg("/select,")
+                .arg(&db_file)
+                .spawn();
+            return Ok(config.data_dir);
+        }
+    }
+    open::that(data_dir).map_err(|error| format!("打开数据目录失败：{error}"))?;
+    Ok(config.data_dir)
+}
+
 /// Validate WebDAV connectivity and create the target directory when missing.
 #[tauri::command]
 pub async fn webdav_test_connection(
