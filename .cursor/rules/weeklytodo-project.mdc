@@ -1,0 +1,73 @@
+---
+description: weeklyTodo 项目专属硬约束（本地优先、周模型带入、WebDAV 整库同步、自动更新、五文件版本同步、分组色板双端一致等）。维护本仓库时必须遵守。
+alwaysApply: false
+---
+
+# weeklyTodo 项目专属约束
+
+> 适用于本仓库（E:\Project\AI\weeklyTodo）的后续开发。通用技术栈约束见 `tauri-react-stack-common.mdc`；详细设计、决策依据与已知问题见 `docs/tech-stack-reference.md`。
+
+## 1. 产品红线：本地优先
+
+- 不引入服务端 / 账号体系；同步只走 WebDAV（可选开关）。
+- 所有数据本机 SQLite 单文件（WAL），无云依赖；默认数据目录为 exe 旁 `data/`（可写时）否则 `%APPDATA%\weeklytodo\data`。
+
+## 2. 周模型（第一层级）
+
+- 周 id = `YYYYMMDD-YYYYMMDD`（周一至周日），如 `20260803-20260809`；以本地时区周一为周起点。
+- 启动时 `ensure_current_week` 自动建当前周；几周未打开则从最近存储周带入未完成内容，避免数据丢失。
+- 带入规则（carry_over）：未完成分支整体复制（父-子结构保持）；分支内已关闭节点保留为只读上下文；完全关闭的分支不带入；新周任务带 `carried_from_task_id` + `origin_week_id` 溯源。
+- 手动建周仅允许指定周一，重复周拒绝。
+
+## 3. 任务模型
+
+- 状态仅 `in_progress` / `closed` 两态（暂无 cancelled）。
+- 关闭任务：若某节点所有子任务已关闭，级联关闭其祖先；重新打开会级联重开祖先。
+- 优先级 P0-P3 存为 0..3 整数，写入前 `clamp` 到合法范围。
+- 执行方式 `self` / `follow_up`；`follow_up` 必须指定负责人，否则拒绝创建。
+- owner/tag 归一化：`INSERT OR IGNORE` + `ensure_*` 取 id；删除 owner 时任务 owner_id 置 NULL；删除 tag 级联清关联。
+- 树操作防护：不能移动到自身 / 自己子树 / 已关闭节点下；已关闭节点不能加子任务（后端 domain + 前端 `computeDrop` 双端校验）。
+- 写操作事件审计：create / update / close / reopen / carry_over / delete 写入 `task_events` 表。
+
+## 4. 分组颜色双端一致（易踩坑）
+
+- `GROUP_COLOR_PALETTE`（src-tauri/src/domain.rs，12 色）与 `GROUP_PALETTE`（src/utils/groupColors.ts）必须手动保持同步；改一侧必须改另一侧。
+- 自动分配在后端（取第一个未用色），前端只负责展示与手动换色（`is_manual` 标记）。
+
+## 5. WebDAV 文件级整库同步
+
+- 同步粒度 = 整个 `weeklytodo.db` 文件；后写覆盖，本地/远端 mtime 秒级比较，相等则 noop。
+- 被覆盖方先备份：远端保存 `weeklytodo.db.YYYYMMDD-HHMMSS.bak`（UTC 时间戳，文件名格式受严格校验）。
+- 自动同步（启动 / 定时）禁止空库覆盖远端：本地无内容且远端存在时返回 skipped，不做任何 PUT。
+- 恢复流程：校验文件名（仅当前库或时间戳备份，防路径穿越）→ 先上传本地当前库为新备份 → 再下载选中版本 → 原子替换。
+- 下载校验 SQLite 魔数 + `PRAGMA integrity_check`；同步前 `PRAGMA wal_checkpoint(TRUNCATE)` 合并 WAL；替换后清理陈旧 `-wal`/`-shm` 侧车文件。
+- 密码存 Windows Credential Manager（keyring service=`weeklytodo`）；前端 localStorage 只存 url / username / 同步调度设置。
+- 恢复后暂停自动同步（`autoSyncPausedAfterRestore`），需用户显式恢复。
+
+## 6. 自动更新
+
+- 版本来源：更新检查用 `env!("CARGO_PKG_VERSION")` 对比 GitHub `releases/latest` 的 `tag_name`（剥 `v` 前缀）。
+- 安装包下载到 `%TEMP%\weeklytodo_update\`；进度事件 `update-download-progress`，文件写完前封顶 99%。
+- 安装：`exit_app_for_update` 退出应用 → 独立 PowerShell helper 等待主进程退出（90s 超时）后启动 NSIS 安装器。
+- 安装包名匹配 `-setup.exe` 或 `_x64-setup.exe`。
+
+## 7. 版本五文件同步 + 发版流程
+
+- 五处版本号必须一致：package.json、package-lock.json、src-tauri/Cargo.toml、src-tauri/Cargo.lock、src-tauri/tauri.conf.json。
+- 发版 = bump 版本（优先 `python .cursor/skills/release-version/scripts/bump_version.py X.Y.Z`）→ commit（仅版本文件）→ 注释 tag `vX.Y.Z` → push 分支 + tag。
+- 只有 `v*` tag 推送触发 `.github/workflows/release.yml`；push main 不触发任何 CI。
+- 详见 `.cursor/skills/release-version/SKILL.md`。
+
+## 8. 存储与配置
+
+- 配置：`%APPDATA%\weeklytodo\weeklytodo-config.json`（data_dir + schema_version）。
+- 迁移数据目录：目标必须可写且不含已有数据库；源库先备份 `weeklytodo.db.pre-migration.bak`；迁移后原文件保留。
+- 前端设置（localStorage key `weeklyTodo.*`）：webdavSettings、proxySettings、closeBehavior，均防御性加载。
+- 关闭行为：点击 × 时按设置询问 / 最小化托盘 / 退出；拦截逻辑在 Rust `intercept_close_request`，决策在前端。
+
+## 9. 质量门槛
+
+- `npm run lint`（tsc --noEmit）、`npm test`、`npm run build` 必须通过。
+- `cd src-tauri && cargo test`、`cargo clippy --all-targets --all-features -- -D warnings`、`cargo fmt --check` 必须通过。
+- 改动涉及 schema 时：新增迁移版本（当前 `SCHEMA_VERSION=3`）并验证 WebDAV 整库同步不受影响。
+- 已知缺陷与待改进项见 `docs/tech-stack-reference.md`「已知问题」。
