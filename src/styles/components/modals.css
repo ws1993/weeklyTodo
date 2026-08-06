@@ -1,0 +1,99 @@
+/* ---------- Modals ---------- */
+.modal-backdrop{
+  position:fixed;inset:0;z-index:60;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(23,32,51,.38);backdrop-filter:blur(2px);
+}
+.modal{
+  width:470px;max-width:94vw;background:var(--surface);
+  border:1px solid var(--border-strong);border-radius:6px;
+  box-shadow:0 18px 50px -12px rgba(23,32,51,.25);
+  position:relative;color:var(--text-1);
+}
+.modal-wide{
+  width:760px;max-width:94vw;height:640px;max-height:92vh;
+  display:flex;flex-direction:column;
+}
+.modal.task-detail{
+  max-height:92vh;display:flex;flex-direction:column;
+}
+.modal.task-detail .modal-body{overflow-y:auto;flex:1;min-height:0}
+.modal-close{
+  position:absolute;top:12px;right:12px;width:28px;height:28px;
+  display:grid;place-items:center;border-radius:3px;border:1px solid transparent;
+  background:transparent;color:var(--text-3);cursor:pointer;
+}
+.modal-close:hover{color:var(--text-1);background:var(--surface-2);border-color:var(--border)}
+.modal-close svg{width:15px;height:15px}
+.modal-title{font-size:15px;font-weight:600;letter-spacing:.3px;padding:16px 44px 0 18px}
+.modal-sub{font-size:12px;color:var(--text-3);margin-top:4px;line-height:1.7;padding:0 44px 0 18px}
+.modal-body{padding:14px 18px 4px;min-height:0}
+.modal-wide .modal-body{display:flex;flex-direction:column;flex:1;overflow:hidden}
+.field{margin-top:12px;display:flex;flex-direction:column;gap:7px}
+.field label{font-size:12px;color:var(--text-2);letter-spacing:.4px}
+.modal input[type="date"]:not([class*="ant-select"]),
+.modal input[type="text"]:not([class*="ant-select"]),
+.modal select,
+.modal-body input:not([class*="ant-select"]),
+.modal-body select,
+.detail-textarea{
+  background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius);
+  padding:7px 10px;color:var(--text-1);font-family:inherit;font-size:13px;
+  outline:none;color-scheme:light;width:100%;
+}
+/* antd Select 内部 input（antd5: ant-select-selection-search-input / antd6: ant-select-input）
+   均含 "ant-select"，用属性子串匹配排除，避免被上面原生 input 规则套上重复边框。
+   注意 .modal input[type="text"] 也必须带 :not()，否则 tags 模式下可见的搜索 input 仍会命中。 */
+.modal input:not([class*="ant-select"]):focus,.modal select:focus,.modal-body input:not([class*="ant-select"]):focus,.modal-body select:focus,.detail-textarea:focus{
+  border-color:var(--brand);box-shadow:0 0 0 3px rgba(21,87,208,.14);
+}
+.week-preview{margin-top:12px;font-size:13px;color:var(--text-2);min-height:21px}
+.week-preview b{font-family:var(--mono);font-weight:500;color:var(--brand);letter-spacing:.5px}
+.week-error{margin-top:8px;font-size:12.5px;color:var(--danger);min-height:18px}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;padding:0 0 16px}
+.modal-wide .modal-actions{padding:12px 18px;border-top:1px solid var(--border);margin-top:0}
+.modal-message{margin-top:10px;font-size:13px;color:var(--success)}
+.modal-error{
+  margin-top:10px;font-size:12.5px;color:var(--danger);background:var(--danger-soft);
+  border:1px solid var(--danger-border);border-radius:var(--radius);padding:9px 11px;
+}
+.modal-hint{font-size:12px;color:var(--text-2);line-height:1.8}
+.modal-hint code{
+  font-family:var(--mono);color:var(--text-2);background:var(--surface-2);
+  border:1px solid var(--border);border-radius:3px;padding:1px 6px;
+}
+.close-behavior-modal-hint{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:11px 12px;background:var(--surface-2);
+  border:1px solid var(--border);border-radius:var(--radius);
+  font-size:12px;color:var(--text-2);line-height:1.7;
+}
+.close-behavior-modal-logo{
+  width:32px;height:32px;flex:none;display:grid;place-items:center;border-radius:6px;
+}
+.detail-textarea{resize:vertical;min-height:76px}
+.action-spacer{flex:1}
+.task-detail .modal-body{max-height:calc(92vh - 120px);overflow-y:auto;padding-right:4px}
+.task-detail .ant-select-selector{
+  background:var(--surface) !important;
+  border-color:var(--border-strong) !important;
+  color:var(--text-1) !important;
+}
+.task-detail .ant-select-selection-placeholder,
+.task-detail .ant-select-input,
+.task-detail .ant-select-selection-search-input{color:var(--text-3) !important}
+.task-detail .ant-select-selection-item{color:var(--text-1) !important}
+.task-detail .ant-radio-wrapper{color:var(--text-2)}
+.ant-select-dropdown{
+  background:var(--surface) !important;
+  border:1px solid var(--border-strong);
+  border-radius:4px;
+  box-shadow:0 12px 34px -12px rgba(23,32,51,.18);
+}
+.ant-select-dropdown .ant-select-item{color:var(--text-2)}
+.ant-select-dropdown .ant-select-item-option-active{background:var(--surface-2)}
+.ant-select-dropdown .ant-select-item-option-selected{
+  color:var(--brand);background:var(--brand-soft);
+}
+.ant-select-dropdown .ant-select-item-option-selected .ant-select-item-option-state{color:var(--brand)}
+.ant-select-dropdown .ant-select-item-option-content{color:inherit}

@@ -1,0 +1,27 @@
+:root{
+  --bg:#F2F6FA;
+  --surface:#FFFFFF;
+  --surface-2:#F7F9FC;
+  --text-1:#172033;
+  --text-2:#647086;
+  --text-3:#8B95A7;
+  --text-4:#A8B2C1;
+  --brand:#1557D0;
+  --brand-hover:#0B43AC;
+  --brand-soft:#EAF1FF;
+  --brand-border:#C9DBF7;
+  --success:#167354;
+  --success-soft:#E8F4EF;
+  --success-border:#C9E3D6;
+  --warning:#9B5D00;
+  --warning-soft:#FFF6E0;
+  --warning-border:#F0DFB8;
+  --danger:#B42333;
+  --danger-soft:#FDEBEC;
+  --danger-border:#F3C9CD;
+  --border:#E1E7F0;
+  --border-strong:#CDD7E6;
+  --radius:3px;
+  --font:"Segoe UI Variable","Microsoft YaHei UI",-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC","Hiragino Sans GB",sans-serif;
+  --mono:"Cascadia Mono","Cascadia Code",Consolas,"JetBrains Mono",monospace;
+}

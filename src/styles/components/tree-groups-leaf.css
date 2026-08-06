@@ -1,0 +1,30 @@
+/* ---------- 轨道式分组 (Rail-style group roots) ---------- */
+.tree-node.group-root{
+  margin-bottom:12px;
+  border-left:3px solid var(--gcolor,var(--border));
+  border-radius:0 4px 4px 0;
+  background:color-mix(in srgb,var(--gcolor,transparent) 4%,transparent);
+  transition:border-left-color .15s,background .15s;
+}
+/* ---------- 叶子节点强化 (Leaf enhancement) ---------- */
+.leaf-dot{
+  width:7px;height:7px;border-radius:999px;
+  background:var(--gcolor,var(--text-3));
+  flex:none;
+  transition:background .15s,transform .15s;
+}
+.tree-row.leaf-active .node-title{font-weight:600}
+.tree-row.leaf-active:hover{
+  background:color-mix(in srgb,var(--gcolor,var(--brand)) 6%,var(--surface-2));
+}
+.tree-row.closed .leaf-dot{
+  background:var(--text-4);transform:scale(.7);
+}
+
+.add-inline .ok-btn,.add-inline .no-btn{
+  width:26px;height:26px;border-radius:3px;border:1px solid var(--border);
+  background:var(--surface);color:var(--text-2);cursor:pointer;display:grid;place-items:center;
+}
+.add-inline .ok-btn:hover{color:#fff;background:var(--brand);border-color:var(--brand)}
+.add-inline .no-btn:hover{color:var(--text-1);background:var(--surface-2)}
+.add-inline svg{width:13px;height:13px}

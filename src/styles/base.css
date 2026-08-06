@@ -1,0 +1,23 @@
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family:var(--font);
+  font-size:13px;
+  color:var(--text-1);
+  background-color:var(--bg);
+  background-image:
+    linear-gradient(rgba(21,87,208,.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(21,87,208,.028) 1px, transparent 1px);
+  background-size:24px 24px;
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;color:inherit}
+::selection{background:var(--brand-soft)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#C9D3E2;border-radius:999px;border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#B3BFD2}
+::-webkit-scrollbar-track{background:transparent}
+.mono{font-family:var(--mono)}
+.muted{color:var(--text-3)}

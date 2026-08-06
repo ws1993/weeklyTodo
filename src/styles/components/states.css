@@ -1,0 +1,21 @@
+/* ---------- States ---------- */
+.loading-state{
+  display:flex;align-items:center;justify-content:center;height:100%;
+  color:var(--text-2);font-size:13px;letter-spacing:1px;
+}
+.error-state{
+  color:var(--danger);background:var(--danger-soft);
+  border:1px solid var(--danger-border);border-radius:4px;
+  padding:12px 14px;margin:14px 0;
+}
+
+@media (max-width:1080px){
+  .app-shell{
+    grid-template-columns:270px minmax(0,1fr);
+    grid-template-areas:
+      "topbar topbar"
+      "rail main";
+  }
+  .actions-pane{display:none}
+  .today{display:none}
+}
