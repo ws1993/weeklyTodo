@@ -524,13 +524,20 @@ button{font-family:inherit;color:inherit}
 .modal-wide .modal-body{display:flex;flex-direction:column;flex:1;overflow:hidden}
 .field{margin-top:12px;display:flex;flex-direction:column;gap:7px}
 .field label{font-size:12px;color:var(--text-2);letter-spacing:.4px}
-.modal input[type="date"],.modal input[type="text"],.modal select,
-.modal-body input:not(.ant-select-selection-search-input),.modal-body select,.detail-textarea{
+.modal input[type="date"]:not([class*="ant-select"]),
+.modal input[type="text"]:not([class*="ant-select"]),
+.modal select,
+.modal-body input:not([class*="ant-select"]),
+.modal-body select,
+.detail-textarea{
   background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius);
   padding:7px 10px;color:var(--text-1);font-family:inherit;font-size:13px;
   outline:none;color-scheme:light;width:100%;
 }
-.modal input:focus,.modal select:focus,.modal-body input:not(.ant-select-selection-search-input):focus,.modal-body select:focus,.detail-textarea:focus{
+/* antd Select 内部 input（antd5: ant-select-selection-search-input / antd6: ant-select-input）
+   均含 "ant-select"，用属性子串匹配排除，避免被上面原生 input 规则套上重复边框。
+   注意 .modal input[type="text"] 也必须带 :not()，否则 tags 模式下可见的搜索 input 仍会命中。 */
+.modal input:not([class*="ant-select"]):focus,.modal select:focus,.modal-body input:not([class*="ant-select"]):focus,.modal-body select:focus,.detail-textarea:focus{
   border-color:var(--brand);box-shadow:0 0 0 3px rgba(21,87,208,.14);
 }
 .week-preview{margin-top:12px;font-size:13px;color:var(--text-2);min-height:21px}
@@ -566,6 +573,7 @@ button{font-family:inherit;color:inherit}
   color:var(--text-1) !important;
 }
 .task-detail .ant-select-selection-placeholder,
+.task-detail .ant-select-input,
 .task-detail .ant-select-selection-search-input{color:var(--text-3) !important}
 .task-detail .ant-select-selection-item{color:var(--text-1) !important}
 .task-detail .ant-radio-wrapper{color:var(--text-2)}
