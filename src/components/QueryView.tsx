@@ -447,32 +447,32 @@ export function QueryView({ open, onClose }: QueryViewProps) {
                           {row.task.title}
                         </span>
                       )}
-                      {renamingId !== row.task.id && (
-                        <span
-                          className="query-row-times"
-                          title={
-                            row.task.status === 'closed' && row.task.closedAt
-                              ? `开始 ${formatDateDay(row.task.createdAt)} · 完成 ${formatDateDay(row.task.closedAt)}`
-                              : `开始 ${formatDateDay(row.task.createdAt)}`
-                          }
-                        >
-                          <ClockIcon size={12} />
-                          <span className="time-date">
-                            {formatDateDay(row.task.createdAt)}
-                          </span>
-                          {row.task.status === 'closed' && row.task.closedAt && (
-                            <>
-                              <span className="time-arrow">→</span>
-                              <span className="time-date">
-                                {formatDateDay(row.task.closedAt)}
-                              </span>
-                            </>
-                          )}
-                        </span>
-                      )}
                     </span>
                     <span className="query-row-path">{row.path}</span>
                   </span>
+                  {renamingId !== row.task.id && (
+                    <span
+                      className="query-row-times"
+                      title={
+                        row.task.status === 'closed' && row.task.closedAt
+                          ? `开始 ${formatDateDay(row.task.createdAt)} · 完成 ${formatDateDay(row.task.closedAt)}`
+                          : `开始 ${formatDateDay(row.task.createdAt)}`
+                      }
+                    >
+                      <ClockIcon size={12} />
+                      <span className="time-date">
+                        {formatDateDay(row.task.createdAt)}
+                      </span>
+                      {row.task.status === 'closed' && row.task.closedAt && (
+                        <>
+                          <span className="time-arrow">→</span>
+                          <span className="time-date">
+                            {formatDateDay(row.task.closedAt)}
+                          </span>
+                        </>
+                      )}
+                    </span>
+                  )}
                   <span className="query-row-tags">
                     {row.task.carriedFromTaskId != null && (
                       <span className="tag tag-carry">带入</span>
