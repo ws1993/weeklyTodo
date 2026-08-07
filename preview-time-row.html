@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="./src/styles/tokens.css">
+<link rel="stylesheet" href="./src/styles/components/modals.css">
+<style>
+  body { background:#F2F6FA; padding:48px; font-family:var(--font); }
+  .preview { width:640px; margin:0 auto; }
+</style>
+</head>
+<body>
+<div class="preview">
+  <div class="modal task-detail" style="width:640px">
+    <h2 class="modal-title">任务详情</h2>
+    <p class="modal-sub">设置执行方式、负责人与标签；输入新值会自动保存到选项库，供后续选择。</p>
+    <div class="modal-body">
+      <div class="task-time">
+        <span class="task-time-label">创建</span>
+        <time datetime="2026-08-05T17:58:00.000">2026-08-05 17:58</time>
+        <span class="task-time-sep">·</span>
+        <span class="task-time-label">完成</span>
+        <time datetime="2026-08-06T17:15:00.000">2026-08-06 17:15</time>
+      </div>
+      <div class="field">
+        <label>标题</label>
+        <input type="text" value="写周报">
+      </div>
+      <div class="field">
+        <label>描述</label>
+        <textarea class="detail-textarea" rows="4" placeholder="补充说明、背景、验收标准…"></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

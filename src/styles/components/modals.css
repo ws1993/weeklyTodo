@@ -27,7 +27,7 @@
 .modal-close svg{width:15px;height:15px}
 .modal-title{font-size:15px;font-weight:600;letter-spacing:.3px;padding:16px 44px 0 18px}
 .modal-sub{font-size:12px;color:var(--text-3);margin-top:4px;line-height:1.7;padding:0 44px 0 18px}
-.modal-body{padding:14px 18px 4px;min-height:0}
+.modal-body{padding:0px 18px 4px 18px;min-height:0}
 .modal-wide .modal-body{display:flex;flex-direction:column;flex:1;overflow:hidden}
 .field{margin-top:12px;display:flex;flex-direction:column;gap:7px}
 .field label{font-size:12px;color:var(--text-2);letter-spacing:.4px}
@@ -62,6 +62,18 @@
   font-family:var(--mono);color:var(--text-2);background:var(--surface-2);
   border:1px solid var(--border);border-radius:3px;padding:1px 6px;
 }
+.task-time{
+  display:flex;align-items:baseline;flex-wrap:nowrap;column-gap:6px;
+  margin-top:12px;
+  font-size:12px;line-height:1.7;color:var(--text-3);
+  user-select:text;
+}
+.task-time .task-time-label{color:var(--text-4);letter-spacing:.4px;white-space:nowrap}
+.task-time time{
+  font-family:var(--mono);color:var(--text-2);
+  font-variant-numeric:tabular-nums;letter-spacing:.2px;white-space:nowrap;
+}
+.task-time .task-time-sep{color:var(--text-4)}
 .close-behavior-modal-hint{
   display:flex;align-items:flex-start;gap:10px;
   padding:11px 12px;background:var(--surface-2);
@@ -73,7 +85,7 @@
 }
 .detail-textarea{resize:vertical;min-height:76px}
 .action-spacer{flex:1}
-.task-detail .modal-body{max-height:calc(92vh - 120px);overflow-y:auto;padding-right:4px}
+.task-detail .modal-body{max-height:calc(92vh - 120px);overflow-y:auto}
 .task-detail .ant-select-selector{
   background:var(--surface) !important;
   border-color:var(--border-strong) !important;

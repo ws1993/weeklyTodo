@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Radio, Select } from 'antd';
 import type { ExecutionMode, Task } from '../shared/contracts/types';
 import { useAppStore } from '../store/appStore';
+import { formatDateTimeMinute } from '../utils/formatDateTime';
 import { appendIndex, descendantIds, subtreeSize, taskPath } from '../utils/tree';
 import { CheckIcon, CrossIcon, TrashIcon } from './ForestIcons';
 
@@ -151,6 +152,18 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
         </p>
 
         <div className="modal-body">
+          <div className="task-time">
+            <span className="task-time-label">创建</span>
+            <time dateTime={task.createdAt}>{formatDateTimeMinute(task.createdAt)}</time>
+            {task.status === 'closed' && task.closedAt && (
+              <>
+                <span className="task-time-sep">·</span>
+                <span className="task-time-label">完成</span>
+                <time dateTime={task.closedAt}>{formatDateTimeMinute(task.closedAt)}</time>
+              </>
+            )}
+          </div>
+
           <div className="field">
             <label>标题</label>
             <input
