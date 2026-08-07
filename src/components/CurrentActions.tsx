@@ -46,7 +46,11 @@ export function CurrentActions({ tasks, onLocate }: CurrentActionsProps) {
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
 
-  const entries = useMemo(() => buildLeafEntries(tasks), [tasks]);
+  // P0 最优先（数值最小），同级保持任务树原有顺序（Array#sort 稳定）。
+  const entries = useMemo(
+    () => buildLeafEntries(tasks).sort((a, b) => a.task.priority - b.task.priority),
+    [tasks],
+  );
   const colorMap = useMemo(() => groupColorMap(groupColors), [groupColors]);
 
   // 分组按叶子首次出现顺序排列，附带叶子数。
@@ -168,7 +172,12 @@ export function CurrentActions({ tasks, onLocate }: CurrentActionsProps) {
             >
               <span className="leaf-dot" style={{ background: color }} />
               <span className="leaf-body">
-                <span className="leaf-title">{entry.task.title}</span>
+                <span className="leaf-title-row">
+                  <span className="leaf-title">{entry.task.title}</span>
+                  <span className={`tag tag-priority tag-priority-sm p${entry.task.priority}`}>
+                    P{entry.task.priority}
+                  </span>
+                </span>
                 {entry.parentTitles.length > 0 && (
                   <span className="leaf-path">
                     {entry.parentTitles.map((title, index) => (
