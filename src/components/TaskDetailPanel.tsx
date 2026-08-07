@@ -73,6 +73,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
     return null;
   }
 
+  const hasChildren = treeTasks.some((item) => item.parentId === task.id);
   const ownerOptions = owners.map((owner) => ({ value: owner.name, label: owner.name }));
   const tagOptions = tags.map((tag) => ({ value: tag.name, label: tag.name }));
 
@@ -96,7 +97,8 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
       await editTask(task.id, {
         title: trimmedTitle,
         description,
-        priority,
+        // 父任务优先级由未完成子任务自动联动，不手动提交。
+        priority: hasChildren ? undefined : priority,
         executionMode,
         ownerName: executionMode === 'follow_up' ? (ownerValue[0] ?? '') : '',
         tagNames,
@@ -176,7 +178,13 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
               options={priorityOptions}
               onChange={(value: number) => setPriority(value)}
               style={{ width: '100%' }}
+              disabled={hasChildren}
             />
+            {hasChildren && (
+              <p className="modal-hint">
+                含子任务：优先级自动取未完成子任务的最高级（P0 最急），不可手动设置；子任务完成或改级后自动联动。
+              </p>
+            )}
           </div>
 
           <div className="field">

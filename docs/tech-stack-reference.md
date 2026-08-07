@@ -24,7 +24,7 @@
 | 状态管理 | zustand | 5.x，单 store |
 | 前端测试 | vitest + @testing-library/react + jsdom | 4.x |
 | 桌面壳 | Tauri 2（Rust） | edition 2021，rust-version 1.81，toolchain 锁定 1.97.1 |
-| 存储 | rusqlite（bundled SQLite） | 0.40；WAL；`PRAGMA user_version` 迁移，当前 SCHEMA_VERSION=3 |
+| 存储 | rusqlite（bundled SQLite） | 0.40；WAL；`PRAGMA user_version` 迁移，当前 SCHEMA_VERSION=4 |
 | HTTP | reqwest | 0.12；features: json / rustls-tls / stream |
 | 凭据 | keyring | 3.x；windows-native（Windows Credential Manager） |
 | WebDAV 测试服务器 | tiny_http | 0.12（dev-dependencies，内存式） |
@@ -104,7 +104,7 @@ db.rs（schema 与迁移唯一 owner）→ SQLite（WAL）
 
 ## 6. 数据库设计
 
-### 表结构（SCHEMA_VERSION = 3）
+### 表结构（SCHEMA_VERSION = 4）
 
 - `weeks(id TEXT PK, start_date, end_date, created_at, carried_from_week_id)`
 - `tasks(id PK AUTOINCREMENT, week_id REFERENCES weeks ON DELETE CASCADE, parent_id REFERENCES tasks ON DELETE CASCADE, title, description, status, priority, sort_index REAL, origin_week_id, carried_from_task_id, created_at, updated_at, closed_at, execution_mode, owner_id)`
@@ -117,7 +117,7 @@ db.rs（schema 与迁移唯一 owner）→ SQLite（WAL）
 
 - `PRAGMA user_version` 递增，每个版本一个事务；只增不改旧版本块。
 - 打开库固定：`foreign_keys=ON` + `journal_mode=WAL`。
-- 迁移示例：v1 建周/任务/事件；v2 加 owners/tags/task_tags/execution_mode/owner_id；v3 加 group_colors。
+- 迁移示例：v1 建周/任务/事件；v2 加 owners/tags/task_tags/execution_mode/owner_id；v3 加 group_colors；v4 回填父任务派生优先级（数据迁移，无表结构变更）。
 
 ### 排序设计
 
@@ -144,6 +144,7 @@ db.rs（schema 与迁移唯一 owner）→ SQLite（WAL）
 - 仅 `in_progress` / `closed`。关闭任务时若某祖先的所有子任务都关闭则级联关闭祖先；重开时级联重开祖先。
 - `follow_up` 执行方式必须指定负责人；`self` 可不指定。
 - 优先级 clamp 到 0..3。
+- **优先级联动**（v4）：父任务及其所有祖先的优先级不由手动设置，而是取「未完成直接子任务」的最高优先级（P0 最小）；子任务全关闭或删除时回落到 P2。改子任务优先级、关闭/重开、删除、移动、新建子任务都会自底向上重算整条祖先链并写入库（`recompute_ancestor_priorities`，审计为带 `autoPriority` 的 update 事件）；无子任务的任务仍可手动设置。v4 迁移会一次性回填存量数据。
 - 树防护：不能移动到自身/子树/已关闭节点；已关闭节点不能新增子任务；前端 `computeDrop` 与后端 domain 双重校验。
 
 ### 审计事件

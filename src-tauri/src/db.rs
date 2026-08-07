@@ -3,7 +3,7 @@ use std::path::Path;
 use rusqlite::Connection;
 
 pub const DB_FILE_NAME: &str = "weeklytodo.db";
-pub const SCHEMA_VERSION: i32 = 3;
+pub const SCHEMA_VERSION: i32 = 4;
 
 /// Open (or create) the SQLite database inside `data_dir` and run migrations.
 pub fn open_database(data_dir: &Path) -> Result<Connection, String> {
@@ -113,6 +113,20 @@ pub fn migrate(conn: &mut Connection) -> Result<(), String> {
         )
         .map_err(|error| format!("创建分组颜色表失败：{error}"))?;
         tx.pragma_update(None, "user_version", 3)
+            .map_err(|error| format!("写入数据库版本失败：{error}"))?;
+        tx.commit()
+            .map_err(|error| format!("提交迁移失败：{error}"))?;
+    }
+
+    if version < 4 {
+        let tx = conn
+            .transaction()
+            .map_err(|error| format!("开启迁移事务失败：{error}"))?;
+        // One-time backfill: derive every parent's priority from its open
+        // children so existing data already reflects the linked-priority rule.
+        crate::domain::backfill_derived_priorities(&tx)
+            .map_err(|error| format!("回填派生优先级失败：{error}"))?;
+        tx.pragma_update(None, "user_version", 4)
             .map_err(|error| format!("写入数据库版本失败：{error}"))?;
         tx.commit()
             .map_err(|error| format!("提交迁移失败：{error}"))?;

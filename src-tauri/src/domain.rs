@@ -566,6 +566,127 @@ fn record_event(
     Ok(())
 }
 
+/// Derive `task_id`'s priority from its open direct children when it has any
+/// children: the highest priority (smallest number) wins, and a node whose
+/// children are all closed degrades back to `DEFAULT_PRIORITY`. Tasks without
+/// children keep their manually set priority. Returns the new priority when
+/// the stored value was updated, `None` otherwise.
+fn derive_priority_from_children(conn: &Connection, task_id: i64) -> Result<Option<i64>, String> {
+    let child_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM tasks WHERE parent_id = ?1",
+            params![task_id],
+            |row| row.get(0),
+        )
+        .map_err(|error| format!("统计子任务失败：{error}"))?;
+    if child_count == 0 {
+        return Ok(None);
+    }
+    let highest_open_priority: Option<i64> = conn
+        .query_row(
+            "SELECT MIN(priority) FROM tasks WHERE parent_id = ?1 AND status = ?2",
+            params![task_id, TASK_STATUS_IN_PROGRESS],
+            |row| row.get(0),
+        )
+        .map_err(|error| format!("统计子任务优先级失败：{error}"))?;
+    let new_priority = highest_open_priority.unwrap_or(DEFAULT_PRIORITY);
+    let current_priority: i64 = conn
+        .query_row(
+            "SELECT priority FROM tasks WHERE id = ?1",
+            params![task_id],
+            |row| row.get(0),
+        )
+        .map_err(|error| format!("读取任务优先级失败：{error}"))?;
+    if current_priority == new_priority {
+        return Ok(None);
+    }
+    conn.execute(
+        "UPDATE tasks SET priority = ?1, updated_at = ?2 WHERE id = ?3",
+        params![new_priority, iso_now(), task_id],
+    )
+    .map_err(|error| format!("联动更新父任务优先级失败：{error}"))?;
+    Ok(Some(new_priority))
+}
+
+/// Recompute the priority of `task_id` and all its ancestors from their open
+/// direct children, walking bottom-up so changes propagate through the whole
+/// ancestor chain. Called after any operation that alters the set of open
+/// children in a subtree: priority edits, close/reopen, move, delete and
+/// creating a subtask. Each changed ancestor is audited as an update event
+/// carrying `autoPriority: true`.
+pub fn recompute_ancestor_priorities(
+    conn: &Connection,
+    week_id: &str,
+    task_id: i64,
+) -> Result<(), String> {
+    let mut current = Some(task_id);
+    let mut guard = 0;
+    while let Some(id) = current {
+        if let Some(new_priority) = derive_priority_from_children(conn, id)? {
+            let payload = serde_json::json!({ "autoPriority": true, "priority": new_priority });
+            record_event(
+                conn,
+                week_id,
+                Some(id),
+                EVENT_TYPE_UPDATE,
+                Some(&payload.to_string()),
+            )?;
+        }
+        current = conn
+            .query_row(
+                "SELECT parent_id FROM tasks WHERE id = ?1",
+                params![id],
+                |row| row.get::<_, Option<i64>>(0),
+            )
+            .map_err(|error| format!("读取任务父级失败：{error}"))?;
+        guard += 1;
+        if guard > 64 {
+            break;
+        }
+    }
+    Ok(())
+}
+
+/// One-time data backfill used by the schema v4 migration: derive every
+/// parent's priority from its open children, deepest nodes first, so existing
+/// data already reflects the linked-priority rule.
+pub fn backfill_derived_priorities(conn: &Connection) -> Result<(), String> {
+    let mut stmt = conn
+        .prepare("SELECT id, parent_id FROM tasks")
+        .map_err(|error| format!("查询任务失败：{error}"))?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, Option<i64>>(1)?))
+        })
+        .map_err(|error| format!("遍历任务失败：{error}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("读取任务失败：{error}"))?;
+
+    let parent_of: std::collections::HashMap<i64, Option<i64>> =
+        rows.iter().map(|(id, parent)| (*id, *parent)).collect();
+    let mut depth: std::collections::HashMap<i64, usize> = std::collections::HashMap::new();
+    let mut task_ids: Vec<i64> = rows.iter().map(|(id, _)| *id).collect();
+    task_ids.sort();
+    for id in &task_ids {
+        let mut level = 0;
+        let mut cursor = parent_of.get(id).copied().flatten();
+        while let Some(parent) = cursor {
+            level += 1;
+            cursor = parent_of.get(&parent).copied().flatten();
+            if level > 64 {
+                break;
+            }
+        }
+        depth.insert(*id, level);
+    }
+    // Deepest nodes first, so a parent always derives from already-finalized children.
+    task_ids.sort_by_key(|id| std::cmp::Reverse(depth.get(id).copied().unwrap_or(0)));
+    for id in task_ids {
+        derive_priority_from_children(conn, id)?;
+    }
+    Ok(())
+}
+
 pub struct CreateTaskInput {
     pub title: String,
     pub description: String,
@@ -643,6 +764,9 @@ pub fn create_task(
     let task_id = conn.last_insert_rowid();
     set_task_tags(conn, task_id, &input.tag_names)?;
     record_event(conn, week_id, Some(task_id), EVENT_TYPE_CREATE, None)?;
+    if input.parent_id.is_some() {
+        recompute_ancestor_priorities(conn, week_id, task_id)?;
+    }
     get_task(conn, week_id, task_id)?.ok_or_else(|| "创建任务后读取失败".to_string())
 }
 
@@ -711,6 +835,7 @@ pub fn update_task(
         set_task_tags(conn, task_id, tag_names)?;
     }
     record_event(conn, week_id, Some(task_id), EVENT_TYPE_UPDATE, None)?;
+    recompute_ancestor_priorities(conn, week_id, task_id)?;
     get_task(conn, week_id, task_id)?.ok_or_else(|| "更新任务后读取失败".to_string())
 }
 
@@ -825,6 +950,9 @@ pub fn close_task(conn: &mut Connection, week_id: &str, task_id: i64) -> Result<
         }
     }
 
+    // Re-derive ancestor priorities now that the open-child set changed.
+    recompute_ancestor_priorities(&tx, week_id, task_id)?;
+
     tx.commit()
         .map_err(|error| format!("提交关闭事务失败：{error}"))?;
     current.status = TASK_STATUS_CLOSED.to_string();
@@ -877,6 +1005,9 @@ pub fn reopen_task(conn: &mut Connection, week_id: &str, task_id: i64) -> Result
             .map_err(|error| format!("读取祖先父级失败：{error}"))?;
     }
 
+    // Re-derive ancestor priorities now that the reopened task is active again.
+    recompute_ancestor_priorities(&tx, week_id, task_id)?;
+
     tx.commit()
         .map_err(|error| format!("提交重新打开事务失败：{error}"))?;
     get_task(conn, week_id, task_id)?.ok_or_else(|| "重新打开任务后读取失败".to_string())
@@ -890,9 +1021,9 @@ pub fn move_task(
     new_parent_id: Option<i64>,
     new_index: f64,
 ) -> Result<(), String> {
-    if get_task(conn, week_id, task_id)?.is_none() {
-        return Err("任务不存在".to_string());
-    }
+    let old_parent_id = get_task(conn, week_id, task_id)?
+        .ok_or_else(|| "任务不存在".to_string())?
+        .parent_id;
 
     if let Some(parent_id) = new_parent_id {
         if parent_id == task_id {
@@ -927,6 +1058,13 @@ pub fn move_task(
     )
     .map_err(|error| format!("移动任务失败：{error}"))?;
     record_event(conn, week_id, Some(task_id), EVENT_TYPE_UPDATE, None)?;
+    // Both the old and the new ancestor chains may need their priority re-derived.
+    if let Some(old_parent) = old_parent_id {
+        recompute_ancestor_priorities(conn, week_id, old_parent)?;
+    }
+    if new_parent_id.is_some() {
+        recompute_ancestor_priorities(conn, week_id, task_id)?;
+    }
     Ok(())
 }
 
@@ -934,6 +1072,7 @@ pub fn move_task(
 /// through the `ON DELETE CASCADE` foreign keys.
 pub fn delete_task(conn: &mut Connection, week_id: &str, task_id: i64) -> Result<usize, String> {
     let task = get_task(conn, week_id, task_id)?.ok_or_else(|| "任务不存在".to_string())?;
+    let parent_id = task.parent_id;
 
     let tx = conn
         .transaction()
@@ -956,6 +1095,9 @@ pub fn delete_task(conn: &mut Connection, week_id: &str, task_id: i64) -> Result
         .map_err(|error| format!("删除任务失败：{error}"))?;
     tx.commit()
         .map_err(|error| format!("提交删除事务失败：{error}"))?;
+    if let Some(parent) = parent_id {
+        recompute_ancestor_priorities(conn, week_id, parent)?;
+    }
     Ok(affected)
 }
 
@@ -1121,6 +1263,9 @@ fn carry_over_branch(
             id_map,
         )?;
     }
+    // The whole subtree is copied now: re-derive this node's priority from its
+    // copied open children (ancestors re-derive when their own recursion ends).
+    derive_priority_from_children(conn, new_id)?;
     Ok(())
 }
 
@@ -1210,6 +1355,29 @@ mod tests {
                 description: String::new(),
                 parent_id,
                 priority: DEFAULT_PRIORITY,
+                execution_mode: EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                tag_names: Vec::new(),
+            },
+        )
+        .unwrap()
+    }
+
+    fn create_task_with_priority(
+        conn: &Connection,
+        week_id: &str,
+        title: &str,
+        parent_id: Option<i64>,
+        priority: i64,
+    ) -> Task {
+        create_task(
+            conn,
+            week_id,
+            CreateTaskInput {
+                title: title.into(),
+                description: String::new(),
+                parent_id,
+                priority,
                 execution_mode: EXECUTION_MODE_SELF.into(),
                 owner_name: None,
                 tag_names: Vec::new(),
@@ -1588,5 +1756,268 @@ mod tests {
         assert!(move_task(&conn, "20260803-20260809", root.id, Some(root.id), 0.0).is_err());
         // Moving a parent under its own child would create a cycle.
         assert!(move_task(&conn, "20260803-20260809", root.id, Some(child.id), 0.0).is_err());
+    }
+
+    #[test]
+    fn subtask_priority_propagates_to_all_ancestors() {
+        let conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+
+        let root = create_plain_task(&conn, "20260803-20260809", "项目", None);
+        let mid = create_plain_task(&conn, "20260803-20260809", "子项目", Some(root.id));
+        create_task_with_priority(&conn, "20260803-20260809", "P0任务", Some(mid.id), 0);
+        create_task_with_priority(&conn, "20260803-20260809", "P1任务", Some(mid.id), 1);
+        create_task_with_priority(&conn, "20260803-20260809", "P2任务", Some(mid.id), 2);
+
+        let mid_now = get_task(&conn, "20260803-20260809", mid.id)
+            .unwrap()
+            .unwrap();
+        let root_now = get_task(&conn, "20260803-20260809", root.id)
+            .unwrap()
+            .unwrap();
+        // 最高优先级（最小数值）层层向上传递。
+        assert_eq!(mid_now.priority, 0);
+        assert_eq!(root_now.priority, 0);
+    }
+
+    #[test]
+    fn leaf_priority_is_never_overwritten() {
+        let conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+
+        let root = create_plain_task(&conn, "20260803-20260809", "项目", None);
+        let leaf =
+            create_task_with_priority(&conn, "20260803-20260809", "P0叶子", Some(root.id), 0);
+        create_task_with_priority(&conn, "20260803-20260809", "P1兄弟", Some(root.id), 1);
+
+        // 兄弟节点变化不影响叶子自身的手动优先级。
+        let leaf_now = get_task(&conn, "20260803-20260809", leaf.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(leaf_now.priority, 0);
+    }
+
+    #[test]
+    fn closing_highest_child_degrades_ancestors() {
+        let mut conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+
+        let root = create_plain_task(&conn, "20260803-20260809", "项目", None);
+        let mid = create_plain_task(&conn, "20260803-20260809", "子项目", Some(root.id));
+        let p0 = create_task_with_priority(&conn, "20260803-20260809", "P0", Some(mid.id), 0);
+        let p1 = create_task_with_priority(&conn, "20260803-20260809", "P1", Some(mid.id), 1);
+        let p2 = create_task_with_priority(&conn, "20260803-20260809", "P2", Some(mid.id), 2);
+
+        close_task(&mut conn, "20260803-20260809", p0.id).unwrap();
+        let mid_now = get_task(&conn, "20260803-20260809", mid.id)
+            .unwrap()
+            .unwrap();
+        let root_now = get_task(&conn, "20260803-20260809", root.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(mid_now.priority, 1);
+        assert_eq!(root_now.priority, 1);
+
+        close_task(&mut conn, "20260803-20260809", p1.id).unwrap();
+        let mid_now = get_task(&conn, "20260803-20260809", mid.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(mid_now.priority, 2);
+
+        // 全部子任务关闭后，父任务级联关闭并回落到默认优先级。
+        close_task(&mut conn, "20260803-20260809", p2.id).unwrap();
+        let mid_now = get_task(&conn, "20260803-20260809", mid.id)
+            .unwrap()
+            .unwrap();
+        let root_now = get_task(&conn, "20260803-20260809", root.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(mid_now.status, TASK_STATUS_CLOSED);
+        assert_eq!(root_now.status, TASK_STATUS_CLOSED);
+        assert_eq!(mid_now.priority, DEFAULT_PRIORITY);
+        assert_eq!(root_now.priority, DEFAULT_PRIORITY);
+    }
+
+    #[test]
+    fn reopening_restores_derived_priority() {
+        let mut conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+
+        let root = create_plain_task(&conn, "20260803-20260809", "项目", None);
+        let mid = create_plain_task(&conn, "20260803-20260809", "子项目", Some(root.id));
+        let p0 = create_task_with_priority(&conn, "20260803-20260809", "P0", Some(mid.id), 0);
+        let p1 = create_task_with_priority(&conn, "20260803-20260809", "P1", Some(mid.id), 1);
+        let p2 = create_task_with_priority(&conn, "20260803-20260809", "P2", Some(mid.id), 2);
+        close_task(&mut conn, "20260803-20260809", p0.id).unwrap();
+        close_task(&mut conn, "20260803-20260809", p1.id).unwrap();
+        close_task(&mut conn, "20260803-20260809", p2.id).unwrap();
+
+        reopen_task(&mut conn, "20260803-20260809", p0.id).unwrap();
+        let mid_now = get_task(&conn, "20260803-20260809", mid.id)
+            .unwrap()
+            .unwrap();
+        let root_now = get_task(&conn, "20260803-20260809", root.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(mid_now.status, TASK_STATUS_IN_PROGRESS);
+        assert_eq!(root_now.status, TASK_STATUS_IN_PROGRESS);
+        assert_eq!(mid_now.priority, 0);
+        assert_eq!(root_now.priority, 0);
+    }
+
+    #[test]
+    fn updating_leaf_priority_updates_ancestors() {
+        let conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+
+        let root = create_plain_task(&conn, "20260803-20260809", "项目", None);
+        let mid = create_plain_task(&conn, "20260803-20260809", "子项目", Some(root.id));
+        let leaf = create_plain_task(&conn, "20260803-20260809", "叶子", Some(mid.id));
+
+        update_task(
+            &conn,
+            "20260803-20260809",
+            leaf.id,
+            UpdateTaskInput {
+                title: None,
+                description: None,
+                priority: Some(0),
+                execution_mode: None,
+                owner_name: None,
+                tag_names: None,
+            },
+        )
+        .unwrap();
+        let mid_now = get_task(&conn, "20260803-20260809", mid.id)
+            .unwrap()
+            .unwrap();
+        let root_now = get_task(&conn, "20260803-20260809", root.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(mid_now.priority, 0);
+        assert_eq!(root_now.priority, 0);
+    }
+
+    #[test]
+    fn move_task_recomputes_old_and_new_ancestors() {
+        let conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+
+        let root_a = create_plain_task(&conn, "20260803-20260809", "项目A", None);
+        let root_b = create_plain_task(&conn, "20260803-20260809", "项目B", None);
+        let child_a =
+            create_task_with_priority(&conn, "20260803-20260809", "A-P0", Some(root_a.id), 0);
+        let child_b =
+            create_task_with_priority(&conn, "20260803-20260809", "B-P2", Some(root_b.id), 2);
+
+        // 把 B 的 P2 子任务移入 A：A 仍为 P0，B 无子任务后不再派生。
+        move_task(
+            &conn,
+            "20260803-20260809",
+            child_b.id,
+            Some(root_a.id),
+            10.0,
+        )
+        .unwrap();
+        let root_a_now = get_task(&conn, "20260803-20260809", root_a.id)
+            .unwrap()
+            .unwrap();
+        let root_b_now = get_task(&conn, "20260803-20260809", root_b.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(root_a_now.priority, 0);
+        assert_eq!(root_b_now.priority, DEFAULT_PRIORITY);
+
+        // 把 A 的 P0 子任务移出到顶层：A 只剩 P2 子任务，降为 P2。
+        move_task(&conn, "20260803-20260809", child_a.id, None, 20.0).unwrap();
+        let root_a_now = get_task(&conn, "20260803-20260809", root_a.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(root_a_now.priority, 2);
+    }
+
+    #[test]
+    fn delete_subtask_recomputes_ancestors() {
+        let mut conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+
+        let root = create_plain_task(&conn, "20260803-20260809", "项目", None);
+        let mid = create_plain_task(&conn, "20260803-20260809", "子项目", Some(root.id));
+        let p0 = create_task_with_priority(&conn, "20260803-20260809", "P0", Some(mid.id), 0);
+        create_task_with_priority(&conn, "20260803-20260809", "P2", Some(mid.id), 2);
+
+        delete_task(&mut conn, "20260803-20260809", p0.id).unwrap();
+        let mid_now = get_task(&conn, "20260803-20260809", mid.id)
+            .unwrap()
+            .unwrap();
+        let root_now = get_task(&conn, "20260803-20260809", root.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(mid_now.priority, 2);
+        assert_eq!(root_now.priority, 2);
+    }
+
+    #[test]
+    fn carry_over_derives_parent_priority_in_target_week() {
+        let conn = db::open_in_memory();
+        seed_week(&conn, "20260727-20260802");
+        seed_week(&conn, "20260803-20260809");
+
+        let root = create_plain_task(&conn, "20260727-20260802", "项目", None);
+        let mid = create_plain_task(&conn, "20260727-20260802", "子项目", Some(root.id));
+        create_task_with_priority(&conn, "20260727-20260802", "P0", Some(mid.id), 0);
+        // 人为把源周父任务优先级改成错误值，验证带入时重新派生。
+        conn.execute(
+            "UPDATE tasks SET priority = 3 WHERE id IN (?1, ?2)",
+            params![root.id, mid.id],
+        )
+        .unwrap();
+
+        carry_over_week(&conn, "20260803-20260809", "20260727-20260802").unwrap();
+        let copied = list_tasks(&conn, "20260803-20260809").unwrap();
+        let copied_mid = copied.iter().find(|task| task.title == "子项目").unwrap();
+        let copied_root = copied.iter().find(|task| task.title == "项目").unwrap();
+        assert_eq!(copied_mid.priority, 0);
+        assert_eq!(copied_root.priority, 0);
+    }
+
+    #[test]
+    fn backfill_derives_priorities_for_existing_data() {
+        let conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+        // 直接插入带陈旧优先级的父子任务，绕过 create_task 的联动。
+        conn.execute(
+            "INSERT INTO tasks (week_id, parent_id, title, description, status, priority,
+                                sort_index, created_at, updated_at, execution_mode)
+             VALUES (?1, NULL, '项目', '', 'in_progress', 3, 0, '2026-08-03', '2026-08-03', 'self')",
+            params!["20260803-20260809"],
+        )
+        .unwrap();
+        let root_id = conn.last_insert_rowid();
+        conn.execute(
+            "INSERT INTO tasks (week_id, parent_id, title, description, status, priority,
+                                sort_index, created_at, updated_at, execution_mode)
+             VALUES (?1, ?2, '子项目', '', 'in_progress', 3, 0, '2026-08-03', '2026-08-03', 'self')",
+            params!["20260803-20260809", root_id],
+        )
+        .unwrap();
+        let mid_id = conn.last_insert_rowid();
+        conn.execute(
+            "INSERT INTO tasks (week_id, parent_id, title, description, status, priority,
+                                sort_index, created_at, updated_at, execution_mode)
+             VALUES (?1, ?2, 'P0', '', 'in_progress', 0, 0, '2026-08-03', '2026-08-03', 'self')",
+            params!["20260803-20260809", mid_id],
+        )
+        .unwrap();
+
+        backfill_derived_priorities(&conn).unwrap();
+        let mid_now = get_task(&conn, "20260803-20260809", mid_id)
+            .unwrap()
+            .unwrap();
+        let root_now = get_task(&conn, "20260803-20260809", root_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(mid_now.priority, 0);
+        assert_eq!(root_now.priority, 0);
     }
 }

@@ -520,7 +520,12 @@ function TaskNode({
         >
           {task.carriedFromTaskId != null && <span className="tag tag-carry">带入</span>}
           {closed && <span className="tag tag-closed">已完成</span>}
-          <span className={`tag tag-priority p${task.priority}`}>P{task.priority}</span>
+          <span
+            className={`tag tag-priority p${task.priority}`}
+            title={hasChildren ? '优先级由未完成子任务自动联动' : undefined}
+          >
+            P{task.priority}
+          </span>
           {task.executionMode === 'self' && <span className="tag tag-self">自己</span>}
           {task.executionMode === 'follow_up' && <span className="tag tag-follow">跟进</span>}
           {task.executionMode === 'follow_up' && task.ownerName && (

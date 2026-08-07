@@ -24,6 +24,7 @@ alwaysApply: false
 - 状态仅 `in_progress` / `closed` 两态（暂无 cancelled）。
 - 关闭任务：若某节点所有子任务已关闭，级联关闭其祖先；重新打开会级联重开祖先。
 - 优先级 P0-P3 存为 0..3 整数，写入前 `clamp` 到合法范围。
+- 优先级联动：父任务及其所有祖先的优先级 = 未完成直接子任务中的最高优先级（P0 最小），子任务全关闭/删除时回落到 P2；改子任务优先级、关闭/重开、删除、移动、新建子任务都会自底向上重算祖先链（`recompute_ancestor_priorities`），无子任务的任务可手动设置；v4 迁移回填存量数据。
 - 执行方式 `self` / `follow_up`；`follow_up` 必须指定负责人，否则拒绝创建。
 - owner/tag 归一化：`INSERT OR IGNORE` + `ensure_*` 取 id；删除 owner 时任务 owner_id 置 NULL；删除 tag 级联清关联。
 - 树操作防护：不能移动到自身 / 自己子树 / 已关闭节点下；已关闭节点不能加子任务（后端 domain + 前端 `computeDrop` 双端校验）。
@@ -69,5 +70,5 @@ alwaysApply: false
 
 - `npm run lint`（tsc --noEmit）、`npm test`、`npm run build` 必须通过。
 - `cd src-tauri && cargo test`、`cargo clippy --all-targets --all-features -- -D warnings`、`cargo fmt --check` 必须通过。
-- 改动涉及 schema 时：新增迁移版本（当前 `SCHEMA_VERSION=3`）并验证 WebDAV 整库同步不受影响。
+- 改动涉及 schema 时：新增迁移版本（当前 `SCHEMA_VERSION=4`）并验证 WebDAV 整库同步不受影响。
 - 已知缺陷与待改进项见 `docs/tech-stack-reference.md`「已知问题」。
