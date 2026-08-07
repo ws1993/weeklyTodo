@@ -1,0 +1,6 @@
+EXIT: 0
+
+STDERR:
+    Blocking waiting for file lock on build directory
+    Checking weekly-todo v1.0.5 (E:\Project\AI\weeklyTodo\src-tauri)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.55s

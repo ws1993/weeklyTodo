@@ -65,7 +65,9 @@ pub fn create_tray(app: &AppHandle) -> tauri::Result<()> {
     let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
 
     TrayIconBuilder::with_id("main-tray")
-        .icon(tauri::image::Image::from_bytes(include_bytes!("../icons/icon.ico"))?)
+        .icon(tauri::image::Image::from_bytes(include_bytes!(
+            "../icons/icon.ico"
+        ))?)
         .tooltip("周计划")
         .menu(&menu)
         .show_menu_on_left_click(false)

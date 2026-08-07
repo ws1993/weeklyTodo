@@ -161,7 +161,9 @@ fn find_xml_tag(body: &str, local_name: &str, closing: bool) -> Option<usize> {
         let tag_end = remainder.find('>')?;
         let token = remainder[..tag_end]
             .trim_start()
-            .split(|character: char| character.is_whitespace() || character == '/' || character == '>')
+            .split(|character: char| {
+                character.is_whitespace() || character == '/' || character == '>'
+            })
             .next()
             .unwrap_or_default();
         if token.rsplit(':').next() == Some(local_name) {
@@ -180,7 +182,10 @@ fn parse_database_versions(xml: &str) -> Vec<RemoteDatabaseVersion> {
         .filter_map(|response| {
             let href = extract_prop(response, "href")?;
             let file_name = href.rsplit('/').next()?.trim();
-            if file_name.is_empty() || file_name.contains('%') || !is_database_version_filename(file_name) {
+            if file_name.is_empty()
+                || file_name.contains('%')
+                || !is_database_version_filename(file_name)
+            {
                 return None;
             }
             let last_modified_utc = extract_prop(response, "getlastmodified")
@@ -382,8 +387,9 @@ pub async fn download_file(
 
 /// Verify that a downloaded file is a readable SQLite database before replacing local data.
 fn validate_sqlite_database(database_path: &Path) -> Result<(), String> {
-    let connection = Connection::open_with_flags(database_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
-        .map_err(|error| format!("下载的 SQLite 数据库无法打开，已放弃覆盖：{error}"))?;
+    let connection =
+        Connection::open_with_flags(database_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .map_err(|error| format!("下载的 SQLite 数据库无法打开，已放弃覆盖：{error}"))?;
     let integrity: String = connection
         .query_row("PRAGMA integrity_check", [], |row| row.get(0))
         .map_err(|error| format!("校验下载的 SQLite 数据库失败，已放弃覆盖：{error}"))?;
@@ -457,11 +463,17 @@ mod tests {
     #[test]
     fn accepts_only_current_database_and_timestamped_backup_filenames() {
         assert!(is_database_version_filename("weeklytodo.db"));
-        assert!(is_database_version_filename("weeklytodo.db.20260804-133200.bak"));
+        assert!(is_database_version_filename(
+            "weeklytodo.db.20260804-133200.bak"
+        ));
 
         assert!(!is_database_version_filename("weeklytodo.db-wal"));
-        assert!(!is_database_version_filename("weeklytodo.db.20260804-1332.bak"));
-        assert!(!is_database_version_filename("weeklytodo.db.20261304-133200.bak"));
+        assert!(!is_database_version_filename(
+            "weeklytodo.db.20260804-1332.bak"
+        ));
+        assert!(!is_database_version_filename(
+            "weeklytodo.db.20261304-133200.bak"
+        ));
         assert!(!is_database_version_filename("../weeklytodo.db"));
         assert!(!is_database_version_filename("weeklytodo.db?version=old"));
     }
@@ -553,7 +565,8 @@ pub mod test_server {
                     .to_string();
                 let mut body = Vec::new();
                 let _ = request.as_reader().read_to_end(&mut body);
-                let response = handle_request(&server_root, &method, &path, &body, depth.as_deref());
+                let response =
+                    handle_request(&server_root, &method, &path, &body, depth.as_deref());
                 let _ = request.respond(response);
             }
         });

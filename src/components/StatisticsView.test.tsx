@@ -43,6 +43,10 @@ const sampleData: StatisticsOverview = {
     { name: '小明', count: 2 },
     { name: '', count: 7 },
   ],
+  byAssigner: [
+    { name: '李四', count: 1 },
+    { name: '', count: 8 },
+  ],
 };
 
 describe('StatisticsView 统计 / 复盘', () => {
@@ -76,7 +80,7 @@ describe('StatisticsView 统计 / 复盘', () => {
     expect(screen.getAllByText('带入 2').length).toBeGreaterThan(0);
   });
 
-  it('渲染优先级 / 标签 / 负责人分布', async () => {
+  it('渲染优先级 / 标签 / 负责人 / 分派人分布', async () => {
     render(<StatisticsView open onClose={vi.fn()} />);
 
     await screen.findByText('按优先级');
@@ -86,7 +90,9 @@ describe('StatisticsView 统计 / 复盘', () => {
     expect(screen.getByText('工作')).toBeTruthy();
     expect(screen.getByText('按负责人')).toBeTruthy();
     expect(screen.getByText('小明')).toBeTruthy();
-    expect(screen.getByText('未指定')).toBeTruthy();
+    expect(screen.getByText('按分派人')).toBeTruthy();
+    expect(screen.getByText('李四')).toBeTruthy();
+    expect(screen.getAllByText('未指定').length).toBeGreaterThanOrEqual(1);
   });
 
   it('无数据时展示空状态', async () => {
@@ -99,6 +105,7 @@ describe('StatisticsView 统计 / 复盘', () => {
       byPriority: [],
       byTag: [],
       byOwner: [],
+      byAssigner: [],
     });
     render(<StatisticsView open onClose={vi.fn()} />);
 

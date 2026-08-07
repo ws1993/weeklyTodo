@@ -14,6 +14,11 @@ export interface Owner {
   name: string;
 }
 
+export interface Assigner {
+  id: number;
+  name: string;
+}
+
 export interface Tag {
   id: number;
   name: string;
@@ -43,6 +48,8 @@ export interface Task {
   executionMode: ExecutionMode;
   ownerId?: number | null;
   ownerName?: string | null;
+  assignerId?: number | null;
+  assignerName?: string | null;
   tags: string[];
 }
 
@@ -64,6 +71,7 @@ export interface QueryFilter {
   startWeekId?: string;
   endWeekId?: string;
   ownerId?: number;
+  assignerId?: number;
   tagId?: number;
 }
 
@@ -112,6 +120,7 @@ export interface StatisticsOverview {
   byPriority: PriorityStat[];
   byTag: NamedCount[];
   byOwner: NamedCount[];
+  byAssigner: NamedCount[];
 }
 
 export interface MigrateResult {

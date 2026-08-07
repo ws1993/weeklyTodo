@@ -256,14 +256,8 @@ pub async fn restore_database_version(
 ) -> Result<RestoreResult, String> {
     let password = credentials::load_password(username)?
         .ok_or_else(|| "尚未保存该账号的密码，请在同步设置中填写密码后重试".to_string())?;
-    restore_database_version_with_password(
-        data_dir,
-        url,
-        username,
-        &password,
-        selected_file_name,
-    )
-    .await
+    restore_database_version_with_password(data_dir, url, username, &password, selected_file_name)
+        .await
 }
 
 /// Testable selected-version restore flow. Remote backup succeeds before local replacement begins.
@@ -295,7 +289,8 @@ pub async fn restore_database_version_with_password(
     }
 
     checkpoint_db(Path::new(data_dir))?;
-    let local_backup_file_name = next_available_backup_filename(&client, &base_url, username, password).await?;
+    let local_backup_file_name =
+        next_available_backup_filename(&client, &base_url, username, password).await?;
     let local_backup_url = format!("{base_url}{local_backup_file_name}");
     webdav::upload_file(&client, &local_backup_url, &local_path, username, password).await?;
 
@@ -317,7 +312,8 @@ async fn next_available_backup_filename(
     password: &str,
 ) -> Result<String, String> {
     for offset_seconds in 0..60 {
-        let candidate = backup_filename((Utc::now() + chrono::Duration::seconds(offset_seconds)).timestamp());
+        let candidate =
+            backup_filename((Utc::now() + chrono::Duration::seconds(offset_seconds)).timestamp());
         let candidate_url = format!("{base_url}{candidate}");
         if webdav::probe_file(client, &candidate_url, username, password)
             .await?
@@ -481,7 +477,10 @@ mod tests {
         checkpoint_db(&remote_data_dir).unwrap();
         let remote_bytes = std::fs::read(remote_data_dir.join(db::DB_FILE_NAME)).unwrap();
         let selected_file_name = "weeklytodo.db.20260804-133200.bak";
-        server.put_file(&format!("weeklytodo/{selected_file_name}"), remote_bytes.clone());
+        server.put_file(
+            &format!("weeklytodo/{selected_file_name}"),
+            remote_bytes.clone(),
+        );
 
         let result = restore_database_version_with_password(
             local_data_dir.to_str().unwrap(),
@@ -536,6 +535,7 @@ mod tests {
                 priority: crate::domain::DEFAULT_PRIORITY,
                 execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
                 owner_name: None,
+                assigner_name: None,
                 tag_names: vec![],
             },
         )

@@ -24,6 +24,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
   const moveTask = useAppStore((state) => state.moveTask);
   const deleteTask = useAppStore((state) => state.deleteTask);
   const owners = useAppStore((state) => state.owners);
+  const assigners = useAppStore((state) => state.assigners);
   const tags = useAppStore((state) => state.tags);
   const treeTasks = useAppStore((state) => state.tree?.tasks ?? []);
 
@@ -32,6 +33,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
   const [priority, setPriority] = useState(2);
   const [executionMode, setExecutionMode] = useState<ExecutionMode>('self');
   const [ownerValue, setOwnerValue] = useState<string[]>([]);
+  const [assignerValue, setAssignerValue] = useState<string[]>([]);
   const [tagNames, setTagNames] = useState<string[]>([]);
   const [parentValue, setParentValue] = useState<string>('none');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -47,6 +49,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
     setPriority(task.priority);
     setExecutionMode(task.executionMode ?? 'self');
     setOwnerValue(task.ownerName ? [task.ownerName] : []);
+    setAssignerValue(task.assignerName ? [task.assignerName] : []);
     setTagNames(task.tags ?? []);
     setParentValue(task.parentId == null ? 'none' : String(task.parentId));
     setConfirmingDelete(false);
@@ -76,6 +79,10 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
 
   const hasChildren = treeTasks.some((item) => item.parentId === task.id);
   const ownerOptions = owners.map((owner) => ({ value: owner.name, label: owner.name }));
+  const assignerOptions = assigners.map((assigner) => ({
+    value: assigner.name,
+    label: assigner.name,
+  }));
   const tagOptions = tags.map((tag) => ({ value: tag.name, label: tag.name }));
 
   const save = async () => {
@@ -103,6 +110,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
         // 非叶子任务的执行方式 / 负责人不展示也不可编辑，保持原值。
         executionMode: hasChildren ? undefined : executionMode,
         ownerName: hasChildren ? undefined : executionMode === 'follow_up' ? (ownerValue[0] ?? '') : '',
+        assignerName: hasChildren ? undefined : (assignerValue[0] ?? ''),
         tagNames,
       });
       onClose();
@@ -148,7 +156,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
         </button>
         <h2 className="modal-title">任务详情</h2>
         <p className="modal-sub">
-          设置执行方式、负责人与标签；输入新值会自动保存到选项库，供后续选择。
+          设置执行方式、负责人、分派人与标签；输入新值会自动保存到选项库，供后续选择。
         </p>
 
         <div className="modal-body">
@@ -231,12 +239,27 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
                   />
                 </div>
               )}
+
+              <div className="field">
+                <label>分派人（可选，可输入新名字自动创建）</label>
+                <Select
+                  mode="tags"
+                  maxCount={1}
+                  allowClear
+                  showSearch
+                  value={assignerValue}
+                  options={assignerOptions}
+                  onChange={(value: string[]) => setAssignerValue(value)}
+                  placeholder="选择或输入分派人，回车确认…"
+                  style={{ width: '100%' }}
+                />
+              </div>
             </>
           )}
 
           {hasChildren && (
             <p className="modal-hint">
-              含子任务：执行方式与负责人由叶子子任务承载，此处不显示、不可编辑。
+              含子任务：执行方式、负责人与分派人由叶子子任务承载，此处不显示、不可编辑。
             </p>
           )}
 

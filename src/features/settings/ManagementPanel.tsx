@@ -11,7 +11,7 @@ import {
   TrunkIcon,
 } from '../../components/ForestIcons';
 import { useAppStore } from '../../store/appStore';
-import type { Owner, Tag } from '../../shared/contracts/types';
+import type { Assigner, Owner, Tag } from '../../shared/contracts/types';
 import * as bridge from '../../api/nativeBridge';
 import { GROUP_PALETTE } from '../../utils/groupColors';
 
@@ -19,6 +19,7 @@ type EditingState = { id: number; name: string } | null;
 
 export function ManagementPanel() {
   const owners = useAppStore((state) => state.owners);
+  const assigners = useAppStore((state) => state.assigners);
   const tags = useAppStore((state) => state.tags);
   const groupColors = useAppStore((state) => state.groupColors);
   const setGroupColor = useAppStore((state) => state.setGroupColor);
@@ -26,11 +27,15 @@ export function ManagementPanel() {
   const refreshMetadata = useAppStore((state) => state.refreshMetadata);
   const refreshTree = useAppStore((state) => state.refreshTree);
 
-  const [activeSection, setActiveSection] = useState<'owners' | 'tags' | 'colors'>('owners');
+  const [activeSection, setActiveSection] = useState<'owners' | 'assigners' | 'tags' | 'colors'>(
+    'owners',
+  );
   const [expandedColorGroup, setExpandedColorGroup] = useState<string | null>(null);
   const [newOwnerName, setNewOwnerName] = useState('');
+  const [newAssignerName, setNewAssignerName] = useState('');
   const [newTagName, setNewTagName] = useState('');
   const [editingOwner, setEditingOwner] = useState<EditingState>(null);
+  const [editingAssigner, setEditingAssigner] = useState<EditingState>(null);
   const [editingTag, setEditingTag] = useState<EditingState>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,6 +52,20 @@ export function ManagementPanel() {
     try {
       await bridge.createOwner(trimmed);
       setNewOwnerName('');
+      await refreshMetadata();
+      await refreshTree();
+    } catch (backendError) {
+      setError(String(backendError));
+    }
+  };
+
+  const handleAddAssigner = async () => {
+    const trimmed = newAssignerName.trim();
+    if (!trimmed) { return; }
+    setError(null);
+    try {
+      await bridge.createAssigner(trimmed);
+      setNewAssignerName('');
       await refreshMetadata();
       await refreshTree();
     } catch (backendError) {
@@ -84,6 +103,22 @@ export function ManagementPanel() {
     }
   };
 
+  const handleRenameAssigner = async (id: number) => {
+    if (!editingAssigner || !editingAssigner.name.trim()) {
+      setEditingAssigner(null);
+      return;
+    }
+    setError(null);
+    try {
+      await bridge.renameAssigner(id, editingAssigner.name.trim());
+      setEditingAssigner(null);
+      await refreshMetadata();
+      await refreshTree();
+    } catch (backendError) {
+      setError(String(backendError));
+    }
+  };
+
   const handleRenameTag = async (id: number) => {
     if (!editingTag || !editingTag.name.trim()) {
       setEditingTag(null);
@@ -107,6 +142,20 @@ export function ManagementPanel() {
     setError(null);
     try {
       await bridge.deleteOwner(id);
+      await refreshMetadata();
+      await refreshTree();
+    } catch (backendError) {
+      setError(String(backendError));
+    }
+  };
+
+  const handleDeleteAssigner = async (id: number, name: string) => {
+    if (!window.confirm(`确定删除分派人「${name}」？\n该操作会清除引用此分派人的所有任务中的分派人信息。`)) {
+      return;
+    }
+    setError(null);
+    try {
+      await bridge.deleteAssigner(id);
       await refreshMetadata();
       await refreshTree();
     } catch (backendError) {
@@ -165,6 +214,14 @@ export function ManagementPanel() {
         >
           负责人
           <span className="management-tab-count">{owners.length}</span>
+        </button>
+        <button
+          type="button"
+          className={`management-tab${activeSection === 'assigners' ? ' active' : ''}`}
+          onClick={() => setActiveSection('assigners')}
+        >
+          分派人
+          <span className="management-tab-count">{assigners.length}</span>
         </button>
         <button
           type="button"
@@ -264,6 +321,99 @@ export function ManagementPanel() {
                         type="button"
                         className="management-item-icon danger"
                         onClick={() => handleDeleteOwner(owner.id, owner.name)}
+                        title="删除"
+                      >
+                        <TrashIcon size={13} />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeSection === 'assigners' && (
+          <div className="management-list">
+            <div className="management-add-row">
+              <input
+                type="text"
+                className="management-add-input"
+                placeholder="输入分派人名称..."
+                value={newAssignerName}
+                onChange={(event) => setNewAssignerName(event.target.value)}
+                onKeyDown={(event) => handleKeyDown(event, handleAddAssigner)}
+              />
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={handleAddAssigner}
+                disabled={!newAssignerName.trim()}
+                title="添加分派人"
+              >
+                <PlusIcon size={13} />
+                添加
+              </button>
+            </div>
+
+            {assigners.length === 0 && (
+              <EmptyState
+                compact
+                icon={<PersonIcon size={18} />}
+                title="暂无分派人"
+                sub="在任务中设置分派人后会自动创建"
+              />
+            )}
+
+            {assigners.map((assigner: Assigner) => (
+              <div key={assigner.id} className="management-item">
+                {editingAssigner?.id === assigner.id ? (
+                  <>
+                    <input
+                      type="text"
+                      className="management-item-input"
+                      value={editingAssigner.name}
+                      onChange={(event) =>
+                        setEditingAssigner({ ...editingAssigner, name: event.target.value })
+                      }
+                      onKeyDown={(event) =>
+                        handleKeyDown(event, () => handleRenameAssigner(assigner.id))
+                      }
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      className="management-item-icon ok"
+                      onClick={() => handleRenameAssigner(assigner.id)}
+                      title="确认"
+                    >
+                      <CheckIcon size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      className="management-item-icon cancel"
+                      onClick={() => setEditingAssigner(null)}
+                      title="取消"
+                    >
+                      <CrossIcon size={13} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="management-item-name">{assigner.name}</span>
+                    <div className="management-item-actions">
+                      <button
+                        type="button"
+                        className="management-item-icon"
+                        onClick={() => setEditingAssigner({ id: assigner.id, name: assigner.name })}
+                        title="重命名"
+                      >
+                        <RenameIcon size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        className="management-item-icon danger"
+                        onClick={() => handleDeleteAssigner(assigner.id, assigner.name)}
                         title="删除"
                       >
                         <TrashIcon size={13} />

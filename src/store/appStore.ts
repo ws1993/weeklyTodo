@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type {
+  Assigner,
   ExecutionMode,
   GroupColor,
   Owner,
@@ -17,6 +18,7 @@ interface AppState {
   recentWeeks: Week[];
   allWeeks: Week[];
   owners: Owner[];
+  assigners: Assigner[];
   tags: Tag[];
   groupColors: GroupColor[];
   tree: WeekTreePayload | null;
@@ -34,6 +36,7 @@ interface AppState {
     parentId?: number | null;
     executionMode?: ExecutionMode;
     ownerName?: string | null;
+    assignerName?: string | null;
     tagNames?: string[];
   }) => Promise<Task>;
   editTask: (
@@ -44,6 +47,7 @@ interface AppState {
       priority?: number;
       executionMode?: ExecutionMode;
       ownerName?: string | null;
+      assignerName?: string | null;
       tagNames?: string[];
     },
   ) => Promise<void>;
@@ -63,6 +67,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   recentWeeks: [],
   allWeeks: [],
   owners: [],
+  assigners: [],
   tags: [],
   groupColors: [],
   tree: null,
@@ -101,12 +106,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   refreshMetadata: async () => {
-    const [owners, tags, groupColors] = await Promise.all([
+    const [owners, assigners, tags, groupColors] = await Promise.all([
       bridge.listOwners(),
+      bridge.listAssigners(),
       bridge.listTags(),
       bridge.listGroupColors(),
     ]);
-    set({ owners, tags, groupColors });
+    set({ owners, assigners, tags, groupColors });
   },
 
   ensureGroupColor: async (name) => {
@@ -148,7 +154,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ tree });
   },
 
-  addTask: async ({ title, description, parentId, executionMode, ownerName, tagNames }) => {
+  addTask: async ({ title, description, parentId, executionMode, ownerName, assignerName, tagNames }) => {
     const { activeWeekId } = get();
     const task = await bridge.createTask({
       weekId: activeWeekId,
@@ -157,6 +163,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       parentId: parentId ?? null,
       executionMode,
       ownerName,
+      assignerName,
       tagNames,
     });
     await get().refreshTree();
@@ -164,7 +171,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     return task;
   },
 
-  editTask: async (taskId, { title, description, priority, executionMode, ownerName, tagNames }) => {
+  editTask: async (taskId, { title, description, priority, executionMode, ownerName, assignerName, tagNames }) => {
     const { activeWeekId } = get();
     await bridge.updateTask({
       weekId: activeWeekId,
@@ -174,6 +181,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       priority,
       executionMode,
       ownerName,
+      assignerName,
       tagNames,
     });
     await get().refreshTree();

@@ -116,6 +116,7 @@ export function StatisticsView({ open, onClose }: StatisticsViewProps) {
 
   const maxTag = Math.max(0, ...(data?.byTag ?? []).map((item) => item.count));
   const maxOwner = Math.max(0, ...(data?.byOwner ?? []).map((item) => item.count));
+  const maxAssigner = Math.max(0, ...(data?.byAssigner ?? []).map((item) => item.count));
   const maxPriority = Math.max(0, ...(data?.byPriority ?? []).map((item) => item.count));
   const hasData = data != null && (data.totalTasks > 0 || data.weeks.length > 0);
 
@@ -220,6 +221,18 @@ export function StatisticsView({ open, onClose }: StatisticsViewProps) {
                     <NamedRow key={item.name} item={item} max={maxOwner} muted={item.name === ''} />
                   ))}
                   {data.byOwner.length === 0 && (
+                    <span className="stats-dist-empty">暂无数据</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="stats-panel">
+                <h3 className="stats-panel-title">按分派人</h3>
+                <div className="stats-dist">
+                  {data.byAssigner.map((item) => (
+                    <NamedRow key={item.name} item={item} max={maxAssigner} muted={item.name === ''} />
+                  ))}
+                  {data.byAssigner.length === 0 && (
                     <span className="stats-dist-empty">暂无数据</span>
                   )}
                 </div>

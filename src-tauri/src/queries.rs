@@ -11,10 +11,11 @@ pub fn query_tasks(conn: &Connection, filter: &QueryFilter) -> Result<Vec<QueryT
         "SELECT t.id, t.week_id, t.parent_id, t.title, t.description, t.status, t.priority,
                 t.sort_index, t.origin_week_id, t.carried_from_task_id, t.created_at,
                 t.updated_at, t.closed_at, t.execution_mode, t.owner_id, o.name,
-                w.id AS week_label,
+                t.assigner_id, a.name, w.id AS week_label,
                 EXISTS(SELECT 1 FROM tasks child WHERE child.parent_id = t.id) AS has_children
          FROM tasks t JOIN weeks w ON w.id = t.week_id
          LEFT JOIN owners o ON o.id = t.owner_id
+         LEFT JOIN assigners a ON a.id = t.assigner_id
          WHERE 1 = 1",
     );
     let mut values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -52,6 +53,10 @@ pub fn query_tasks(conn: &Connection, filter: &QueryFilter) -> Result<Vec<QueryT
         sql.push_str(" AND t.owner_id = ?");
         values.push(Box::new(owner_id));
     }
+    if let Some(assigner_id) = filter.assigner_id {
+        sql.push_str(" AND t.assigner_id = ?");
+        values.push(Box::new(assigner_id));
+    }
     if let Some(tag_id) = filter.tag_id {
         sql.push_str(" AND t.id IN (SELECT task_id FROM task_tags WHERE tag_id = ?)");
         values.push(Box::new(tag_id));
@@ -81,14 +86,16 @@ pub fn query_tasks(conn: &Connection, filter: &QueryFilter) -> Result<Vec<QueryT
                 execution_mode: row.get(13)?,
                 owner_id: row.get(14)?,
                 owner_name: row.get(15)?,
+                assigner_id: row.get(16)?,
+                assigner_name: row.get(17)?,
                 tags: Vec::new(),
             };
             Ok(QueryTaskRow {
-                week_label: row.get(16)?,
+                week_label: row.get(18)?,
                 week_id: task.week_id.clone(),
                 task,
                 path: String::new(),
-                has_children: row.get(17)?,
+                has_children: row.get(19)?,
             })
         })
         .map_err(|error| format!("查询任务失败：{error}"))?;
@@ -276,6 +283,29 @@ pub fn statistics_overview(conn: &Connection, limit: i64) -> Result<StatisticsOv
         rows
     };
 
+    // 按分派人分布（未指定分派人最后；其余按数量降序）。
+    let by_assigner = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT COALESCE(assigners.name, ''), COUNT(*)
+                 FROM tasks LEFT JOIN assigners ON assigners.id = tasks.assigner_id
+                 GROUP BY assigners.name
+                 ORDER BY (assigners.name IS NULL) ASC, COUNT(*) DESC, assigners.name",
+            )
+            .map_err(|error| format!("准备分派人统计失败：{error}"))?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(NamedCount {
+                    name: row.get(0)?,
+                    count: row.get(1)?,
+                })
+            })
+            .map_err(|error| format!("查询分派人统计失败：{error}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| format!("读取分派人统计失败：{error}"))?;
+        rows
+    };
+
     Ok(StatisticsOverview {
         weeks,
         total_tasks,
@@ -285,6 +315,7 @@ pub fn statistics_overview(conn: &Connection, limit: i64) -> Result<StatisticsOv
         by_priority,
         by_tag,
         by_owner,
+        by_assigner,
     })
 }
 
@@ -323,6 +354,7 @@ mod tests {
                 priority: 2,
                 execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
                 owner_name: None,
+                assigner_name: None,
                 tag_names: Vec::new(),
             },
         )
@@ -337,6 +369,7 @@ mod tests {
                 priority: 2,
                 execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
                 owner_name: None,
+                assigner_name: None,
                 tag_names: Vec::new(),
             },
         )
@@ -381,6 +414,7 @@ mod tests {
                 priority: 2,
                 execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
                 owner_name: Some("小明".into()),
+                assigner_name: None,
                 tag_names: vec!["高优".into()],
             },
         )
@@ -395,6 +429,7 @@ mod tests {
                 priority: 2,
                 execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
                 owner_name: None,
+                assigner_name: None,
                 tag_names: Vec::new(),
             },
         )
@@ -427,6 +462,56 @@ mod tests {
     }
 
     #[test]
+    fn query_filters_by_assigner() {
+        let conn = db::open_in_memory();
+        insert_week_helper(&conn, "20260803-20260809", "20260803", "20260809");
+
+        let assigned = create_task(
+            &conn,
+            "20260803-20260809",
+            CreateTaskInput {
+                title: "分派给张三的任务".into(),
+                description: String::new(),
+                parent_id: None,
+                priority: 2,
+                execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                assigner_name: Some("张三".into()),
+                tag_names: Vec::new(),
+            },
+        )
+        .unwrap();
+        create_task(
+            &conn,
+            "20260803-20260809",
+            CreateTaskInput {
+                title: "未分派任务".into(),
+                description: String::new(),
+                parent_id: None,
+                priority: 2,
+                execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                assigner_name: None,
+                tag_names: Vec::new(),
+            },
+        )
+        .unwrap();
+
+        let assigner_id = crate::domain::ensure_assigner(&conn, "张三").unwrap();
+        let by_assigner = query_tasks(
+            &conn,
+            &QueryFilter {
+                assigner_id: Some(assigner_id),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(by_assigner.len(), 1);
+        assert_eq!(by_assigner[0].task.id, assigned.id);
+        assert_eq!(by_assigner[0].task.assigner_name.as_deref(), Some("张三"));
+    }
+
+    #[test]
     fn query_reports_has_children_for_parents_only() {
         let conn = db::open_in_memory();
         insert_week_helper(&conn, "20260803-20260809", "20260803", "20260809");
@@ -441,6 +526,7 @@ mod tests {
                 priority: 2,
                 execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
                 owner_name: None,
+                assigner_name: None,
                 tag_names: Vec::new(),
             },
         )
@@ -455,6 +541,7 @@ mod tests {
                 priority: 2,
                 execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
                 owner_name: None,
+                assigner_name: None,
                 tag_names: Vec::new(),
             },
         )
@@ -500,6 +587,7 @@ mod tests {
                 priority: 0,
                 execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
                 owner_name: Some("小明".into()),
+                assigner_name: Some("李四".into()),
                 tag_names: vec!["工作".into()],
             },
         )
@@ -514,6 +602,7 @@ mod tests {
                 priority: 2,
                 execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
                 owner_name: None,
+                assigner_name: None,
                 tag_names: Vec::new(),
             },
         )
@@ -528,6 +617,7 @@ mod tests {
                 priority: 1,
                 execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
                 owner_name: None,
+                assigner_name: None,
                 tag_names: Vec::new(),
             },
         )
@@ -543,6 +633,7 @@ mod tests {
                 priority: 2,
                 execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
                 owner_name: None,
+                assigner_name: None,
                 tag_names: Vec::new(),
             },
         )
@@ -623,6 +714,16 @@ mod tests {
                 .map(|item| (item.name.as_str(), item.count))
                 .collect::<Vec<_>>(),
             vec![("小明", 1), ("", 3)]
+        );
+
+        // 分派人分布：有名字的在前，未指定排最后。
+        assert_eq!(
+            stats
+                .by_assigner
+                .iter()
+                .map(|item| (item.name.as_str(), item.count))
+                .collect::<Vec<_>>(),
+            vec![("李四", 1), ("", 3)]
         );
     }
 

@@ -531,11 +531,11 @@ function TaskNode({
           {!hasAnyChildren && task.executionMode === 'self' && (
             <span className="tag tag-self">自己</span>
           )}
-          {!hasAnyChildren && task.executionMode === 'follow_up' && (
-            <span className="tag tag-follow">跟进</span>
+          {!hasAnyChildren && task.assignerName && (
+            <span className="tag tag-assign-combo">分派·{task.assignerName}</span>
           )}
           {!hasAnyChildren && task.executionMode === 'follow_up' && task.ownerName && (
-            <span className="tag tag-owner">{task.ownerName}</span>
+            <span className="tag tag-follow-combo">跟进·{task.ownerName}</span>
           )}
           {visibleTags.map((tag) => (
             <span key={tag} className="tag tag-label">{tag}</span>

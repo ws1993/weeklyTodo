@@ -102,6 +102,7 @@ pub async fn create_task(
     priority: Option<i64>,
     execution_mode: Option<String>,
     owner_name: Option<String>,
+    assigner_name: Option<String>,
     tag_names: Option<Vec<String>>,
 ) -> Result<domain::Task, String> {
     let config = resolve_storage()?;
@@ -116,6 +117,7 @@ pub async fn create_task(
             priority: priority.unwrap_or(domain::DEFAULT_PRIORITY),
             execution_mode: execution_mode.unwrap_or_else(|| domain::EXECUTION_MODE_SELF.into()),
             owner_name,
+            assigner_name,
             tag_names: tag_names.unwrap_or_default(),
         },
     )
@@ -131,6 +133,7 @@ pub async fn update_task(
     priority: Option<i64>,
     execution_mode: Option<String>,
     owner_name: Option<String>,
+    assigner_name: Option<String>,
     tag_names: Option<Vec<String>>,
 ) -> Result<domain::Task, String> {
     let config = resolve_storage()?;
@@ -145,9 +148,53 @@ pub async fn update_task(
             priority,
             execution_mode,
             owner_name,
+            assigner_name,
             tag_names,
         },
     )
+}
+
+/// All known assigners for dropdown options.
+#[tauri::command]
+pub async fn list_assigners() -> Result<Vec<domain::Assigner>, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    domain::list_assigners(&conn)
+}
+
+/// Create a new assigner.
+#[tauri::command]
+pub async fn create_assigner(name: String) -> Result<domain::Assigner, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    let id = domain::ensure_assigner(&conn, &name)?;
+    conn.query_row(
+        "SELECT id, name FROM assigners WHERE id = ?1",
+        rusqlite::params![id],
+        |row| {
+            Ok(domain::Assigner {
+                id: row.get(0)?,
+                name: row.get(1)?,
+            })
+        },
+    )
+    .map_err(|error| format!("读取新建分派人失败:{error}"))
+}
+
+/// Rename an existing assigner.
+#[tauri::command]
+pub async fn rename_assigner(id: i64, name: String) -> Result<domain::Assigner, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    domain::rename_assigner(&conn, id, &name)
+}
+
+/// Delete an assigner. Tasks referencing it get assigner_id cleared.
+#[tauri::command]
+pub async fn delete_assigner(id: i64) -> Result<(), String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    domain::delete_assigner(&conn, id)
 }
 
 /// All known owners for dropdown options.

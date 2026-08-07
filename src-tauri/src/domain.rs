@@ -43,12 +43,21 @@ pub struct Task {
     pub execution_mode: String,
     pub owner_id: Option<i64>,
     pub owner_name: Option<String>,
+    pub assigner_id: Option<i64>,
+    pub assigner_name: Option<String>,
     pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Owner {
+    pub id: i64,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Assigner {
     pub id: i64,
     pub name: String,
 }
@@ -73,8 +82,8 @@ pub struct GroupColor {
 /// High-distinction palette used for group color auto-assignment.
 /// Must stay in sync with `GROUP_PALETTE` in `src/utils/groupColors.ts`.
 pub const GROUP_COLOR_PALETTE: [&str; 12] = [
-    "#E05A3E", "#E0A03D", "#A9B84A", "#4F9E5A", "#2E9E7C", "#2AA5A0",
-    "#3B8FBF", "#4A6FD1", "#5A5FC0", "#7A5FC0", "#C05FA0", "#C0557A",
+    "#E05A3E", "#E0A03D", "#A9B84A", "#4F9E5A", "#2E9E7C", "#2AA5A0", "#3B8FBF", "#4A6FD1",
+    "#5A5FC0", "#7A5FC0", "#C05FA0", "#C0557A",
 ];
 
 /// Format a date as `YYYYMMDD`.
@@ -174,6 +183,8 @@ fn task_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Task> {
         execution_mode: row.get(13)?,
         owner_id: row.get(14)?,
         owner_name: row.get(15)?,
+        assigner_id: row.get(16)?,
+        assigner_name: row.get(17)?,
         tags: Vec::new(),
     })
 }
@@ -183,8 +194,10 @@ fn get_task(conn: &Connection, week_id: &str, task_id: i64) -> Result<Option<Tas
         .query_row(
             "SELECT t.id, t.week_id, t.parent_id, t.title, t.description, t.status, t.priority,
                     t.sort_index, t.origin_week_id, t.carried_from_task_id, t.created_at,
-                    t.updated_at, t.closed_at, t.execution_mode, t.owner_id, o.name
+                    t.updated_at, t.closed_at, t.execution_mode, t.owner_id, o.name,
+                    t.assigner_id, a.name
              FROM tasks t LEFT JOIN owners o ON o.id = t.owner_id
+             LEFT JOIN assigners a ON a.id = t.assigner_id
              WHERE t.id = ?1 AND t.week_id = ?2",
             params![task_id, week_id],
             task_from_row,
@@ -241,8 +254,10 @@ fn list_tasks(conn: &Connection, week_id: &str) -> Result<Vec<Task>, String> {
         .prepare(
             "SELECT t.id, t.week_id, t.parent_id, t.title, t.description, t.status, t.priority,
                     t.sort_index, t.origin_week_id, t.carried_from_task_id, t.created_at,
-                    t.updated_at, t.closed_at, t.execution_mode, t.owner_id, o.name
+                    t.updated_at, t.closed_at, t.execution_mode, t.owner_id, o.name,
+                    t.assigner_id, a.name
              FROM tasks t LEFT JOIN owners o ON o.id = t.owner_id
+             LEFT JOIN assigners a ON a.id = t.assigner_id
              WHERE t.week_id = ?1 ORDER BY t.sort_index, t.id",
         )
         .map_err(|error| format!("查询任务失败：{error}"))?;
@@ -417,6 +432,87 @@ pub fn delete_tag(conn: &Connection, id: i64) -> Result<(), String> {
     Ok(())
 }
 
+/// Ensure an assigner exists by name; create it when missing. Returns the assigner id.
+pub fn ensure_assigner(conn: &Connection, name: &str) -> Result<i64, String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err("分派人不能为空".to_string());
+    }
+    conn.execute(
+        "INSERT OR IGNORE INTO assigners (name) VALUES (?1)",
+        params![trimmed],
+    )
+    .map_err(|error| format!("写入分派人失败：{error}"))?;
+    conn.query_row(
+        "SELECT id FROM assigners WHERE name = ?1",
+        params![trimmed],
+        |row| row.get(0),
+    )
+    .map_err(|error| format!("读取分派人失败：{error}"))
+}
+
+/// All assigners ordered by name, for dropdown options.
+pub fn list_assigners(conn: &Connection) -> Result<Vec<Assigner>, String> {
+    let mut stmt = conn
+        .prepare("SELECT id, name FROM assigners ORDER BY name COLLATE NOCASE, id")
+        .map_err(|error| format!("查询分派人列表失败：{error}"))?;
+    let assigners = stmt
+        .query_map([], |row| {
+            Ok(Assigner {
+                id: row.get(0)?,
+                name: row.get(1)?,
+            })
+        })
+        .map_err(|error| format!("遍历分派人列表失败：{error}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("读取分派人列表失败：{error}"))?;
+    Ok(assigners)
+}
+
+/// Rename an assigner. Returns the updated assigner.
+pub fn rename_assigner(conn: &Connection, id: i64, new_name: &str) -> Result<Assigner, String> {
+    let trimmed = new_name.trim();
+    if trimmed.is_empty() {
+        return Err("分派人名称不能为空".to_string());
+    }
+    let affected = conn
+        .execute(
+            "UPDATE assigners SET name = ?1 WHERE id = ?2",
+            params![trimmed, id],
+        )
+        .map_err(|error| format!("重命名分派人失败:{error}"))?;
+    if affected == 0 {
+        return Err("分派人不存在".to_string());
+    }
+    conn.query_row(
+        "SELECT id, name FROM assigners WHERE id = ?1",
+        params![id],
+        |row| {
+            Ok(Assigner {
+                id: row.get(0)?,
+                name: row.get(1)?,
+            })
+        },
+    )
+    .map_err(|error| format!("读取重命名后的分派人失败:{error}"))
+}
+
+/// Delete an assigner by id. Sets assigner_id to NULL on all referencing tasks.
+pub fn delete_assigner(conn: &Connection, id: i64) -> Result<(), String> {
+    conn.execute(
+        "UPDATE tasks SET assigner_id = NULL WHERE assigner_id = ?1",
+        params![id],
+    )
+    .map_err(|error| format!("清除任务分派人引用失败:{error}"))?;
+    let affected = conn
+        .execute("DELETE FROM assigners WHERE id = ?1", params![id])
+        .map_err(|error| format!("删除分派人失败:{error}"))?;
+    if affected == 0 {
+        return Err("分派人不存在".to_string());
+    }
+    Ok(())
+}
+
 fn group_color_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<GroupColor> {
     Ok(GroupColor {
         name: row.get(0)?,
@@ -509,8 +605,7 @@ pub fn reset_group_color(conn: &Connection, name: &str) -> Result<GroupColor, St
     if trimmed.is_empty() {
         return Err("分组名称不能为空".to_string());
     }
-    let current = read_group_color(conn, trimmed)?
-        .ok_or_else(|| "分组颜色不存在".to_string())?;
+    let current = read_group_color(conn, trimmed)?.ok_or_else(|| "分组颜色不存在".to_string())?;
     let color = first_unused_palette_color_excluding(conn, &current.color)?;
     conn.execute(
         "UPDATE group_colors SET color = ?1, is_manual = 0 WHERE name = ?2",
@@ -537,7 +632,9 @@ fn first_unused_palette_color_excluding(
     GROUP_COLOR_PALETTE
         .iter()
         .copied()
-        .find(|color| *color == current_color || !used.iter().any(|used_color| used_color.as_str() == *color))
+        .find(|color| {
+            *color == current_color || !used.iter().any(|used_color| used_color.as_str() == *color)
+        })
         .ok_or_else(|| "分组颜色已用尽，请手动选择".to_string())
 }
 
@@ -699,6 +796,7 @@ pub struct CreateTaskInput {
     pub priority: i64,
     pub execution_mode: String,
     pub owner_name: Option<String>,
+    pub assigner_name: Option<String>,
     pub tag_names: Vec<String>,
 }
 
@@ -737,6 +835,10 @@ pub fn create_task(
     if execution_mode == EXECUTION_MODE_FOLLOW_UP && owner_id.is_none() {
         return Err("跟进任务需要指定负责人".to_string());
     }
+    let assigner_id = match &input.assigner_name {
+        Some(name) if !name.trim().is_empty() => Some(ensure_assigner(conn, name)?),
+        _ => None,
+    };
 
     let now = iso_now();
     let priority = input.priority.clamp(0, 3);
@@ -751,8 +853,8 @@ pub fn create_task(
     conn.execute(
         "INSERT INTO tasks (week_id, parent_id, title, description, status, priority, sort_index,
                             origin_week_id, carried_from_task_id, created_at, updated_at,
-                            execution_mode, owner_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, NULL, ?8, ?8, ?9, ?10)",
+                            execution_mode, owner_id, assigner_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, NULL, ?8, ?8, ?9, ?10, ?11)",
         params![
             week_id,
             input.parent_id,
@@ -763,7 +865,8 @@ pub fn create_task(
             next_index,
             now,
             execution_mode,
-            owner_id
+            owner_id,
+            assigner_id
         ],
     )
     .map_err(|error| format!("写入任务失败：{error}"))?;
@@ -784,6 +887,8 @@ pub struct UpdateTaskInput {
     pub execution_mode: Option<String>,
     /// `Some("")` clears the owner; `None` keeps the current owner.
     pub owner_name: Option<String>,
+    /// `Some("")` clears the assigner; `None` keeps the current assigner.
+    pub assigner_name: Option<String>,
     /// `Some(names)` replaces all tags; `None` leaves tags unchanged.
     pub tag_names: Option<Vec<String>>,
 }
@@ -831,11 +936,21 @@ pub fn update_task(
     if execution_mode == EXECUTION_MODE_FOLLOW_UP && owner_id.is_none() {
         return Err("跟进任务需要指定负责人".to_string());
     }
+    // 分派人是独立可选字段：不参与执行方式校验，仅叶子任务可编辑。
+    let assigner_id = if is_leaf {
+        match &input.assigner_name {
+            Some(name) if name.trim().is_empty() => None,
+            Some(name) => Some(ensure_assigner(conn, name)?),
+            None => current.assigner_id,
+        }
+    } else {
+        current.assigner_id
+    };
 
     conn.execute(
         "UPDATE tasks SET title = ?1, description = ?2, priority = ?3, updated_at = ?4,
-                          execution_mode = ?5, owner_id = ?6
-         WHERE id = ?7 AND week_id = ?8",
+                          execution_mode = ?5, owner_id = ?6, assigner_id = ?7
+         WHERE id = ?8 AND week_id = ?9",
         params![
             title,
             description,
@@ -843,6 +958,7 @@ pub fn update_task(
             iso_now(),
             execution_mode,
             owner_id,
+            assigner_id,
             task_id,
             week_id
         ],
@@ -1258,8 +1374,8 @@ fn carry_over_branch(
     conn.execute(
         "INSERT INTO tasks (week_id, parent_id, title, description, status, priority, sort_index,
                             origin_week_id, carried_from_task_id, created_at, updated_at, closed_at,
-                            execution_mode, owner_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10, ?11, ?12, ?13)",
+                            execution_mode, owner_id, assigner_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10, ?11, ?12, ?13, ?14)",
         params![
             target_week_id,
             target_parent_id,
@@ -1273,7 +1389,8 @@ fn carry_over_branch(
             now,
             task.closed_at,
             task.execution_mode,
-            task.owner_id
+            task.owner_id,
+            task.assigner_id
         ],
     )
     .map_err(|error| format!("复制任务失败：{error}"))?;
@@ -1393,6 +1510,7 @@ mod tests {
                 priority: DEFAULT_PRIORITY,
                 execution_mode: EXECUTION_MODE_SELF.into(),
                 owner_name: None,
+                assigner_name: None,
                 tag_names: Vec::new(),
             },
         )
@@ -1416,6 +1534,7 @@ mod tests {
                 priority,
                 execution_mode: EXECUTION_MODE_SELF.into(),
                 owner_name: None,
+                assigner_name: None,
                 tag_names: Vec::new(),
             },
         )
@@ -1536,6 +1655,7 @@ mod tests {
                 priority: DEFAULT_PRIORITY,
                 execution_mode: EXECUTION_MODE_FOLLOW_UP.into(),
                 owner_name: None,
+                assigner_name: None,
                 tag_names: Vec::new(),
             },
         );
@@ -1551,6 +1671,7 @@ mod tests {
                 priority: DEFAULT_PRIORITY,
                 execution_mode: EXECUTION_MODE_FOLLOW_UP.into(),
                 owner_name: Some("小王".into()),
+                assigner_name: None,
                 tag_names: Vec::new(),
             },
         )
@@ -1574,6 +1695,7 @@ mod tests {
                 priority: DEFAULT_PRIORITY,
                 execution_mode: EXECUTION_MODE_SELF.into(),
                 owner_name: Some("小明".into()),
+                assigner_name: None,
                 tag_names: vec!["总结".into(), "高优".into()],
             },
         )
@@ -1605,6 +1727,7 @@ mod tests {
                 priority: DEFAULT_PRIORITY,
                 execution_mode: EXECUTION_MODE_SELF.into(),
                 owner_name: Some("小明".into()),
+                assigner_name: None,
                 tag_names: vec!["总结".into()],
             },
         )
@@ -1620,6 +1743,7 @@ mod tests {
                 priority: None,
                 execution_mode: Some(EXECUTION_MODE_FOLLOW_UP.into()),
                 owner_name: Some("小红".into()),
+                assigner_name: None,
                 tag_names: Some(vec!["总结".into(), "汇报".into()]),
             },
         )
@@ -1643,6 +1767,7 @@ mod tests {
                 priority: None,
                 execution_mode: Some(EXECUTION_MODE_SELF.into()),
                 owner_name: Some(String::new()),
+                assigner_name: None,
                 tag_names: Some(Vec::new()),
             },
         )
@@ -1707,6 +1832,7 @@ mod tests {
                 priority: DEFAULT_PRIORITY,
                 execution_mode: EXECUTION_MODE_FOLLOW_UP.into(),
                 owner_name: Some("小王".into()),
+                assigner_name: Some("李四".into()),
                 tag_names: vec!["开发".into()],
             },
         )
@@ -1717,7 +1843,171 @@ mod tests {
         assert_eq!(target_tasks.len(), 1);
         assert_eq!(target_tasks[0].execution_mode, EXECUTION_MODE_FOLLOW_UP);
         assert_eq!(target_tasks[0].owner_name.as_deref(), Some("小王"));
+        assert_eq!(target_tasks[0].assigner_name.as_deref(), Some("李四"));
         assert_eq!(target_tasks[0].tags, vec!["开发".to_string()]);
+    }
+
+    #[test]
+    fn assigner_is_optional_and_auto_created() {
+        let conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+
+        // 分派人不填也允许创建，且不依赖执行方式。
+        let no_assigner = create_task(
+            &conn,
+            "20260803-20260809",
+            CreateTaskInput {
+                title: "自己执行任务".into(),
+                description: String::new(),
+                parent_id: None,
+                priority: DEFAULT_PRIORITY,
+                execution_mode: EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                assigner_name: None,
+                tag_names: Vec::new(),
+            },
+        )
+        .unwrap();
+        assert_eq!(no_assigner.assigner_id, None);
+        assert_eq!(no_assigner.assigner_name, None);
+
+        let assigned = create_task(
+            &conn,
+            "20260803-20260809",
+            CreateTaskInput {
+                title: "分派给张三".into(),
+                description: String::new(),
+                parent_id: None,
+                priority: DEFAULT_PRIORITY,
+                execution_mode: EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                assigner_name: Some("张三".into()),
+                tag_names: Vec::new(),
+            },
+        )
+        .unwrap();
+        assert_eq!(assigned.assigner_name.as_deref(), Some("张三"));
+
+        // 重复使用同一分派人不会产生重复行。
+        let assigners = list_assigners(&conn).unwrap();
+        assert_eq!(assigners.len(), 1);
+        assert_eq!(assigners[0].name, "张三");
+    }
+
+    #[test]
+    fn update_task_sets_and_clears_assigner() {
+        let conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+        let task = create_task(
+            &conn,
+            "20260803-20260809",
+            CreateTaskInput {
+                title: "写周报".into(),
+                description: String::new(),
+                parent_id: None,
+                priority: DEFAULT_PRIORITY,
+                execution_mode: EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                assigner_name: Some("张三".into()),
+                tag_names: Vec::new(),
+            },
+        )
+        .unwrap();
+        assert_eq!(task.assigner_name.as_deref(), Some("张三"));
+
+        // 换人。
+        let switched = update_task(
+            &conn,
+            "20260803-20260809",
+            task.id,
+            UpdateTaskInput {
+                title: None,
+                description: None,
+                priority: None,
+                execution_mode: None,
+                owner_name: None,
+                assigner_name: Some("李四".into()),
+                tag_names: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(switched.assigner_name.as_deref(), Some("李四"));
+
+        // 清空（Some("") 置空）。
+        let cleared = update_task(
+            &conn,
+            "20260803-20260809",
+            task.id,
+            UpdateTaskInput {
+                title: None,
+                description: None,
+                priority: None,
+                execution_mode: None,
+                owner_name: None,
+                assigner_name: Some(String::new()),
+                tag_names: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(cleared.assigner_name, None);
+        assert_eq!(cleared.assigner_id, None);
+    }
+
+    #[test]
+    fn assigner_is_ignored_for_non_leaf_tasks() {
+        let conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+        let parent = create_plain_task(&conn, "20260803-20260809", "项目A", None);
+        create_plain_task(&conn, "20260803-20260809", "子任务", Some(parent.id));
+
+        // 非叶子任务更新分派人会被静默忽略，保留原值。
+        let updated = update_task(
+            &conn,
+            "20260803-20260809",
+            parent.id,
+            UpdateTaskInput {
+                title: None,
+                description: None,
+                priority: None,
+                execution_mode: None,
+                owner_name: None,
+                assigner_name: Some("张三".into()),
+                tag_names: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(updated.assigner_id, None);
+        assert_eq!(updated.assigner_name, None);
+    }
+
+    #[test]
+    fn delete_assigner_clears_task_references() {
+        let conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+        create_task(
+            &conn,
+            "20260803-20260809",
+            CreateTaskInput {
+                title: "分派任务".into(),
+                description: String::new(),
+                parent_id: None,
+                priority: DEFAULT_PRIORITY,
+                execution_mode: EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                assigner_name: Some("张三".into()),
+                tag_names: Vec::new(),
+            },
+        )
+        .unwrap();
+
+        let assigners = list_assigners(&conn).unwrap();
+        assert_eq!(assigners.len(), 1);
+        delete_assigner(&conn, assigners[0].id).unwrap();
+
+        let tasks = list_tasks(&conn, "20260803-20260809").unwrap();
+        assert_eq!(tasks[0].assigner_id, None);
+        assert_eq!(tasks[0].assigner_name, None);
+        assert!(list_assigners(&conn).unwrap().is_empty());
     }
 
     #[test]
@@ -1739,6 +2029,7 @@ mod tests {
                 priority: DEFAULT_PRIORITY,
                 execution_mode: EXECUTION_MODE_SELF.into(),
                 owner_name: None,
+                assigner_name: None,
                 tag_names: vec!["开发".into()],
             },
         )
@@ -1801,13 +2092,17 @@ mod tests {
 
         let done_root = create_plain_task(&conn, "20260803-20260809", "已完成项目", None);
         close_task(&mut conn, "20260803-20260809", done_root.id).unwrap();
-        let closed = get_task(&conn, "20260803-20260809", done_root.id).unwrap().unwrap();
+        let closed = get_task(&conn, "20260803-20260809", done_root.id)
+            .unwrap()
+            .unwrap();
         assert_eq!(closed.status, TASK_STATUS_CLOSED);
 
         // Attaching a new open child reopens the closed parent automatically.
         let child = create_plain_task(&conn, "20260803-20260809", "新挂的事项", Some(done_root.id));
         assert_eq!(child.status, TASK_STATUS_IN_PROGRESS);
-        let reopened = get_task(&conn, "20260803-20260809", done_root.id).unwrap().unwrap();
+        let reopened = get_task(&conn, "20260803-20260809", done_root.id)
+            .unwrap()
+            .unwrap();
         assert_eq!(reopened.status, TASK_STATUS_IN_PROGRESS);
         assert!(reopened.closed_at.is_none());
     }
@@ -1824,20 +2119,27 @@ mod tests {
         // Closing the leaf cascades: root and middle have no open children left.
         close_task(&mut conn, "20260803-20260809", leaf.id).unwrap();
         for task_id in [root.id, middle.id, leaf.id] {
-            let task = get_task(&conn, "20260803-20260809", task_id).unwrap().unwrap();
+            let task = get_task(&conn, "20260803-20260809", task_id)
+                .unwrap()
+                .unwrap();
             assert_eq!(task.status, TASK_STATUS_CLOSED);
         }
 
         // Attaching under the closed middle group reopens middle and root,
         // while the old leaf stays closed.
-        let new_child = create_plain_task(&conn, "20260803-20260809", "新挂的事项", Some(middle.id));
+        let new_child =
+            create_plain_task(&conn, "20260803-20260809", "新挂的事项", Some(middle.id));
         assert_eq!(new_child.status, TASK_STATUS_IN_PROGRESS);
         for task_id in [root.id, middle.id] {
-            let task = get_task(&conn, "20260803-20260809", task_id).unwrap().unwrap();
+            let task = get_task(&conn, "20260803-20260809", task_id)
+                .unwrap()
+                .unwrap();
             assert_eq!(task.status, TASK_STATUS_IN_PROGRESS);
             assert!(task.closed_at.is_none());
         }
-        let leaf_now = get_task(&conn, "20260803-20260809", leaf.id).unwrap().unwrap();
+        let leaf_now = get_task(&conn, "20260803-20260809", leaf.id)
+            .unwrap()
+            .unwrap();
         assert_eq!(leaf_now.status, TASK_STATUS_CLOSED);
     }
 
@@ -1850,10 +2152,21 @@ mod tests {
         close_task(&mut conn, "20260803-20260809", completed.id).unwrap();
 
         let loose = create_plain_task(&conn, "20260803-20260809", "游离任务", None);
-        move_task(&conn, "20260803-20260809", loose.id, Some(completed.id), 0.0).unwrap();
+        move_task(
+            &conn,
+            "20260803-20260809",
+            loose.id,
+            Some(completed.id),
+            0.0,
+        )
+        .unwrap();
 
-        let completed_now = get_task(&conn, "20260803-20260809", completed.id).unwrap().unwrap();
-        let loose_now = get_task(&conn, "20260803-20260809", loose.id).unwrap().unwrap();
+        let completed_now = get_task(&conn, "20260803-20260809", completed.id)
+            .unwrap()
+            .unwrap();
+        let loose_now = get_task(&conn, "20260803-20260809", loose.id)
+            .unwrap()
+            .unwrap();
         assert_eq!(completed_now.status, TASK_STATUS_IN_PROGRESS);
         assert!(completed_now.closed_at.is_none());
         assert_eq!(loose_now.parent_id, Some(completed.id));
@@ -1870,8 +2183,17 @@ mod tests {
         close_task(&mut conn, "20260803-20260809", done_item.id).unwrap();
 
         // 挂载即激活：即使被挂的任务本身已关闭，父节点也自动重开。
-        move_task(&conn, "20260803-20260809", done_item.id, Some(target.id), 0.0).unwrap();
-        let target_now = get_task(&conn, "20260803-20260809", target.id).unwrap().unwrap();
+        move_task(
+            &conn,
+            "20260803-20260809",
+            done_item.id,
+            Some(target.id),
+            0.0,
+        )
+        .unwrap();
+        let target_now = get_task(&conn, "20260803-20260809", target.id)
+            .unwrap()
+            .unwrap();
         assert_eq!(target_now.status, TASK_STATUS_IN_PROGRESS);
         assert!(target_now.closed_at.is_none());
     }
@@ -2002,6 +2324,7 @@ mod tests {
                 priority: Some(0),
                 execution_mode: None,
                 owner_name: None,
+                assigner_name: None,
                 tag_names: None,
             },
         )
@@ -2035,6 +2358,7 @@ mod tests {
                 priority: None,
                 execution_mode: Some(EXECUTION_MODE_FOLLOW_UP.into()),
                 owner_name: Some("小明".into()),
+                assigner_name: None,
                 tag_names: None,
             },
         )
@@ -2053,6 +2377,7 @@ mod tests {
                 priority: None,
                 execution_mode: Some(EXECUTION_MODE_FOLLOW_UP.into()),
                 owner_name: Some("小明".into()),
+                assigner_name: None,
                 tag_names: None,
             },
         )
@@ -2072,6 +2397,7 @@ mod tests {
                 priority: None,
                 execution_mode: Some(EXECUTION_MODE_FOLLOW_UP.into()),
                 owner_name: Some("小红".into()),
+                assigner_name: None,
                 tag_names: None,
             },
         )

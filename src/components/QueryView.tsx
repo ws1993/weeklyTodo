@@ -29,6 +29,7 @@ interface WeekProgress {
 export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
   const allWeeks = useAppStore((state) => state.allWeeks);
   const owners = useAppStore((state) => state.owners);
+  const assigners = useAppStore((state) => state.assigners);
   const tags = useAppStore((state) => state.tags);
 
   const [keyword, setKeyword] = useState('');
@@ -37,6 +38,7 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
   const [status, setStatus] = useState<StatusFilter>('');
   const [carriedOnly, setCarriedOnly] = useState(false);
   const [ownerId, setOwnerId] = useState<number | undefined>();
+  const [assignerId, setAssignerId] = useState<number | undefined>();
   const [tagId, setTagId] = useState<number | undefined>();
   const [results, setResults] = useState<QueryTaskRow[]>([]);
   const [summaries, setSummaries] = useState<WeekSummary[]>([]);
@@ -60,6 +62,7 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
         status: status || undefined,
         carriedOverOnly: carriedOnly || undefined,
         ownerId,
+        assignerId,
         tagId,
       });
       setResults(rows);
@@ -68,7 +71,7 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
     } finally {
       setLoading(false);
     }
-  }, [open, debouncedKeyword, weekId, status, carriedOnly, ownerId, tagId]);
+  }, [open, debouncedKeyword, weekId, status, carriedOnly, ownerId, assignerId, tagId]);
 
   useEffect(() => {
     void runQuery();
@@ -97,6 +100,10 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
   }, [allWeeks]);
 
   const ownerOptions = owners.map((owner) => ({ value: String(owner.id), label: owner.name }));
+  const assignerOptions = assigners.map((assigner) => ({
+    value: String(assigner.id),
+    label: assigner.name,
+  }));
   const tagOptions = tags.map((tag) => ({ value: String(tag.id), label: tag.name }));
 
   const activeWeek = allWeeks.find((week) => week.id === weekId);
@@ -220,6 +227,12 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
                 onChange={(value) => setOwnerId(value ? Number(value) : undefined)}
               />
               <DropdownSelect
+                label="分派人"
+                options={assignerOptions}
+                value={assignerId !== undefined ? String(assignerId) : ''}
+                onChange={(value) => setAssignerId(value ? Number(value) : undefined)}
+              />
+              <DropdownSelect
                 label="标签"
                 options={tagOptions}
                 value={tagId !== undefined ? String(tagId) : ''}
@@ -298,13 +311,13 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
                     {!row.hasChildren && row.task.executionMode === 'self' && (
                       <span className="tag tag-self">自己</span>
                     )}
-                    {!row.hasChildren && row.task.executionMode === 'follow_up' && (
-                      <span className="tag tag-follow">跟进</span>
+                    {!row.hasChildren && row.task.assignerName && (
+                      <span className="tag tag-assign-combo">分派·{row.task.assignerName}</span>
                     )}
                     {!row.hasChildren &&
                       row.task.executionMode === 'follow_up' &&
                       row.task.ownerName && (
-                        <span className="tag tag-owner">{row.task.ownerName}</span>
+                        <span className="tag tag-follow-combo">跟进·{row.task.ownerName}</span>
                       )}
                     {row.task.tags.slice(0, 3).map((tag) => (
                       <span key={tag} className="tag tag-label">

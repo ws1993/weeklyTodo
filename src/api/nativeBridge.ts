@@ -1,5 +1,6 @@
 import type {
   AppStatePayload,
+  Assigner,
   ExecutionMode,
   GroupColor,
   MigrateResult,
@@ -67,6 +68,7 @@ export async function createTask(input: {
   priority?: number;
   executionMode?: ExecutionMode;
   ownerName?: string | null;
+  assignerName?: string | null;
   tagNames?: string[];
 }): Promise<Task> {
   return invokeCommand<Task>('create_task', {
@@ -77,6 +79,7 @@ export async function createTask(input: {
     priority: input.priority,
     executionMode: input.executionMode,
     ownerName: input.ownerName,
+    assignerName: input.assignerName,
     tagNames: input.tagNames,
   });
 }
@@ -89,6 +92,7 @@ export async function updateTask(input: {
   priority?: number;
   executionMode?: ExecutionMode;
   ownerName?: string | null;
+  assignerName?: string | null;
   tagNames?: string[];
 }): Promise<Task> {
   return invokeCommand<Task>('update_task', {
@@ -99,8 +103,25 @@ export async function updateTask(input: {
     priority: input.priority,
     executionMode: input.executionMode,
     ownerName: input.ownerName,
+    assignerName: input.assignerName,
     tagNames: input.tagNames,
   });
+}
+
+export async function listAssigners(): Promise<Assigner[]> {
+  return invokeCommand<Assigner[]>('list_assigners');
+}
+
+export async function createAssigner(name: string): Promise<Assigner> {
+  return invokeCommand<Assigner>('create_assigner', { name });
+}
+
+export async function renameAssigner(id: number, name: string): Promise<Assigner> {
+  return invokeCommand<Assigner>('rename_assigner', { id, name });
+}
+
+export async function deleteAssigner(id: number): Promise<void> {
+  return invokeCommand<void>('delete_assigner', { id });
 }
 
 export async function listOwners(): Promise<Owner[]> {

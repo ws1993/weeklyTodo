@@ -37,6 +37,7 @@ pub struct QueryFilter {
     pub start_week_id: Option<String>,
     pub end_week_id: Option<String>,
     pub owner_id: Option<i64>,
+    pub assigner_id: Option<i64>,
     pub tag_id: Option<i64>,
 }
 
@@ -82,6 +83,7 @@ pub struct StatisticsOverview {
     pub by_priority: Vec<PriorityStat>,
     pub by_tag: Vec<NamedCount>,
     pub by_owner: Vec<NamedCount>,
+    pub by_assigner: Vec<NamedCount>,
 }
 
 #[derive(Debug, Serialize)]
