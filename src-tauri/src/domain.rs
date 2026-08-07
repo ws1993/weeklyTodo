@@ -566,12 +566,8 @@ fn record_event(
     Ok(())
 }
 
-/// Derive `task_id`'s priority from its open direct children when it has any
-/// children: the highest priority (smallest number) wins, and a node whose
-/// children are all closed degrades back to `DEFAULT_PRIORITY`. Tasks without
-/// children keep their manually set priority. Returns the new priority when
-/// the stored value was updated, `None` otherwise.
-fn derive_priority_from_children(conn: &Connection, task_id: i64) -> Result<Option<i64>, String> {
+/// Whether `task_id` has any children, regardless of their status.
+pub fn has_children(conn: &Connection, task_id: i64) -> Result<bool, String> {
     let child_count: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM tasks WHERE parent_id = ?1",
@@ -579,7 +575,16 @@ fn derive_priority_from_children(conn: &Connection, task_id: i64) -> Result<Opti
             |row| row.get(0),
         )
         .map_err(|error| format!("统计子任务失败：{error}"))?;
-    if child_count == 0 {
+    Ok(child_count > 0)
+}
+
+/// Derive `task_id`'s priority from its open direct children when it has any
+/// children: the highest priority (smallest number) wins, and a node whose
+/// children are all closed degrades back to `DEFAULT_PRIORITY`. Tasks without
+/// children keep their manually set priority. Returns the new priority when
+/// the stored value was updated, `None` otherwise.
+fn derive_priority_from_children(conn: &Connection, task_id: i64) -> Result<Option<i64>, String> {
+    if !has_children(conn, task_id)? {
         return Ok(None);
     }
     let highest_open_priority: Option<i64> = conn
@@ -800,15 +805,26 @@ pub fn update_task(
     let description = input.description.unwrap_or(current.description.clone());
     let priority = input.priority.unwrap_or(current.priority).clamp(0, 3);
 
-    let execution_mode = match input.execution_mode.as_deref() {
-        Some(EXECUTION_MODE_FOLLOW_UP) => EXECUTION_MODE_FOLLOW_UP.to_string(),
-        Some(_) => EXECUTION_MODE_SELF.to_string(),
-        None => current.execution_mode.clone(),
+    // 非叶子任务不展示也不允许编辑执行方式 / 负责人：忽略传入值，保留原有数据，
+    // 任务变回叶子后恢复可编辑。
+    let is_leaf = !has_children(conn, task_id)?;
+    let execution_mode = if is_leaf {
+        match input.execution_mode.as_deref() {
+            Some(EXECUTION_MODE_FOLLOW_UP) => EXECUTION_MODE_FOLLOW_UP.to_string(),
+            Some(_) => EXECUTION_MODE_SELF.to_string(),
+            None => current.execution_mode.clone(),
+        }
+    } else {
+        current.execution_mode.clone()
     };
-    let owner_id = match &input.owner_name {
-        Some(name) if name.trim().is_empty() => None,
-        Some(name) => Some(ensure_owner(conn, name)?),
-        None => current.owner_id,
+    let owner_id = if is_leaf {
+        match &input.owner_name {
+            Some(name) if name.trim().is_empty() => None,
+            Some(name) => Some(ensure_owner(conn, name)?),
+            None => current.owner_id,
+        }
+    } else {
+        current.owner_id
     };
     if execution_mode == EXECUTION_MODE_FOLLOW_UP && owner_id.is_none() {
         return Err("跟进任务需要指定负责人".to_string());
@@ -1896,6 +1912,70 @@ mod tests {
             .unwrap();
         assert_eq!(mid_now.priority, 0);
         assert_eq!(root_now.priority, 0);
+    }
+
+    #[test]
+    fn update_task_ignores_execution_and_owner_for_non_leaf() {
+        let conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+
+        let root = create_plain_task(&conn, "20260803-20260809", "项目", None);
+        let child = create_plain_task(&conn, "20260803-20260809", "子任务", Some(root.id));
+
+        // 非叶子任务尝试改成 follow_up + 负责人，应被静默忽略（保留 self / 无负责人）。
+        let updated = update_task(
+            &conn,
+            "20260803-20260809",
+            root.id,
+            UpdateTaskInput {
+                title: None,
+                description: None,
+                priority: None,
+                execution_mode: Some(EXECUTION_MODE_FOLLOW_UP.into()),
+                owner_name: Some("小明".into()),
+                tag_names: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(updated.execution_mode, EXECUTION_MODE_SELF);
+        assert_eq!(updated.owner_name, None);
+
+        // 叶子任务仍可正常设置执行方式与负责人。
+        let child_updated = update_task(
+            &conn,
+            "20260803-20260809",
+            child.id,
+            UpdateTaskInput {
+                title: None,
+                description: None,
+                priority: None,
+                execution_mode: Some(EXECUTION_MODE_FOLLOW_UP.into()),
+                owner_name: Some("小明".into()),
+                tag_names: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(child_updated.execution_mode, EXECUTION_MODE_FOLLOW_UP);
+        assert_eq!(child_updated.owner_name.as_deref(), Some("小明"));
+
+        // 把子任务移走后，原非叶子任务恢复可编辑。
+        move_task(&conn, "20260803-20260809", child.id, None, 10.0).unwrap();
+        let root_restored = update_task(
+            &conn,
+            "20260803-20260809",
+            root.id,
+            UpdateTaskInput {
+                title: None,
+                description: None,
+                priority: None,
+                execution_mode: Some(EXECUTION_MODE_FOLLOW_UP.into()),
+                owner_name: Some("小红".into()),
+                tag_names: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(root_restored.execution_mode, EXECUTION_MODE_FOLLOW_UP);
+        assert_eq!(root_restored.owner_name.as_deref(), Some("小红"));
     }
 
     #[test]

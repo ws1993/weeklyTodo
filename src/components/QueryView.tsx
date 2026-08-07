@@ -295,15 +295,17 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
                     <span className={`tag tag-priority p${row.task.priority}`}>
                       P{row.task.priority}
                     </span>
-                    {row.task.executionMode === 'self' && (
+                    {!row.hasChildren && row.task.executionMode === 'self' && (
                       <span className="tag tag-self">自己</span>
                     )}
-                    {row.task.executionMode === 'follow_up' && (
+                    {!row.hasChildren && row.task.executionMode === 'follow_up' && (
                       <span className="tag tag-follow">跟进</span>
                     )}
-                    {row.task.executionMode === 'follow_up' && row.task.ownerName && (
-                      <span className="tag tag-owner">{row.task.ownerName}</span>
-                    )}
+                    {!row.hasChildren &&
+                      row.task.executionMode === 'follow_up' &&
+                      row.task.ownerName && (
+                        <span className="tag tag-owner">{row.task.ownerName}</span>
+                      )}
                     {row.task.tags.slice(0, 3).map((tag) => (
                       <span key={tag} className="tag tag-label">
                         {tag}

@@ -51,12 +51,17 @@
   display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 9px;
   border-radius:999px;font-size:11px;color:var(--text-2);
   border:1px solid var(--border);background:var(--surface);cursor:pointer;
-  transition:all .12s;max-width:150px;
+  transition:all .12s;max-width:150px;white-space:nowrap;
 }
 .g-chip:hover{border-color:var(--border-strong)}
 .g-chip.active{
   color:var(--text-1);border-color:var(--border-strong);
   background:var(--surface-2);font-weight:600;
+}
+/* 标签文字单行显示，超出最大宽度时省略隐藏。 */
+.g-chip-text{
+  min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .g-chip-dot{width:7px;height:7px;border-radius:50%;flex:none}
 .g-chip.active .g-chip-dot{box-shadow:0 0 0 2px rgba(23,32,51,.06)}

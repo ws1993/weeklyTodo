@@ -11,7 +11,8 @@ pub fn query_tasks(conn: &Connection, filter: &QueryFilter) -> Result<Vec<QueryT
         "SELECT t.id, t.week_id, t.parent_id, t.title, t.description, t.status, t.priority,
                 t.sort_index, t.origin_week_id, t.carried_from_task_id, t.created_at,
                 t.updated_at, t.closed_at, t.execution_mode, t.owner_id, o.name,
-                w.id AS week_label
+                w.id AS week_label,
+                EXISTS(SELECT 1 FROM tasks child WHERE child.parent_id = t.id) AS has_children
          FROM tasks t JOIN weeks w ON w.id = t.week_id
          LEFT JOIN owners o ON o.id = t.owner_id
          WHERE 1 = 1",
@@ -87,6 +88,7 @@ pub fn query_tasks(conn: &Connection, filter: &QueryFilter) -> Result<Vec<QueryT
                 week_id: task.week_id.clone(),
                 task,
                 path: String::new(),
+                has_children: row.get(17)?,
             })
         })
         .map_err(|error| format!("查询任务失败：{error}"))?;
@@ -422,6 +424,54 @@ mod tests {
         .unwrap();
         assert_eq!(by_tag.len(), 1);
         assert_eq!(by_tag[0].task.tags, vec!["高优".to_string()]);
+    }
+
+    #[test]
+    fn query_reports_has_children_for_parents_only() {
+        let conn = db::open_in_memory();
+        insert_week_helper(&conn, "20260803-20260809", "20260803", "20260809");
+
+        let root = create_task(
+            &conn,
+            "20260803-20260809",
+            CreateTaskInput {
+                title: "项目".into(),
+                description: String::new(),
+                parent_id: None,
+                priority: 2,
+                execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                tag_names: Vec::new(),
+            },
+        )
+        .unwrap();
+        create_task(
+            &conn,
+            "20260803-20260809",
+            CreateTaskInput {
+                title: "子任务".into(),
+                description: String::new(),
+                parent_id: Some(root.id),
+                priority: 2,
+                execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                tag_names: Vec::new(),
+            },
+        )
+        .unwrap();
+
+        let rows = query_tasks(
+            &conn,
+            &QueryFilter {
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(rows.len(), 2);
+        let parent = rows.iter().find(|row| row.task.title == "项目").unwrap();
+        let child = rows.iter().find(|row| row.task.title == "子任务").unwrap();
+        assert!(parent.has_children);
+        assert!(!child.has_children);
     }
 
     #[test]

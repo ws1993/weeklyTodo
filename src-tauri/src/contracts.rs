@@ -23,6 +23,8 @@ pub struct QueryTaskRow {
     pub week_id: String,
     pub week_label: String,
     pub path: String,
+    /// Whether the task has any children (regardless of their status).
+    pub has_children: bool,
 }
 
 #[derive(Debug, Deserialize, Default)]

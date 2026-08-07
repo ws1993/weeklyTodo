@@ -99,8 +99,9 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
         description,
         // 父任务优先级由未完成子任务自动联动，不手动提交。
         priority: hasChildren ? undefined : priority,
-        executionMode,
-        ownerName: executionMode === 'follow_up' ? (ownerValue[0] ?? '') : '',
+        // 非叶子任务的执行方式 / 负责人不展示也不可编辑，保持原值。
+        executionMode: hasChildren ? undefined : executionMode,
+        ownerName: hasChildren ? undefined : executionMode === 'follow_up' ? (ownerValue[0] ?? '') : '',
         tagNames,
       });
       onClose();
@@ -187,33 +188,43 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
             )}
           </div>
 
-          <div className="field">
-            <label>执行方式</label>
-            <Radio.Group
-              value={executionMode}
-              onChange={(event) => setExecutionMode(event.target.value as ExecutionMode)}
-              options={[
-                { value: 'self', label: '自己执行' },
-                { value: 'follow_up', label: '需要跟进' },
-              ]}
-            />
-          </div>
+          {!hasChildren && (
+            <>
+              <div className="field">
+                <label>执行方式</label>
+                <Radio.Group
+                  value={executionMode}
+                  onChange={(event) => setExecutionMode(event.target.value as ExecutionMode)}
+                  options={[
+                    { value: 'self', label: '自己执行' },
+                    { value: 'follow_up', label: '需要跟进' },
+                  ]}
+                />
+              </div>
 
-          {executionMode === 'follow_up' && (
-            <div className="field">
-              <label>负责人（可输入新名字自动创建）</label>
-              <Select
-                mode="tags"
-                maxCount={1}
-                allowClear
-                showSearch
-                value={ownerValue}
-                options={ownerOptions}
-                onChange={(value: string[]) => setOwnerValue(value)}
-                placeholder="选择或输入负责人，回车确认…"
-                style={{ width: '100%' }}
-              />
-            </div>
+              {executionMode === 'follow_up' && (
+                <div className="field">
+                  <label>负责人（可输入新名字自动创建）</label>
+                  <Select
+                    mode="tags"
+                    maxCount={1}
+                    allowClear
+                    showSearch
+                    value={ownerValue}
+                    options={ownerOptions}
+                    onChange={(value: string[]) => setOwnerValue(value)}
+                    placeholder="选择或输入负责人，回车确认…"
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              )}
+            </>
+          )}
+
+          {hasChildren && (
+            <p className="modal-hint">
+              含子任务：执行方式与负责人由叶子子任务承载，此处不显示、不可编辑。
+            </p>
           )}
 
           <div className="field">

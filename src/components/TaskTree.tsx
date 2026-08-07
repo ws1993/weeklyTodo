@@ -310,6 +310,8 @@ function TaskNode({
   const hasChildren = children.length > 0;
   const isLeaf = !hasChildren;
   const closed = task.status === 'closed';
+  // 「非叶子」以真实子任务判断（不受「仅看未完成」过滤影响），用于隐藏执行方式/负责人。
+  const hasAnyChildren = allTasks.some((item) => item.parentId === task.id);
 
   // 定位目标位于本节点子树内时，强制展开以便目标可见。
   useEffect(() => {
@@ -526,9 +528,13 @@ function TaskNode({
           >
             P{task.priority}
           </span>
-          {task.executionMode === 'self' && <span className="tag tag-self">自己</span>}
-          {task.executionMode === 'follow_up' && <span className="tag tag-follow">跟进</span>}
-          {task.executionMode === 'follow_up' && task.ownerName && (
+          {!hasAnyChildren && task.executionMode === 'self' && (
+            <span className="tag tag-self">自己</span>
+          )}
+          {!hasAnyChildren && task.executionMode === 'follow_up' && (
+            <span className="tag tag-follow">跟进</span>
+          )}
+          {!hasAnyChildren && task.executionMode === 'follow_up' && task.ownerName && (
             <span className="tag tag-owner">{task.ownerName}</span>
           )}
           {visibleTags.map((tag) => (

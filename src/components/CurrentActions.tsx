@@ -129,7 +129,7 @@ export function CurrentActions({ tasks, onLocate }: CurrentActionsProps) {
             onClick={() => setActiveGroup(null)}
           >
             <span className="g-chip-dot" style={{ background: GROUP_COLOR_PENDING }} />
-            全部
+            <span className="g-chip-text">全部</span>
           </button>
           {groups.map((group) => (
             <button
@@ -142,7 +142,7 @@ export function CurrentActions({ tasks, onLocate }: CurrentActionsProps) {
                 className="g-chip-dot"
                 style={{ background: colorMap.get(group.title) ?? GROUP_COLOR_PENDING }}
               />
-              {group.title}
+              <span className="g-chip-text">{group.title}</span>
             </button>
           ))}
         </div>

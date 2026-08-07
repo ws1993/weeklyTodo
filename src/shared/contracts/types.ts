@@ -72,6 +72,8 @@ export interface QueryTaskRow {
   weekId: string;
   weekLabel: string;
   path: string;
+  /** Whether the task has any children (regardless of their status). */
+  hasChildren: boolean;
 }
 
 /** Row returned by `week_summaries`: [weekId, total, open]. */
