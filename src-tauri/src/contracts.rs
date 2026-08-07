@@ -23,6 +23,8 @@ pub struct QueryTaskRow {
     pub week_id: String,
     pub week_label: String,
     pub path: String,
+    /// 顶层任务（分组轨道 / 项目）标题。
+    pub root_title: String,
     /// Whether the task has any children (regardless of their status).
     pub has_children: bool,
 }
@@ -31,6 +33,8 @@ pub struct QueryTaskRow {
 #[serde(rename_all = "camelCase")]
 pub struct QueryFilter {
     pub week_id: Option<String>,
+    /// 按顶层任务（项目）标题过滤，跨周同名合并。
+    pub group_filter: Option<String>,
     pub keyword: Option<String>,
     pub status: Option<String>,
     pub carried_over_only: Option<bool>,

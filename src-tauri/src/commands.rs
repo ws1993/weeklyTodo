@@ -357,6 +357,14 @@ pub async fn query_all_tasks(filter: QueryFilter) -> Result<Vec<QueryTaskRow>, S
     queries::query_tasks(&conn, &filter)
 }
 
+/// 项目（顶层任务）标题列表：不传周返回跨周去重后的全部项目，传周只返回该周项目。
+#[tauri::command]
+pub async fn query_group_options(week_id: Option<String>) -> Result<Vec<String>, String> {
+    let config = resolve_storage()?;
+    let conn = open_conn(&config)?;
+    queries::group_options(&conn, week_id.as_deref())
+}
+
 #[tauri::command]
 pub async fn week_summaries() -> Result<Vec<(String, i64, i64)>, String> {
     let config = resolve_storage()?;

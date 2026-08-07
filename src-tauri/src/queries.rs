@@ -24,6 +24,26 @@ pub fn query_tasks(conn: &Connection, filter: &QueryFilter) -> Result<Vec<QueryT
         sql.push_str(" AND t.week_id = ?");
         values.push(Box::new(week_id.clone()));
     }
+    if let Some(group) = &filter.group_filter {
+        if !group.trim().is_empty() {
+            // 项目 = 顶层任务（parent_id 为空）。用递归 CTE 把每个任务映射到其根任务，
+            // 再按根任务标题过滤；跨周同名根任务视为同一项目。
+            sql.push_str(
+                " AND t.id IN (
+                    WITH RECURSIVE root_of(id, root_id) AS (
+                        SELECT id, id FROM tasks WHERE parent_id IS NULL
+                        UNION ALL
+                        SELECT child.id, root_of.root_id
+                        FROM tasks child JOIN root_of ON child.parent_id = root_of.id
+                    )
+                    SELECT root_of.id FROM root_of
+                    JOIN tasks root_task ON root_task.id = root_of.root_id
+                    WHERE root_task.title = ?
+                )",
+            );
+            values.push(Box::new(group.trim().to_string()));
+        }
+    }
     if let Some(start_week_id) = &filter.start_week_id {
         sql.push_str(" AND w.start_date >= (SELECT start_date FROM weeks WHERE id = ?)");
         values.push(Box::new(start_week_id.clone()));
@@ -95,6 +115,7 @@ pub fn query_tasks(conn: &Connection, filter: &QueryFilter) -> Result<Vec<QueryT
                 week_id: task.week_id.clone(),
                 task,
                 path: String::new(),
+                root_title: String::new(),
                 has_children: row.get(19)?,
             })
         })
@@ -104,6 +125,7 @@ pub fn query_tasks(conn: &Connection, filter: &QueryFilter) -> Result<Vec<QueryT
     for row in rows {
         let mut item = row.map_err(|error| format!("读取查询结果失败：{error}"))?;
         item.path = build_path(conn, &item.task)?;
+        item.root_title = build_root_title(conn, &item.task)?;
         result.push(item);
     }
     // Attach tag names to every returned task.
@@ -113,6 +135,60 @@ pub fn query_tasks(conn: &Connection, filter: &QueryFilter) -> Result<Vec<QueryT
         item.task.tags = tag_map.get(&item.task.id).cloned().unwrap_or_default();
     }
     Ok(result)
+}
+
+/// 项目（顶层任务）标题列表，供查询页「项目」筛选下拉使用。
+/// 传入某周时只返回该周的项目；不传则返回跨周全部项目（同名去重合并）。
+pub fn group_options(conn: &Connection, week_id: Option<&str>) -> Result<Vec<String>, String> {
+    let mut sql =
+        String::from("SELECT DISTINCT title FROM tasks WHERE parent_id IS NULL AND title != ''");
+    let mut values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+    if let Some(week_id) = week_id {
+        sql.push_str(" AND week_id = ?");
+        values.push(Box::new(week_id.to_string()));
+    }
+    sql.push_str(" ORDER BY title");
+
+    let params = rusqlite::params_from_iter(values.iter().map(|value| value.as_ref()));
+    let mut stmt = conn
+        .prepare(&sql)
+        .map_err(|error| format!("准备项目选项查询失败：{error}"))?;
+    let rows = stmt
+        .query_map(params, |row| row.get::<_, String>(0))
+        .map_err(|error| format!("查询项目选项失败：{error}"))?;
+    let mut titles = Vec::new();
+    for row in rows {
+        titles.push(row.map_err(|error| format!("读取项目选项失败：{error}"))?);
+    }
+    Ok(titles)
+}
+
+/// 向上追溯任务的顶层祖先标题（项目名）；无父节点时返回自身标题。
+fn build_root_title(conn: &Connection, task: &Task) -> Result<String, String> {
+    let mut title = task.title.clone();
+    let mut current_id = task.parent_id;
+    let mut guard = 0;
+    while let Some(parent_id) = current_id {
+        let parent: Option<(String, Option<i64>)> = conn
+            .query_row(
+                "SELECT title, parent_id FROM tasks WHERE id = ?1",
+                params![parent_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(|error| format!("读取任务根节点失败：{error}"))?;
+        if let Some((parent_title, parent_of_parent)) = parent {
+            title = parent_title;
+            current_id = parent_of_parent;
+        } else {
+            break;
+        }
+        guard += 1;
+        if guard > 64 {
+            break;
+        }
+    }
+    Ok(title)
 }
 
 /// Build a `父 > 子 > 孙` display path for a task by walking up parents.
@@ -559,6 +635,166 @@ mod tests {
         let child = rows.iter().find(|row| row.task.title == "子任务").unwrap();
         assert!(parent.has_children);
         assert!(!child.has_children);
+    }
+
+    #[test]
+    fn query_filters_by_group_and_reports_root_title() {
+        let conn = db::open_in_memory();
+        insert_week_helper(&conn, "20260803-20260809", "20260803", "20260809");
+        insert_week_helper(&conn, "20260810-20260816", "20260810", "20260816");
+
+        // 第 1 周：项目 A（含子任务）+ 项目 B。
+        let week1_project_a = create_task(
+            &conn,
+            "20260803-20260809",
+            CreateTaskInput {
+                title: "项目A".into(),
+                description: String::new(),
+                parent_id: None,
+                priority: 2,
+                execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                assigner_name: None,
+                tag_names: Vec::new(),
+            },
+        )
+        .unwrap();
+        create_task(
+            &conn,
+            "20260803-20260809",
+            CreateTaskInput {
+                title: "A的子任务".into(),
+                description: String::new(),
+                parent_id: Some(week1_project_a.id),
+                priority: 2,
+                execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                assigner_name: None,
+                tag_names: Vec::new(),
+            },
+        )
+        .unwrap();
+        create_task(
+            &conn,
+            "20260803-20260809",
+            CreateTaskInput {
+                title: "项目B".into(),
+                description: String::new(),
+                parent_id: None,
+                priority: 2,
+                execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                assigner_name: None,
+                tag_names: Vec::new(),
+            },
+        )
+        .unwrap();
+        // 第 2 周：同名项目 A。
+        let week2_project_a = create_task(
+            &conn,
+            "20260810-20260816",
+            CreateTaskInput {
+                title: "项目A".into(),
+                description: String::new(),
+                parent_id: None,
+                priority: 2,
+                execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                assigner_name: None,
+                tag_names: Vec::new(),
+            },
+        )
+        .unwrap();
+        create_task(
+            &conn,
+            "20260810-20260816",
+            CreateTaskInput {
+                title: "A的另一个子任务".into(),
+                description: String::new(),
+                parent_id: Some(week2_project_a.id),
+                priority: 2,
+                execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                assigner_name: None,
+                tag_names: Vec::new(),
+            },
+        )
+        .unwrap();
+
+        // 按项目「项目A」过滤：跨周命中，且每个结果都带正确 root_title。
+        let by_group = query_tasks(
+            &conn,
+            &QueryFilter {
+                group_filter: Some("项目A".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(by_group.len(), 4);
+        assert!(by_group.iter().all(|row| row.root_title == "项目A"));
+        assert!(
+            !by_group.iter().any(|row| row.task.title == "项目B"),
+            "项目B 不应出现在项目A 的筛选结果中"
+        );
+
+        // 项目 + 周组合过滤：只命中第 2 周的项目A 及其子任务。
+        let by_group_and_week = query_tasks(
+            &conn,
+            &QueryFilter {
+                week_id: Some("20260810-20260816".into()),
+                group_filter: Some("项目A".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(by_group_and_week.len(), 2);
+        assert!(by_group_and_week
+            .iter()
+            .all(|row| row.week_id == "20260810-20260816"));
+    }
+
+    #[test]
+    fn group_options_scopes_to_week_and_merges_across_weeks() {
+        let conn = db::open_in_memory();
+        insert_week_helper(&conn, "20260803-20260809", "20260803", "20260809");
+        insert_week_helper(&conn, "20260810-20260816", "20260810", "20260816");
+
+        for (week_id, titles) in [
+            ("20260803-20260809", vec!["项目A", "项目B"]),
+            ("20260810-20260816", vec!["项目A"]),
+        ] {
+            for title in titles {
+                create_task(
+                    &conn,
+                    week_id,
+                    CreateTaskInput {
+                        title: title.into(),
+                        description: String::new(),
+                        parent_id: None,
+                        priority: 2,
+                        execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
+                        owner_name: None,
+                        assigner_name: None,
+                        tag_names: Vec::new(),
+                    },
+                )
+                .unwrap();
+            }
+        }
+
+        // 跨周同名去重合并。
+        assert_eq!(
+            group_options(&conn, None).unwrap(),
+            vec!["项目A".to_string(), "项目B".to_string()]
+        );
+        assert_eq!(
+            group_options(&conn, Some("20260803-20260809")).unwrap(),
+            vec!["项目A".to_string(), "项目B".to_string()]
+        );
+        assert_eq!(
+            group_options(&conn, Some("20260810-20260816")).unwrap(),
+            vec!["项目A".to_string()]
+        );
     }
 
     #[test]

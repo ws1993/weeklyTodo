@@ -9,6 +9,12 @@ import { CheckIcon, CrossIcon, TrashIcon } from './ForestIcons';
 interface TaskDetailPanelProps {
   task: Task | null;
   onClose: () => void;
+  /** 所在周的任务树（上级任务下拉 / 删除数量等上下文）。缺省取当前激活周 store 数据。 */
+  tasks?: Task[];
+  /** 操作目标周；缺省取当前激活周。查询页跨周编辑时传入行所在周。 */
+  weekId?: string;
+  /** 保存 / 完成 / 删除成功后的回调，用于查询页刷新结果。 */
+  onMutated?: () => void | Promise<void>;
 }
 
 const priorityOptions = [
@@ -18,7 +24,7 @@ const priorityOptions = [
   { value: 3, label: 'P3 低' },
 ];
 
-export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
+export function TaskDetailPanel({ task, onClose, tasks, weekId, onMutated }: TaskDetailPanelProps) {
   const editTask = useAppStore((state) => state.editTask);
   const toggleTask = useAppStore((state) => state.toggleTask);
   const moveTask = useAppStore((state) => state.moveTask);
@@ -26,7 +32,10 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
   const owners = useAppStore((state) => state.owners);
   const assigners = useAppStore((state) => state.assigners);
   const tags = useAppStore((state) => state.tags);
-  const treeTasks = useAppStore((state) => state.tree?.tasks ?? []);
+  const activeWeekId = useAppStore((state) => state.activeWeekId);
+  const storeTreeTasks = useAppStore((state) => state.tree?.tasks ?? []);
+  const treeTasks = tasks ?? storeTreeTasks;
+  const targetWeekId = weekId ?? activeWeekId;
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -100,19 +109,25 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
     try {
       const newParentId = parentValue === 'none' ? null : Number(parentValue);
       if (newParentId !== task.parentId) {
-        await moveTask(task.id, newParentId, appendIndex(treeTasks, newParentId, task.id));
+        // 行所在周的任务树已作为上下文传入，appendIndex 与落库都按目标周处理。
+        await moveTask(task.id, newParentId, appendIndex(treeTasks, newParentId, task.id), targetWeekId);
       }
-      await editTask(task.id, {
-        title: trimmedTitle,
-        description,
-        // 父任务优先级由未完成子任务自动联动，不手动提交。
-        priority: hasChildren ? undefined : priority,
-        // 非叶子任务的执行方式 / 负责人不展示也不可编辑，保持原值。
-        executionMode: hasChildren ? undefined : executionMode,
-        ownerName: hasChildren ? undefined : executionMode === 'follow_up' ? (ownerValue[0] ?? '') : '',
-        assignerName: hasChildren ? undefined : (assignerValue[0] ?? ''),
-        tagNames,
-      });
+      await editTask(
+        task.id,
+        {
+          title: trimmedTitle,
+          description,
+          // 父任务优先级由未完成子任务自动联动，不手动提交。
+          priority: hasChildren ? undefined : priority,
+          // 非叶子任务的执行方式 / 负责人不展示也不可编辑，保持原值。
+          executionMode: hasChildren ? undefined : executionMode,
+          ownerName: hasChildren ? undefined : executionMode === 'follow_up' ? (ownerValue[0] ?? '') : '',
+          assignerName: hasChildren ? undefined : (assignerValue[0] ?? ''),
+          tagNames,
+        },
+        targetWeekId,
+      );
+      await onMutated?.();
       onClose();
     } catch (saveError) {
       setError(String(saveError));
@@ -125,6 +140,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
     setBusy(true);
     try {
       await toggleTask(task.id);
+      await onMutated?.();
       onClose();
     } finally {
       setBusy(false);
@@ -136,6 +152,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
     setError(null);
     try {
       await deleteTask(task.id);
+      await onMutated?.();
       onClose();
     } catch (deleteError) {
       setError(String(deleteError));

@@ -65,6 +65,8 @@ export interface AppStatePayload {
 
 export interface QueryFilter {
   weekId?: string;
+  /** 按顶层任务（项目）标题过滤，跨周同名合并。 */
+  groupFilter?: string;
   keyword?: string;
   status?: string;
   carriedOverOnly?: boolean;
@@ -80,6 +82,8 @@ export interface QueryTaskRow {
   weekId: string;
   weekLabel: string;
   path: string;
+  /** 顶层任务（分组轨道 / 项目）标题。 */
+  rootTitle: string;
   /** Whether the task has any children (regardless of their status). */
   hasChildren: boolean;
 }

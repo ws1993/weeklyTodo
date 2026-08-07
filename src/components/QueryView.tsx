@@ -1,18 +1,35 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { QueryTaskRow, Week, WeekSummary } from '../shared/contracts/types';
-import { queryAllTasks, weekSummaries } from '../api/nativeBridge';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { QueryTaskRow, Task, Week, WeekSummary } from '../shared/contracts/types';
+import {
+  deleteTask,
+  getWeekTree,
+  queryAllTasks,
+  queryGroupOptions,
+  updateTask,
+  weekSummaries,
+} from '../api/nativeBridge';
 import { useAppStore } from '../store/appStore';
+import { formatDateDay } from '../utils/formatDateTime';
 import { formatCnRange, isCurrentWeek, weekStatus } from '../utils/weekFormat';
+import { subtreeSize } from '../utils/tree';
 import { EmptyState } from './EmptyState';
-import { CalendarIcon, ChevronRightIcon, CrossIcon, SearchIcon } from './ForestIcons';
+import {
+  CalendarIcon,
+  ClockIcon,
+  CrossIcon,
+  RenameIcon,
+  SearchIcon,
+  SettingsIcon,
+  TrashIcon,
+} from './ForestIcons';
 import { DropdownSelect, SearchField, SegmentedControl, ToggleSwitch } from './QueryControls';
+import { TaskDetailPanel } from './TaskDetailPanel';
 
 type StatusFilter = '' | 'in_progress' | 'closed';
 
 interface QueryViewProps {
   open: boolean;
   onClose: () => void;
-  onNavigate: (weekId: string) => void;
 }
 
 const statusOptions: Array<{ value: StatusFilter; label: string }> = [
@@ -26,15 +43,20 @@ interface WeekProgress {
   done: number;
 }
 
-export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
+export function QueryView({ open, onClose }: QueryViewProps) {
   const allWeeks = useAppStore((state) => state.allWeeks);
   const owners = useAppStore((state) => state.owners);
   const assigners = useAppStore((state) => state.assigners);
   const tags = useAppStore((state) => state.tags);
+  const activeWeekId = useAppStore((state) => state.activeWeekId);
+  const refreshTree = useAppStore((state) => state.refreshTree);
+  const refreshMetadata = useAppStore((state) => state.refreshMetadata);
 
   const [keyword, setKeyword] = useState('');
   const [debouncedKeyword, setDebouncedKeyword] = useState('');
   const [weekId, setWeekId] = useState('');
+  const [groupFilter, setGroupFilter] = useState('');
+  const [groupOptions, setGroupOptions] = useState<string[]>([]);
   const [status, setStatus] = useState<StatusFilter>('');
   const [carriedOnly, setCarriedOnly] = useState(false);
   const [ownerId, setOwnerId] = useState<number | undefined>();
@@ -43,6 +65,14 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
   const [results, setResults] = useState<QueryTaskRow[]>([]);
   const [summaries, setSummaries] = useState<WeekSummary[]>([]);
   const [loading, setLoading] = useState(false);
+  const [detailRow, setDetailRow] = useState<QueryTaskRow | null>(null);
+  const [detailTasks, setDetailTasks] = useState<Task[] | null>(null);
+  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null);
+  const [deleteCount, setDeleteCount] = useState(0);
+  // 按周缓存整棵任务树，供删除确认数量与详情上下文复用。
+  const weekTreesCache = useRef(new Map<string, Task[]>());
 
   // 关键词防抖：避免每个按键都触发一次跨库查询。
   useEffect(() => {
@@ -59,6 +89,7 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
       const rows = await queryAllTasks({
         keyword: debouncedKeyword || undefined,
         weekId: weekId || undefined,
+        groupFilter: groupFilter || undefined,
         status: status || undefined,
         carriedOverOnly: carriedOnly || undefined,
         ownerId,
@@ -71,11 +102,107 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
     } finally {
       setLoading(false);
     }
-  }, [open, debouncedKeyword, weekId, status, carriedOnly, ownerId, assignerId, tagId]);
+  }, [open, debouncedKeyword, weekId, groupFilter, status, carriedOnly, ownerId, assignerId, tagId]);
 
   useEffect(() => {
     void runQuery();
   }, [runQuery]);
+
+  const loadGroupOptions = useCallback(
+    async (targetWeekId: string) => {
+      const options = await queryGroupOptions(targetWeekId || undefined);
+      setGroupOptions(options);
+      if (groupFilter && !options.includes(groupFilter)) {
+        // 切到某个周后，所选项目不存在于该周时自动清空，避免出现「筛选出空结果」的困惑。
+        setGroupFilter('');
+      }
+    },
+    [groupFilter],
+  );
+
+  useEffect(() => {
+    void loadGroupOptions(weekId);
+  }, [weekId, loadGroupOptions]);
+
+  // 打开详情前先拿到行所在周的整棵任务树作为上下文。
+  useEffect(() => {
+    if (!detailRow) {
+      setDetailTasks(null);
+      return;
+    }
+    const cached = weekTreesCache.current.get(detailRow.weekId);
+    if (cached) {
+      setDetailTasks(cached);
+      return;
+    }
+    let cancelled = false;
+    void getWeekTree(detailRow.weekId).then((tree) => {
+      if (cancelled) {
+        return;
+      }
+      weekTreesCache.current.set(detailRow.weekId, tree.tasks);
+      setDetailTasks(tree.tasks);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [detailRow]);
+
+  /** 详情面板保存 / 完成 / 删除后统一刷新查询结果与相关缓存。 */
+  const handleDetailMutated = useCallback(async () => {
+    await runQuery();
+    await refreshMetadata();
+    if (detailRow && detailRow.weekId === activeWeekId) {
+      await refreshTree();
+    }
+    await loadGroupOptions(weekId);
+  }, [runQuery, refreshMetadata, refreshTree, loadGroupOptions, detailRow, activeWeekId, weekId]);
+
+  const openDetail = (row: QueryTaskRow) => {
+    setRenamingId(null);
+    setConfirmingDeleteId(null);
+    setDetailRow(row);
+  };
+
+  const commitRename = async (row: QueryTaskRow) => {
+    const title = renameDraft.trim();
+    if (title && title !== row.task.title) {
+      await updateTask({ weekId: row.weekId, taskId: row.task.id, title });
+      await runQuery();
+      if (row.weekId === activeWeekId) {
+        await refreshTree();
+      }
+      await refreshMetadata();
+      await loadGroupOptions(weekId);
+    }
+    setRenamingId(null);
+    setRenameDraft('');
+  };
+
+  const armDelete = async (row: QueryTaskRow) => {
+    setConfirmingDeleteId(row.task.id);
+    setDeleteCount(0);
+    try {
+      const cached = weekTreesCache.current.get(row.weekId);
+      const treeTasks = cached ?? (await getWeekTree(row.weekId)).tasks;
+      weekTreesCache.current.set(row.weekId, treeTasks);
+      setDeleteCount(subtreeSize(treeTasks, row.task.id));
+    } catch {
+      // 获取子树数量失败时仍可删除，确认文案退化为通用提示。
+    }
+    window.setTimeout(() => setConfirmingDeleteId(null), 4000);
+  };
+
+  const doDelete = async (row: QueryTaskRow) => {
+    setConfirmingDeleteId(null);
+    await deleteTask(row.weekId, row.task.id);
+    await runQuery();
+    if (row.weekId === activeWeekId) {
+      await refreshTree();
+    }
+    await refreshMetadata();
+    await loadGroupOptions(weekId);
+  };
 
   const progressByWeek = useMemo(() => {
     const map = new Map<string, WeekProgress>();
@@ -112,11 +239,6 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
     return null;
   }
 
-  const handleNavigate = (targetWeekId: string) => {
-    onNavigate(targetWeekId);
-    onClose();
-  };
-
   return (
     <div className="query-overlay">
       <header className="query-overlay-header">
@@ -127,7 +249,7 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
           查看所有周
         </div>
         <div className="query-overlay-actions">
-          <span className="query-overlay-hint">点击结果跳转到对应周</span>
+          <span className="query-overlay-hint">双击结果打开任务详情 · 悬停行查看操作</span>
           <button className="query-overlay-close" title="关闭" onClick={onClose}>
             <CrossIcon size={15} />
           </button>
@@ -221,6 +343,13 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
               />
               <span className="query-toolbar-sep" />
               <DropdownSelect
+                label="项目"
+                options={groupOptions.map((name) => ({ value: name, label: name }))}
+                value={groupFilter}
+                onChange={setGroupFilter}
+              />
+              <span className="query-toolbar-sep" />
+              <DropdownSelect
                 label="负责人"
                 options={ownerOptions}
                 value={ownerId !== undefined ? String(ownerId) : ''}
@@ -282,11 +411,11 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
                   className="query-row"
                   role="button"
                   tabIndex={0}
-                  onClick={() => handleNavigate(row.weekId)}
+                  onDoubleClick={() => openDetail(row)}
                   onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
+                    if (event.key === 'Enter') {
                       event.preventDefault();
-                      handleNavigate(row.weekId);
+                      openDetail(row);
                     }
                   }}
                 >
@@ -294,10 +423,53 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
                     className={`query-row-dot${row.task.status === 'closed' ? ' closed' : ''}`}
                   />
                   <span className="query-row-main">
-                    <span
-                      className={`query-row-title${row.task.status === 'closed' ? ' closed' : ''}`}
-                    >
-                      {row.task.title}
+                    <span className="query-row-titleline">
+                      {renamingId === row.task.id ? (
+                        <input
+                          autoFocus
+                          className="task-title-input"
+                          value={renameDraft}
+                          onChange={(event) => setRenameDraft(event.target.value)}
+                          onBlur={() => void commitRename(row)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              void commitRename(row);
+                            } else if (event.key === 'Escape') {
+                              setRenamingId(null);
+                              setRenameDraft('');
+                            }
+                          }}
+                        />
+                      ) : (
+                        <span
+                          className={`query-row-title${row.task.status === 'closed' ? ' closed' : ''}`}
+                        >
+                          {row.task.title}
+                        </span>
+                      )}
+                      {renamingId !== row.task.id && (
+                        <span
+                          className="query-row-times"
+                          title={
+                            row.task.status === 'closed' && row.task.closedAt
+                              ? `开始 ${formatDateDay(row.task.createdAt)} · 完成 ${formatDateDay(row.task.closedAt)}`
+                              : `开始 ${formatDateDay(row.task.createdAt)}`
+                          }
+                        >
+                          <ClockIcon size={12} />
+                          <span className="time-date">
+                            {formatDateDay(row.task.createdAt)}
+                          </span>
+                          {row.task.status === 'closed' && row.task.closedAt && (
+                            <>
+                              <span className="time-arrow">→</span>
+                              <span className="time-date">
+                                {formatDateDay(row.task.closedAt)}
+                              </span>
+                            </>
+                          )}
+                        </span>
+                      )}
                     </span>
                     <span className="query-row-path">{row.path}</span>
                   </span>
@@ -326,14 +498,70 @@ export function QueryView({ open, onClose, onNavigate }: QueryViewProps) {
                     ))}
                   </span>
                   <span className="query-row-week">{row.weekLabel}</span>
-                  <span className="query-row-go">
-                    <ChevronRightIcon size={14} />
+                  <span className="query-row-actions">
+                    <button
+                      className="edit-btn"
+                      title="重命名"
+                      aria-label="重命名"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setConfirmingDeleteId(null);
+                        setRenamingId(row.task.id);
+                        setRenameDraft(row.task.title);
+                      }}
+                    >
+                      <RenameIcon size={14} />
+                    </button>
+                    <button
+                      className="edit-btn"
+                      title="任务设置"
+                      aria-label="打开任务设置"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openDetail(row);
+                      }}
+                    >
+                      <SettingsIcon size={14} />
+                    </button>
+                    <button
+                      className={`edit-btn danger ${confirmingDeleteId === row.task.id ? 'armed' : ''}`}
+                      title={
+                        confirmingDeleteId === row.task.id
+                          ? `再次点击确认删除${deleteCount > 0 ? `（含 ${deleteCount} 项）` : ''}`
+                          : '删除任务'
+                      }
+                      aria-label="删除任务"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (confirmingDeleteId === row.task.id) {
+                          void doDelete(row);
+                        } else {
+                          void armDelete(row);
+                        }
+                      }}
+                    >
+                      {confirmingDeleteId === row.task.id ? (
+                        <CrossIcon size={14} />
+                      ) : (
+                        <TrashIcon size={14} />
+                      )}
+                    </button>
                   </span>
                 </div>
               ))}
           </div>
         </main>
       </div>
+
+      {detailRow && detailTasks && (
+        <TaskDetailPanel
+          task={detailRow.task}
+          tasks={detailTasks}
+          weekId={detailRow.weekId}
+          onClose={() => setDetailRow(null)}
+          onMutated={() => void handleDetailMutated()}
+        />
+      )}
     </div>
   );
 }

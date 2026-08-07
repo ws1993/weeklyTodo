@@ -197,6 +197,11 @@ export async function queryAllTasks(filter: QueryFilter): Promise<QueryTaskRow[]
   return invokeCommand<QueryTaskRow[]>('query_all_tasks', { filter });
 }
 
+/** 项目（顶层任务）标题列表：不传周返回跨周去重后的全部项目，传周只返回该周项目。 */
+export async function queryGroupOptions(weekId?: string): Promise<string[]> {
+  return invokeCommand<string[]>('query_group_options', { weekId: weekId ?? null });
+}
+
 export async function weekSummaries(): Promise<WeekSummary[]> {
   return invokeCommand<WeekSummary[]>('week_summaries');
 }

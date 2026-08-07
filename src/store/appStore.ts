@@ -50,10 +50,12 @@ interface AppState {
       assignerName?: string | null;
       tagNames?: string[];
     },
+    /** 目标周；缺省为当前激活周。查询页跨周编辑时显式传入。 */
+    weekId?: string,
   ) => Promise<void>;
-  toggleTask: (taskId: number) => Promise<void>;
-  moveTask: (taskId: number, newParentId: number | null, newIndex: number) => Promise<void>;
-  deleteTask: (taskId: number) => Promise<void>;
+  toggleTask: (taskId: number, weekId?: string) => Promise<void>;
+  moveTask: (taskId: number, newParentId: number | null, newIndex: number, weekId?: string) => Promise<void>;
+  deleteTask: (taskId: number, weekId?: string) => Promise<void>;
   createWeek: (mondayDate: string) => Promise<Week>;
   ensureGroupColor: (name: string) => Promise<void>;
   setGroupColor: (name: string, color: string) => Promise<void>;
@@ -171,10 +173,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     return task;
   },
 
-  editTask: async (taskId, { title, description, priority, executionMode, ownerName, assignerName, tagNames }) => {
+  editTask: async (taskId, { title, description, priority, executionMode, ownerName, assignerName, tagNames }, targetWeekId) => {
     const { activeWeekId } = get();
     await bridge.updateTask({
-      weekId: activeWeekId,
+      weekId: targetWeekId ?? activeWeekId,
       taskId,
       title,
       description,
@@ -188,29 +190,32 @@ export const useAppStore = create<AppState>((set, get) => ({
     await get().refreshMetadata();
   },
 
-  toggleTask: async (taskId) => {
+  toggleTask: async (taskId, targetWeekId) => {
     const { activeWeekId, tree } = get();
-    const task = tree?.tasks.find((item) => item.id === taskId);
+    const weekId = targetWeekId ?? activeWeekId;
+    const task =
+      tree?.tasks.find((item) => item.id === taskId && item.weekId === weekId) ??
+      tree?.tasks.find((item) => item.id === taskId);
     if (!task) {
       return;
     }
     if (task.status === 'closed') {
-      await bridge.reopenTask(activeWeekId, taskId);
+      await bridge.reopenTask(weekId, taskId);
     } else {
-      await bridge.closeTask(activeWeekId, taskId);
+      await bridge.closeTask(weekId, taskId);
     }
     await get().refreshTree();
   },
 
-  moveTask: async (taskId, newParentId, newIndex) => {
+  moveTask: async (taskId, newParentId, newIndex, targetWeekId) => {
     const { activeWeekId } = get();
-    await bridge.moveTask(activeWeekId, taskId, newParentId, newIndex);
+    await bridge.moveTask(targetWeekId ?? activeWeekId, taskId, newParentId, newIndex);
     await get().refreshTree();
   },
 
-  deleteTask: async (taskId) => {
+  deleteTask: async (taskId, targetWeekId) => {
     const { activeWeekId } = get();
-    await bridge.deleteTask(activeWeekId, taskId);
+    await bridge.deleteTask(targetWeekId ?? activeWeekId, taskId);
     await get().refreshTree();
     await get().refreshMetadata();
   },

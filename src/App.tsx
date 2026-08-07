@@ -46,7 +46,6 @@ export function App() {
   const groupColors = useAppStore((state) => state.groupColors);
   const activeWeekId = useAppStore((state) => state.activeWeekId);
   const currentWeekId = useAppStore((state) => state.currentWeekId);
-  const selectWeek = useAppStore((state) => state.selectWeek);
 
   const [queryOpen, setQueryOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
@@ -299,7 +298,6 @@ export function App() {
       <QueryView
         open={queryOpen}
         onClose={() => setQueryOpen(false)}
-        onNavigate={(weekId) => void selectWeek(weekId)}
       />
       <StatisticsView open={statsOpen} onClose={() => setStatsOpen(false)} />
       <CreateWeekModal open={createOpen} onClose={() => setCreateOpen(false)} />
