@@ -73,7 +73,7 @@ export type DropPosition = 'before' | 'after' | 'inside';
 /**
  * Compute the target parent and sort index for dropping `draggedId` relative to
  * `target`. Returns `null` when the drop is not allowed (onto itself, into its
- * own subtree, or inside a closed task).
+ * own subtree).
  */
 export function computeDrop(
   tasks: Task[],
@@ -86,19 +86,11 @@ export function computeDrop(
   }
 
   if (position === 'inside') {
-    if (target.status === 'closed') {
-      return null;
-    }
+    // Dropping inside a closed task is allowed: the backend reopens the node
+    // (and its ancestors) so the new open child keeps the tree consistent.
     const children = sortedChildren(tasks, target.id);
     const last = children[children.length - 1];
     return { parentId: target.id, index: last ? last.sortIndex + 1 : 0 };
-  }
-
-  // Reordering next to a child of a closed task would reparent under a closed
-  // task, which the backend rejects.
-  const parent = target.parentId != null ? tasks.find((task) => task.id === target.parentId) : undefined;
-  if (parent?.status === 'closed') {
-    return null;
   }
 
   const siblings = sortedChildren(tasks, target.parentId).filter(

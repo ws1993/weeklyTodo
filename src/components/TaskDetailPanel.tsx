@@ -64,7 +64,7 @@ export function TaskDetailPanel({ task, onClose }: TaskDetailPanelProps) {
         .map((item) => ({
           value: String(item.id),
           label: taskPath(treeTasks, item.id),
-          disabled: item.status === 'closed',
+          // 已关闭的父节点可选：保存后由后端自动重开该节点及其祖先链。
         })),
     ];
   }, [treeTasks, task]);

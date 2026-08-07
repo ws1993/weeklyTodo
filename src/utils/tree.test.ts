@@ -89,19 +89,19 @@ describe('computeDrop', () => {
     expect(computeDrop(tasks, 1, tasks[0], 'inside')).toBeNull();
   });
 
-  it('rejects dropping inside a closed task', () => {
+  it('allows dropping inside a closed task (backend reopens it)', () => {
     const closed = makeTask({ id: 99, title: '已完成', status: 'closed' });
-    expect(computeDrop(tasks, 1, closed, 'inside')).toBeNull();
+    expect(computeDrop(tasks, 4, closed, 'inside')).toEqual({ parentId: 99, index: 0 });
   });
 
-  it('rejects dropping next to a child of a closed task', () => {
+  it('allows dropping next to a child of a closed task (backend reopens the parent)', () => {
     const forest = [
       makeTask({ id: 10, title: '已完成根', status: 'closed' }),
       makeTask({ id: 11, title: '仍打开的孙', parentId: 10 }),
       makeTask({ id: 12, title: '游离任务', parentId: null }),
     ];
-    expect(computeDrop(forest, 12, forest[1], 'before')).toBeNull();
-    expect(computeDrop(forest, 12, forest[1], 'after')).toBeNull();
+    expect(computeDrop(forest, 12, forest[1], 'before')).toEqual({ parentId: 10, index: -1 });
+    expect(computeDrop(forest, 12, forest[1], 'after')).toEqual({ parentId: 10, index: 1 });
   });
 });
 

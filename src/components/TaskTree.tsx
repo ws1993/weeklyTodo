@@ -545,18 +545,16 @@ function TaskNode({
 
         <span className="row-spacer" />
         <span className="task-actions">
-          {!closed && (
-            <button
-              className="add-btn"
-              title="添加子任务"
-              onClick={(event) => {
-                event.stopPropagation();
-                setShowInlineAdd(true);
-              }}
-            >
-              <PlusIcon size={12} />
-            </button>
-          )}
+          <button
+            className="add-btn"
+            title="添加子任务"
+            onClick={(event) => {
+              event.stopPropagation();
+              setShowInlineAdd(true);
+            }}
+          >
+            <PlusIcon size={12} />
+          </button>
           <button
             className="edit-btn"
             title="重命名"
@@ -622,7 +620,7 @@ function TaskNode({
         </div>
       )}
 
-      {showInlineAdd && !closed && (
+      {showInlineAdd && (
         <div className={`add-inline ${depthClass}`}>
           <input
             autoFocus

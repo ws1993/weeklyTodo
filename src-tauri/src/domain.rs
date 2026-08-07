@@ -719,7 +719,9 @@ pub fn create_task(
         let parent =
             get_task(conn, week_id, parent_id)?.ok_or_else(|| "父任务不存在".to_string())?;
         if parent.status == TASK_STATUS_CLOSED {
-            return Err("不能向已关闭的任务添加子任务".to_string());
+            // 挂到已关闭节点 = 该节点重新激活：自动重开自身与祖先链，
+            // 保持「已关闭节点下没有开放子任务」的不变量不被破坏。
+            reopen_closed_chain(conn, week_id, parent_id)?;
         }
     }
 
@@ -976,7 +978,46 @@ pub fn close_task(conn: &mut Connection, week_id: &str, task_id: i64) -> Result<
     Ok(current)
 }
 
-/// Reopen a closed task. Ancestors stay closed unless reopened explicitly.
+/// Reopen `task_id` and any closed ancestors up the chain, recording a reopen
+/// event for each. Used when a task is attached beneath a closed node: once a
+/// completed node gains a new open child it must become active again so the
+/// tree stays consistent (a closed node never holds open descendants).
+fn reopen_closed_chain(conn: &Connection, week_id: &str, task_id: i64) -> Result<(), String> {
+    let now = iso_now();
+    let mut cursor = Some(task_id);
+    let mut guard = 0;
+    while let Some(current) = cursor {
+        let status: String = conn
+            .query_row(
+                "SELECT status FROM tasks WHERE id = ?1 AND week_id = ?2",
+                params![current, week_id],
+                |row| row.get(0),
+            )
+            .map_err(|error| format!("读取任务状态失败：{error}"))?;
+        if status == TASK_STATUS_CLOSED {
+            conn.execute(
+                "UPDATE tasks SET status = ?1, closed_at = NULL, updated_at = ?2 WHERE id = ?3",
+                params![TASK_STATUS_IN_PROGRESS, now, current],
+            )
+            .map_err(|error| format!("重新打开任务失败：{error}"))?;
+            record_event(conn, week_id, Some(current), EVENT_TYPE_REOPEN, None)?;
+        }
+        cursor = conn
+            .query_row(
+                "SELECT parent_id FROM tasks WHERE id = ?1 AND week_id = ?2",
+                params![current, week_id],
+                |row| row.get(0),
+            )
+            .map_err(|error| format!("读取祖先父级失败：{error}"))?;
+        guard += 1;
+        if guard > 64 {
+            break;
+        }
+    }
+    Ok(())
+}
+
+/// Reopen a closed task and cascade to its closed ancestors.
 pub fn reopen_task(conn: &mut Connection, week_id: &str, task_id: i64) -> Result<Task, String> {
     let current = get_task(conn, week_id, task_id)?.ok_or_else(|| "任务不存在".to_string())?;
     if current.status == TASK_STATUS_IN_PROGRESS {
@@ -994,32 +1035,9 @@ pub fn reopen_task(conn: &mut Connection, week_id: &str, task_id: i64) -> Result
     .map_err(|error| format!("重新打开任务失败：{error}"))?;
     record_event(&tx, week_id, Some(task_id), EVENT_TYPE_REOPEN, None)?;
 
-    // Reopen closed ancestors so the reopened task keeps its context.
-    let mut ancestor_id = current.parent_id;
-    while let Some(ancestor) = ancestor_id {
-        let ancestor_status: String = tx
-            .query_row(
-                "SELECT status FROM tasks WHERE id = ?1",
-                params![ancestor],
-                |row| row.get(0),
-            )
-            .map_err(|error| format!("读取祖先任务状态失败：{error}"))?;
-        if ancestor_status == TASK_STATUS_CLOSED {
-            tx.execute(
-                "UPDATE tasks SET status = ?1, closed_at = NULL, updated_at = ?2 WHERE id = ?3",
-                params![TASK_STATUS_IN_PROGRESS, now, ancestor],
-            )
-            .map_err(|error| format!("重新打开父任务失败：{error}"))?;
-            record_event(&tx, week_id, Some(ancestor), EVENT_TYPE_REOPEN, None)?;
-        }
-        ancestor_id = tx
-            .query_row(
-                "SELECT parent_id FROM tasks WHERE id = ?1",
-                params![ancestor],
-                |row| row.get(0),
-            )
-            .map_err(|error| format!("读取祖先父级失败：{error}"))?;
-    }
+    // Reopen closed ancestors so the reopened task keeps its context. The task
+    // itself is already open, so the chain walk starts from its own id.
+    reopen_closed_chain(&tx, week_id, task_id)?;
 
     // Re-derive ancestor priorities now that the reopened task is active again.
     recompute_ancestor_priorities(&tx, week_id, task_id)?;
@@ -1048,7 +1066,9 @@ pub fn move_task(
         let parent =
             get_task(conn, week_id, parent_id)?.ok_or_else(|| "父任务不存在".to_string())?;
         if parent.status == TASK_STATUS_CLOSED {
-            return Err("不能移动到已关闭的任务下".to_string());
+            // 挂到已关闭节点 = 该节点重新激活：自动重开自身与祖先链，
+            // 保持「已关闭节点下没有开放子任务」的不变量不被破坏。
+            reopen_closed_chain(conn, week_id, parent_id)?;
         }
         // Prevent cycles: the new parent must not be inside the moved subtree.
         let mut cursor = Some(parent_id);
@@ -1772,6 +1792,88 @@ mod tests {
         assert!(move_task(&conn, "20260803-20260809", root.id, Some(root.id), 0.0).is_err());
         // Moving a parent under its own child would create a cycle.
         assert!(move_task(&conn, "20260803-20260809", root.id, Some(child.id), 0.0).is_err());
+    }
+
+    #[test]
+    fn create_child_under_closed_parent_reopens_chain() {
+        let mut conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+
+        let done_root = create_plain_task(&conn, "20260803-20260809", "已完成项目", None);
+        close_task(&mut conn, "20260803-20260809", done_root.id).unwrap();
+        let closed = get_task(&conn, "20260803-20260809", done_root.id).unwrap().unwrap();
+        assert_eq!(closed.status, TASK_STATUS_CLOSED);
+
+        // Attaching a new open child reopens the closed parent automatically.
+        let child = create_plain_task(&conn, "20260803-20260809", "新挂的事项", Some(done_root.id));
+        assert_eq!(child.status, TASK_STATUS_IN_PROGRESS);
+        let reopened = get_task(&conn, "20260803-20260809", done_root.id).unwrap().unwrap();
+        assert_eq!(reopened.status, TASK_STATUS_IN_PROGRESS);
+        assert!(reopened.closed_at.is_none());
+    }
+
+    #[test]
+    fn create_child_under_closed_parent_reopens_all_ancestors() {
+        let mut conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+
+        let root = create_plain_task(&conn, "20260803-20260809", "根项目", None);
+        let middle = create_plain_task(&conn, "20260803-20260809", "中间分组", Some(root.id));
+        let leaf = create_plain_task(&conn, "20260803-20260809", "已完成的叶子", Some(middle.id));
+
+        // Closing the leaf cascades: root and middle have no open children left.
+        close_task(&mut conn, "20260803-20260809", leaf.id).unwrap();
+        for task_id in [root.id, middle.id, leaf.id] {
+            let task = get_task(&conn, "20260803-20260809", task_id).unwrap().unwrap();
+            assert_eq!(task.status, TASK_STATUS_CLOSED);
+        }
+
+        // Attaching under the closed middle group reopens middle and root,
+        // while the old leaf stays closed.
+        let new_child = create_plain_task(&conn, "20260803-20260809", "新挂的事项", Some(middle.id));
+        assert_eq!(new_child.status, TASK_STATUS_IN_PROGRESS);
+        for task_id in [root.id, middle.id] {
+            let task = get_task(&conn, "20260803-20260809", task_id).unwrap().unwrap();
+            assert_eq!(task.status, TASK_STATUS_IN_PROGRESS);
+            assert!(task.closed_at.is_none());
+        }
+        let leaf_now = get_task(&conn, "20260803-20260809", leaf.id).unwrap().unwrap();
+        assert_eq!(leaf_now.status, TASK_STATUS_CLOSED);
+    }
+
+    #[test]
+    fn move_task_into_closed_parent_reopens_chain() {
+        let mut conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+
+        let completed = create_plain_task(&conn, "20260803-20260809", "已完成分组", None);
+        close_task(&mut conn, "20260803-20260809", completed.id).unwrap();
+
+        let loose = create_plain_task(&conn, "20260803-20260809", "游离任务", None);
+        move_task(&conn, "20260803-20260809", loose.id, Some(completed.id), 0.0).unwrap();
+
+        let completed_now = get_task(&conn, "20260803-20260809", completed.id).unwrap().unwrap();
+        let loose_now = get_task(&conn, "20260803-20260809", loose.id).unwrap().unwrap();
+        assert_eq!(completed_now.status, TASK_STATUS_IN_PROGRESS);
+        assert!(completed_now.closed_at.is_none());
+        assert_eq!(loose_now.parent_id, Some(completed.id));
+    }
+
+    #[test]
+    fn moving_a_closed_task_under_a_closed_parent_reopens_the_parent() {
+        let mut conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+
+        let target = create_plain_task(&conn, "20260803-20260809", "已完成目标", None);
+        close_task(&mut conn, "20260803-20260809", target.id).unwrap();
+        let done_item = create_plain_task(&conn, "20260803-20260809", "已完成的项", None);
+        close_task(&mut conn, "20260803-20260809", done_item.id).unwrap();
+
+        // 挂载即激活：即使被挂的任务本身已关闭，父节点也自动重开。
+        move_task(&conn, "20260803-20260809", done_item.id, Some(target.id), 0.0).unwrap();
+        let target_now = get_task(&conn, "20260803-20260809", target.id).unwrap().unwrap();
+        assert_eq!(target_now.status, TASK_STATUS_IN_PROGRESS);
+        assert!(target_now.closed_at.is_none());
     }
 
     #[test]
