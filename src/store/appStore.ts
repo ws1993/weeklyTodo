@@ -56,7 +56,12 @@ interface AppState {
     /** 目标周；缺省为当前激活周。查询页跨周编辑时显式传入。 */
     weekId?: string,
   ) => Promise<void>;
-  toggleTask: (taskId: number, weekId?: string) => Promise<void>;
+  toggleTask: (
+    taskId: number,
+    weekId?: string,
+    /** 调用方已知当前状态时直接传入，避免依赖 store 树查找（跨周任务不在当前激活周树中）。 */
+    currentStatus?: Task['status'],
+  ) => Promise<void>;
   moveTask: (taskId: number, newParentId: number | null, newIndex: number, weekId?: string) => Promise<void>;
   deleteTask: (taskId: number, weekId?: string) => Promise<void>;
   createWeek: (mondayDate: string) => Promise<Week>;
@@ -201,16 +206,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     await get().refreshMetadata();
   },
 
-  toggleTask: async (taskId, targetWeekId) => {
+  toggleTask: async (taskId, targetWeekId, currentStatus) => {
     const { activeWeekId, tree } = get();
     const weekId = targetWeekId ?? activeWeekId;
-    const task =
+    const treeTask =
       tree?.tasks.find((item) => item.id === taskId && item.weekId === weekId) ??
       tree?.tasks.find((item) => item.id === taskId);
-    if (!task) {
+    const status = currentStatus ?? treeTask?.status;
+    if (!status) {
       return;
     }
-    if (task.status === 'closed') {
+    if (status === 'closed') {
       await bridge.reopenTask(weekId, taskId);
     } else {
       await bridge.closeTask(weekId, taskId);

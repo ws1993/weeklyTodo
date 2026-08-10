@@ -94,15 +94,16 @@ export function TaskDetailPanel({ task, onClose, tasks, weekId, onMutated }: Tas
   }));
   const tagOptions = tags.map((tag) => ({ value: tag.name, label: tag.name }));
 
-  const save = async () => {
+  /** 将详情面板的当前编辑落库；校验失败或后端报错时返回 false，调用方据此中止后续操作。 */
+  const persistEdits = async (): Promise<boolean> => {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
       setError('任务标题不能为空');
-      return;
+      return false;
     }
     if (executionMode === 'follow_up' && ownerValue.length === 0) {
       setError('跟进任务需要指定负责人');
-      return;
+      return false;
     }
     setBusy(true);
     setError(null);
@@ -127,19 +128,32 @@ export function TaskDetailPanel({ task, onClose, tasks, weekId, onMutated }: Tas
         },
         targetWeekId,
       );
-      await onMutated?.();
-      onClose();
+      return true;
     } catch (saveError) {
       setError(String(saveError));
+      return false;
     } finally {
       setBusy(false);
     }
   };
 
+  const save = async () => {
+    if (!(await persistEdits())) {
+      return;
+    }
+    await onMutated?.();
+    onClose();
+  };
+
   const toggleDone = async () => {
+    // 先保存当前编辑，避免「改完直接标记完成」时丢失未落库的修改。
+    if (!(await persistEdits())) {
+      return;
+    }
     setBusy(true);
     try {
-      await toggleTask(task.id);
+      // 传入目标周与已知状态：查询页跨周打开详情时，store 树里未必有该任务。
+      await toggleTask(task.id, targetWeekId, task.status);
       await onMutated?.();
       onClose();
     } finally {
