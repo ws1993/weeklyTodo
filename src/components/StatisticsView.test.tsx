@@ -65,8 +65,8 @@ const sampleData: StatisticsOverview = {
   ],
   byTag: [{ name: '工作', count: 3 }],
   byOwner: [
-    { name: '小明', count: 2 },
     { name: '', count: 7 },
+    { name: '小明', count: 2 },
   ],
   byAssigner: [
     { name: '李四', count: 1 },
@@ -137,7 +137,18 @@ describe('StatisticsView 统计 / 复盘', () => {
     expect(screen.getByText('小明')).toBeTruthy();
     expect(screen.getByText('按分派人')).toBeTruthy();
     expect(screen.getByText('李四')).toBeTruthy();
-    expect(screen.getAllByText('未指定').length).toBeGreaterThanOrEqual(1);
+
+    // 无负责人的任务归为「自己」：置顶显示加粗徽章，不再显示未指定。
+    const ownerPanel = screen.getByText('按负责人').closest('.stats-panel')!;
+    const ownerNames = Array.from(ownerPanel.querySelectorAll('.stats-dist-name')).map(
+      (node) => node.textContent,
+    );
+    expect(ownerNames[0]).toBe('自己');
+    expect(ownerNames[1]).toBe('小明');
+    expect(ownerPanel.querySelector('.stats-dist-row.self .tag-self')).toBeTruthy();
+
+    // 分派人面板的未指定保留原语义。
+    expect(screen.getByText('未指定')).toBeTruthy();
   });
 
   it('无数据时展示空状态', async () => {

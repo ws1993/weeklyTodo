@@ -141,6 +141,9 @@
   font-size:12px;
 }
 .stats-dist-row.muted{opacity:.55}
+/* 自己的任务：加粗徽章 + 强调色，与跟进负责人区分开。 */
+.stats-dist-row.self .stats-dist-name{font-weight:700;color:var(--text-1)}
+.stats-dist-row.self .tag-self{font-weight:700;color:var(--text-1)}
 .stats-dist-name{
   flex:none;width:96px;
   color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;

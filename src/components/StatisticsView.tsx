@@ -60,11 +60,22 @@ function PriorityRow({ stat, max }: { stat: PriorityStat; max: number }) {
   );
 }
 
-function NamedRow({ item, max, muted }: { item: NamedCount; max: number; muted?: boolean }) {
+function NamedRow({
+  item,
+  max,
+  muted,
+  self,
+}: {
+  item: NamedCount;
+  max: number;
+  muted?: boolean;
+  /** 自己的任务（无负责人）：显示「自己」徽章，置顶且加粗高亮。 */
+  self?: boolean;
+}) {
   return (
-    <div className={`stats-dist-row${muted ? ' muted' : ''}`}>
-      <span className="stats-dist-name" title={item.name}>
-        {item.name || '未指定'}
+    <div className={`stats-dist-row${muted ? ' muted' : ''}${self ? ' self' : ''}`}>
+      <span className="stats-dist-name" title={self ? '自己' : item.name}>
+        {self ? <span className="tag tag-self">自己</span> : item.name || '未指定'}
       </span>
       <CountBar count={item.count} max={max} />
       <span className="stats-dist-meta">{item.count}</span>
@@ -366,7 +377,12 @@ export function StatisticsView({ open, onClose }: StatisticsViewProps) {
                 <h3 className="stats-panel-title">按负责人</h3>
                 <div className="stats-dist">
                   {data.byOwner.map((item) => (
-                    <NamedRow key={item.name} item={item} max={maxOwner} muted={item.name === ''} />
+                    <NamedRow
+                      key={item.name || '__self__'}
+                      item={item}
+                      max={maxOwner}
+                      self={item.name === ''}
+                    />
                   ))}
                   {data.byOwner.length === 0 && (
                     <span className="stats-dist-empty">暂无数据</span>

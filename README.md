@@ -80,6 +80,16 @@ npm run tauri:build   # 生成 NSIS 安装器
 
 打 `v*` 标签推送到 GitHub 后，[release.yml](.github/workflows/release.yml) 会自动构建并把安装器发布到 GitHub Release；应用内「检查更新」会从最新 Release 获取安装包。
 
+### 预热 Rust 编译缓存（可选，推荐发版前执行）
+
+GitHub Actions 的缓存按分支 / 标签隔离：Release 工作流由 `v*` 标签触发，只能读取该标签和默认分支（main）上的缓存。为了让发版时跳过 Rust 依赖的全量编译（约 7 分钟），发版前先在 main 上预热一次：
+
+```bash
+gh workflow run warm-cache.yml
+```
+
+首次执行是全量编译（约 8 分钟，一次性成本），之后执行会恢复已有缓存并增量编译，通常 1 分钟内完成。依赖变更后需重新预热。发版时 [release.yml](.github/workflows/release.yml) 会自动命中该缓存，将整体打包时间从约 8 分钟降至约 2~3 分钟。
+
 ## 友联
 
 [LINUX DO - 新的理想型社区](https://linux.do/)

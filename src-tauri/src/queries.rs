@@ -422,14 +422,14 @@ pub fn statistics_overview(
         rows
     };
 
-    // 按负责人分布（未指定负责人最后；其余按数量降序）。
+    // 按负责人分布（自己的任务最先；其余按数量降序）。
     let by_owner = {
         let sql = format!(
             "SELECT COALESCE(owners.name, ''), COUNT(*)
              FROM tasks t LEFT JOIN owners ON owners.id = t.owner_id
              WHERE t.{task_condition}
              GROUP BY owners.name
-             ORDER BY (owners.name IS NULL) ASC, COUNT(*) DESC, owners.name",
+             ORDER BY (owners.name IS NULL) DESC, COUNT(*) DESC, owners.name",
         );
         let mut stmt = conn
             .prepare(&sql)
