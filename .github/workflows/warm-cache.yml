@@ -36,6 +36,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
+          # 必须与 release.yml 的缓存 key 一致（不包含 job 名），
+          # 发版 tag 才能在 main 上命中这份预热缓存。
+          add-job-id-key: false
       - name: Compile backend to warm cache
         # 与 tauri build 的 Rust 部分保持完全一致（Cargo.toml 无自定义 features），
         # 编译产物直接给发版 tag 复用。

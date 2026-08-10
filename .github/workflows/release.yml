@@ -24,6 +24,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
+          # 必须与 warm-cache.yml 的缓存 key 一致，否则 main 上预热的
+          # 缓存匹配不上。job 名不同会导致 key 不同（add-job-id-key 默认 true）。
+          add-job-id-key: false
           # tag 域的缓存互不可读，存了也没用，还会挤占配额、可能挤掉
           # main 分支的预热缓存（见 warm-cache.yml）。发版只读不写。
           save-if: false
