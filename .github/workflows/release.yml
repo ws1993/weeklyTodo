@@ -24,6 +24,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
+          # tag 域的缓存互不可读，存了也没用，还会挤占配额、可能挤掉
+          # main 分支的预热缓存（见 warm-cache.yml）。发版只读不写。
+          save-if: false
       - name: Install frontend dependencies
         run: npm install
       - name: Build frontend

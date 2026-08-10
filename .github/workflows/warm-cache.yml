@@ -1,0 +1,43 @@
+name: Warm Cargo cache
+
+# 手动预热 main 分支的 Rust 编译缓存。GitHub Actions 的缓存按 ref 隔离：
+# tag 发版只能读取自己 tag 和默认分支（main）的缓存，因此先在 main 上把
+# 依赖编译一遍并保存，发版 tag 即可命中，避免每次发版全量编译（~7 分钟）。
+#
+# 用法：发版前手动跑一次
+#   gh workflow run warm-cache.yml
+#
+# 第一次跑是全量编译（~8 分钟，一次性成本）；之后每次跑会先恢复 main 上
+# 已有的缓存，只有依赖变更时才做增量编译，通常 1 分钟内完成。
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  warm-cargo-cache:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.1
+      - name: Install frontend dependencies
+        run: npm install
+      - name: Build frontend
+        run: npm run build
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - name: Compile backend to warm cache
+        # 与 tauri build 的 Rust 部分保持完全一致（Cargo.toml 无自定义 features），
+        # 编译产物直接给发版 tag 复用。
+        run: cargo build --release
+        working-directory: src-tauri
