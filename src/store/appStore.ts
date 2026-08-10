@@ -11,6 +11,9 @@ import type {
 } from '../shared/contracts/types';
 import * as bridge from '../api/nativeBridge';
 
+/** 防止 React StrictMode 双 effect 或 WebDAV 恢复流程并发触发多次初始化。 */
+let initializeInFlight: Promise<void> | null = null;
+
 interface AppState {
   storageDir: string;
   currentWeekId: string;
@@ -76,27 +79,35 @@ export const useAppStore = create<AppState>((set, get) => ({
   loading: true,
   error: null,
 
-  initialize: async () => {
-    set({ loading: true, error: null });
-    try {
-      const state = await bridge.initializeApp();
-      const [recentWeeks, allWeeks] = await Promise.all([
-        bridge.recentWeeks(4),
-        bridge.listWeeks(),
-      ]);
-      set({
-        storageDir: state.storageDir,
-        currentWeekId: state.currentWeekId,
-        activeWeekId: state.currentWeekId,
-        recentWeeks,
-        allWeeks,
-        loading: false,
-      });
-      await get().refreshTree();
-      await get().refreshMetadata();
-    } catch (error) {
-      set({ loading: false, error: String(error) });
+  initialize: () => {
+    if (initializeInFlight) {
+      return initializeInFlight;
     }
+    initializeInFlight = (async () => {
+      set({ loading: true, error: null });
+      try {
+        const state = await bridge.initializeApp();
+        const [recentWeeks, allWeeks] = await Promise.all([
+          bridge.recentWeeks(4),
+          bridge.listWeeks(),
+        ]);
+        set({
+          storageDir: state.storageDir,
+          currentWeekId: state.currentWeekId,
+          activeWeekId: state.currentWeekId,
+          recentWeeks,
+          allWeeks,
+          loading: false,
+        });
+        await get().refreshTree();
+        await get().refreshMetadata();
+      } catch (error) {
+        set({ loading: false, error: String(error) });
+      } finally {
+        initializeInFlight = null;
+      }
+    })();
+    return initializeInFlight;
   },
 
   refreshWeeks: async () => {

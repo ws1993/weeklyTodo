@@ -1012,36 +1012,6 @@ fn copy_task_tags(conn: &Connection, source_id: i64, target_id: i64) -> Result<(
     Ok(())
 }
 
-/// Whether the subtree rooted at `root_id` contains at least one open task.
-fn subtree_has_open(conn: &Connection, root_id: i64) -> Result<bool, String> {
-    let mut frontier = vec![root_id];
-    while let Some(current) = frontier.pop() {
-        let status: String = conn
-            .query_row(
-                "SELECT status FROM tasks WHERE id = ?1",
-                params![current],
-                |row| row.get(0),
-            )
-            .map_err(|error| format!("读取任务状态失败：{error}"))?;
-        if status == TASK_STATUS_IN_PROGRESS {
-            return Ok(true);
-        }
-        let mut stmt = conn
-            .prepare("SELECT id FROM tasks WHERE parent_id = ?1")
-            .map_err(|error| format!("查询子任务失败：{error}"))?;
-        let mapped = stmt
-            .query_map(params![current], |row| row.get(0))
-            .map_err(|error| format!("遍历子任务失败：{error}"))?;
-        let children: Vec<i64> = mapped
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|error| format!("读取子任务失败：{error}"))?;
-        for child in children {
-            frontier.push(child);
-        }
-    }
-    Ok(false)
-}
-
 /// Close a task and, when all siblings are closed, its ancestors (bottom-up).
 pub fn close_task(conn: &mut Connection, week_id: &str, task_id: i64) -> Result<Task, String> {
     let mut current = get_task(conn, week_id, task_id)?.ok_or_else(|| "任务不存在".to_string())?;
@@ -1260,15 +1230,8 @@ pub fn ensure_current_week(conn: &mut Connection) -> Result<(Week, bool), String
     let monday = monday_of(today);
     let week_id = week_range_key(monday);
 
-    if has_week(conn, &week_id)? {
-        let week = conn
-            .query_row(
-                "SELECT id, start_date, end_date, created_at, carried_from_week_id
-                 FROM weeks WHERE id = ?1",
-                params![week_id],
-                week_from_row,
-            )
-            .map_err(|error| format!("读取当前周失败：{error}"))?;
+    // Fast path: the current week already exists.
+    if let Some(week) = get_week(conn, &week_id)? {
         return Ok((week, false));
     }
 
@@ -1276,22 +1239,32 @@ pub fn ensure_current_week(conn: &mut Connection) -> Result<(Week, bool), String
     let carried_from = latest_week_starting_on_or_before(conn, today)?;
     let new_week = week_from_monday(monday, carried_from.as_ref().map(|w| w.id.clone()));
 
+    // Use an IMMEDIATE transaction so concurrent callers (e.g. React
+    // StrictMode double effects or a sync-triggered re-initialize) serialize
+    // on the write lock instead of both passing the existence check and
+    // racing on the INSERT.
     let tx = conn
-        .transaction()
+        .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
         .map_err(|error| format!("开启建周事务失败：{error}"))?;
+    // Re-check inside the transaction: a concurrent connection may have
+    // created this week while we waited for the write lock.
+    if let Some(week) = get_week(&tx, &week_id)? {
+        return Ok((week, false));
+    }
+    // Insert the target week first: carried tasks reference `week_id`, so the
+    // week row must exist before copying tasks over (foreign key constraint).
+    insert_week(&tx, &new_week)?;
     if let Some(source) = &carried_from {
         carry_over_week(&tx, &new_week.id, &source.id)?;
     }
-    insert_week(&tx, &new_week)?;
     tx.commit()
         .map_err(|error| format!("提交建周事务失败：{error}"))?;
 
     Ok((new_week, true))
 }
 
-/// Clone unfinished branches of `source_week_id` into `target_week_id`.
-/// Open tasks are copied. Within an open branch, closed descendants are copied
-/// as read-only context (status preserved). Fully closed branches are omitted.
+/// Clone unfinished tasks of `source_week_id` into `target_week_id`.
+/// Only open tasks are copied; closed tasks always stay in their source week.
 fn carry_over_week(
     conn: &Connection,
     target_week_id: &str,
@@ -1304,8 +1277,7 @@ fn carry_over_week(
 
     // Map source task id -> target task id for copied tasks.
     let mut id_map: std::collections::HashMap<i64, i64> = std::collections::HashMap::new();
-    // Roots are tasks without a parent (top-level open tasks and top-level closed tasks
-    // that have open descendants).
+    // Roots are top-level tasks.
     let root_ids: Vec<i64> = source_tasks
         .iter()
         .filter(|task| task.parent_id.is_none())
@@ -1341,6 +1313,8 @@ fn carry_over_week(
 }
 
 /// Recursively carry one branch. `target_parent_id` is the carried parent task in the target week.
+/// Closed tasks are never copied; their open descendants are promoted to the
+/// target parent's level so no unfinished work is silently dropped.
 #[allow(clippy::too_many_arguments)]
 fn carry_over_branch(
     conn: &Connection,
@@ -1360,16 +1334,25 @@ fn carry_over_branch(
         .iter()
         .filter(|child| child.parent_id == Some(source_id))
         .collect();
-    let has_open_child = children.iter().any(|child| {
-        child.status == TASK_STATUS_IN_PROGRESS || subtree_has_open(conn, child.id).unwrap_or(false)
-    });
 
-    // Skip a completely closed top-level branch (no parent carried over) with no open descendants.
-    if task.status == TASK_STATUS_CLOSED && target_parent_id.is_none() && !has_open_child {
+    // Closed tasks do not carry over. Recurse into their children so any open
+    // descendants still come over, promoted to the target parent's level.
+    if task.status == TASK_STATUS_CLOSED {
+        for child in children {
+            carry_over_branch(
+                conn,
+                target_week_id,
+                source_week_id,
+                source_tasks,
+                child.id,
+                target_parent_id,
+                id_map,
+            )?;
+        }
         return Ok(());
     }
 
-    // Copy this task (open tasks and closed contextual tasks both come over).
+    // Copy this open task.
     let now = iso_now();
     conn.execute(
         "INSERT INTO tasks (week_id, parent_id, title, description, status, priority, sort_index,
@@ -1599,7 +1582,7 @@ mod tests {
     }
 
     #[test]
-    fn closed_context_stays_inside_open_branch() {
+    fn closed_nodes_are_not_carried_over() {
         let mut conn = db::open_in_memory();
         seed_week(&conn, "20260727-20260802");
         seed_week(&conn, "20260803-20260809");
@@ -1612,13 +1595,62 @@ mod tests {
         carry_over_week(&conn, "20260803-20260809", "20260727-20260802").unwrap();
         let target_tasks = list_tasks(&conn, "20260803-20260809").unwrap();
         let titles: Vec<&str> = target_tasks.iter().map(|t| t.title.as_str()).collect();
-        assert_eq!(titles, vec!["项目B", "已完成步骤", "进行中的步骤"]);
-        let copied_done = target_tasks
+        // Closed tasks inside an open branch stay in the source week.
+        assert_eq!(titles, vec!["项目B", "进行中的步骤"]);
+        assert!(target_tasks
             .iter()
-            .find(|t| t.title == "已完成步骤")
-            .unwrap();
-        assert_eq!(copied_done.status, TASK_STATUS_CLOSED);
-        assert!(copied_done.closed_at.is_some());
+            .all(|t| t.status == TASK_STATUS_IN_PROGRESS));
+    }
+
+    #[test]
+    fn closed_subtree_is_not_carried_over() {
+        let mut conn = db::open_in_memory();
+        seed_week(&conn, "20260727-20260802");
+        seed_week(&conn, "20260803-20260809");
+
+        // An open root with a sibling branch that is fully closed.
+        let open_root = create_plain_task(&conn, "20260727-20260802", "开放项目", None);
+        create_plain_task(&conn, "20260727-20260802", "开放子任务", Some(open_root.id));
+        let closed_root = create_plain_task(&conn, "20260727-20260802", "已结束项目", None);
+        let closed_child = create_plain_task(
+            &conn,
+            "20260727-20260802",
+            "已结束子任务",
+            Some(closed_root.id),
+        );
+        close_task(&mut conn, "20260727-20260802", closed_child.id).unwrap();
+        close_task(&mut conn, "20260727-20260802", closed_root.id).unwrap();
+
+        carry_over_week(&conn, "20260803-20260809", "20260727-20260802").unwrap();
+        let target_tasks = list_tasks(&conn, "20260803-20260809").unwrap();
+        let titles: Vec<&str> = target_tasks.iter().map(|t| t.title.as_str()).collect();
+        assert_eq!(titles, vec!["开放项目", "开放子任务"]);
+    }
+
+    #[test]
+    fn open_descendant_of_closed_task_is_promoted() {
+        let mut conn = db::open_in_memory();
+        seed_week(&conn, "20260727-20260802");
+        seed_week(&conn, "20260803-20260809");
+
+        // Guard against invariant violations: an open task nested under a closed
+        // task must still be carried over (promoted to the target parent level).
+        let closed_root = create_plain_task(&conn, "20260727-20260802", "关闭根", None);
+        let closed_mid = create_plain_task(
+            &conn,
+            "20260727-20260802",
+            "关闭中间层",
+            Some(closed_root.id),
+        );
+        create_plain_task(&conn, "20260727-20260802", "开放叶", Some(closed_mid.id));
+        close_task(&mut conn, "20260727-20260802", closed_mid.id).unwrap();
+        close_task(&mut conn, "20260727-20260802", closed_root.id).unwrap();
+
+        carry_over_week(&conn, "20260803-20260809", "20260727-20260802").unwrap();
+        let target_tasks = list_tasks(&conn, "20260803-20260809").unwrap();
+        let titles: Vec<&str> = target_tasks.iter().map(|t| t.title.as_str()).collect();
+        assert_eq!(titles, vec!["开放叶"]);
+        assert_eq!(target_tasks[0].parent_id, None);
     }
 
     #[test]
@@ -1630,6 +1662,89 @@ mod tests {
         let (week_again, created_again) = ensure_current_week(&mut conn).unwrap();
         assert!(!created_again);
         assert_eq!(week_again.id, week.id);
+    }
+
+    #[test]
+    fn ensure_current_week_carries_over_from_previous_week() {
+        let mut conn = db::open_in_memory();
+        // A previous week with unfinished tasks (ends before the current week).
+        seed_week(&conn, "20260803-20260809");
+        create_plain_task(&conn, "20260803-20260809", "项目A", None);
+
+        let (week, created) = ensure_current_week(&mut conn).unwrap();
+        assert!(created);
+        assert_eq!(week.id, current_week_id());
+        assert_ne!(week.id, "20260803-20260809");
+
+        // Open tasks from the previous week must have been carried over.
+        let target_tasks = list_tasks(&conn, &week.id).unwrap();
+        let titles: Vec<&str> = target_tasks.iter().map(|t| t.title.as_str()).collect();
+        assert_eq!(titles, vec!["项目A"]);
+    }
+
+    #[test]
+    fn ensure_current_week_is_safe_under_concurrent_calls() {
+        use std::sync::{Arc, Barrier};
+
+        let dir = std::env::temp_dir().join(format!(
+            "weeklytodo-concurrency-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        // Seed a previous week with an unfinished task so carry-over actually runs.
+        {
+            let conn = db::open_database(&dir).unwrap();
+            conn.execute(
+                "INSERT INTO weeks (id, start_date, end_date, created_at, carried_from_week_id)
+                 VALUES ('20260803-20260809', '20260803', '20260809', '2026-08-03T08:00:00.000', NULL)",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO tasks (week_id, title, status, priority, sort_index, created_at, updated_at)
+                 VALUES ('20260803-20260809', '并发任务', 'in_progress', 2, 0,
+                         '2026-08-03T08:00:00.000', '2026-08-03T08:00:00.000')",
+                [],
+            )
+            .unwrap();
+        }
+
+        // Two connections racing to create the current week, like React
+        // StrictMode double effects in dev mode.
+        let barrier = Arc::new(Barrier::new(2));
+        let dir_a = dir.clone();
+        let barrier_a = barrier.clone();
+        let handle_a = std::thread::spawn(move || {
+            barrier_a.wait();
+            let mut conn = db::open_database(&dir_a).unwrap();
+            ensure_current_week(&mut conn).unwrap()
+        });
+        let dir_b = dir.clone();
+        let barrier_b = barrier.clone();
+        let handle_b = std::thread::spawn(move || {
+            barrier_b.wait();
+            let mut conn = db::open_database(&dir_b).unwrap();
+            ensure_current_week(&mut conn).unwrap()
+        });
+
+        let result_a = handle_a.join().unwrap();
+        let result_b = handle_b.join().unwrap();
+        assert_eq!(result_a.0.id, result_b.0.id);
+        assert_eq!(result_a.0.id, current_week_id());
+        // Exactly one call created the week; the other reused it.
+        assert_ne!(result_a.1, result_b.1);
+
+        // Carry-over ran exactly once.
+        let conn = db::open_database(&dir).unwrap();
+        let tasks = list_tasks(&conn, &result_a.0.id).unwrap();
+        let titles: Vec<&str> = tasks.iter().map(|t| t.title.as_str()).collect();
+        assert_eq!(titles, vec!["并发任务"]);
+        drop(conn);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

@@ -16,7 +16,7 @@ alwaysApply: false
 
 - 周 id = `YYYYMMDD-YYYYMMDD`（周一至周日），如 `20260803-20260809`；以本地时区周一为周起点。
 - 启动时 `ensure_current_week` 自动建当前周；几周未打开则从最近存储周带入未完成内容，避免数据丢失。
-- 带入规则（carry_over）：未完成分支整体复制（父-子结构保持）；分支内已关闭节点保留为只读上下文；完全关闭的分支不带入；新周任务带 `carried_from_task_id` + `origin_week_id` 溯源。
+- 带入规则（carry_over）：只复制未完成任务（父-子结构保持）；已关闭任务一律不带入、留在原周；异常数据下已关闭节点的未完成后代会提升到父级继续带入；新周任务带 `carried_from_task_id` + `origin_week_id` 溯源。
 - 手动建周仅允许指定周一，重复周拒绝。
 
 ## 3. 任务模型

@@ -15,6 +15,11 @@ pub fn open_database(data_dir: &Path) -> Result<Connection, String> {
         .map_err(|error| format!("启用外键失败：{error}"))?;
     conn.pragma_update(None, "journal_mode", "WAL")
         .map_err(|error| format!("启用 WAL 失败：{error}"))?;
+    // Wait for the write lock when a concurrent connection holds it, instead
+    // of failing immediately with SQLITE_BUSY. Needed for IMMEDIATE
+    // transactions (see `ensure_current_week`).
+    conn.busy_timeout(std::time::Duration::from_secs(10))
+        .map_err(|error| format!("设置忙等待超时失败：{error}"))?;
     migrate(&mut conn)?;
     Ok(conn)
 }
@@ -158,6 +163,8 @@ pub fn open_in_memory() -> Connection {
     let mut conn = Connection::open_in_memory().expect("open in-memory database");
     conn.pragma_update(None, "foreign_keys", "ON")
         .expect("enable foreign keys");
+    conn.busy_timeout(std::time::Duration::from_secs(10))
+        .expect("set busy timeout");
     migrate(&mut conn).expect("run migrations");
     conn
 }
