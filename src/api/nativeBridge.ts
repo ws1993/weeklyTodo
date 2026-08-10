@@ -206,9 +206,15 @@ export async function weekSummaries(): Promise<WeekSummary[]> {
   return invokeCommand<WeekSummary[]>('week_summaries');
 }
 
-/** 历史统计 / 复盘视图的一次性聚合数据（近 N 周趋势 + 各维度分布）。 */
-export async function statisticsOverview(limit?: number): Promise<StatisticsOverview> {
-  return invokeCommand<StatisticsOverview>('statistics_overview', { limit: limit ?? 12 });
+/** 历史统计 / 复盘视图的一次性聚合数据（可按起止周过滤，缺省为全部历史）。 */
+export async function statisticsOverview(
+  startWeekId?: string,
+  endWeekId?: string,
+): Promise<StatisticsOverview> {
+  return invokeCommand<StatisticsOverview>('statistics_overview', {
+    startWeekId: startWeekId ?? null,
+    endWeekId: endWeekId ?? null,
+  });
 }
 
 export async function getStorageDir(): Promise<string> {

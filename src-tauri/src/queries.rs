@@ -240,73 +240,152 @@ pub fn week_summaries(conn: &Connection) -> Result<Vec<(String, i64, i64)>, Stri
     Ok(rows)
 }
 
-/// 一次性聚合「统计 / 复盘」视图需要的全部数据。
-pub fn statistics_overview(conn: &Connection, limit: i64) -> Result<StatisticsOverview, String> {
-    let limit = limit.clamp(1, 52);
+/// 把起止周 id 解析为对应周 `start_date` 边界；周 id 不存在时视为无该边界。
+fn resolve_week_bound(conn: &Connection, week_id: Option<&str>) -> Result<Option<String>, String> {
+    let Some(week_id) = week_id else {
+        return Ok(None);
+    };
+    conn.query_row(
+        "SELECT start_date FROM weeks WHERE id = ?1",
+        params![week_id],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(|error| format!("解析统计范围周失败：{error}"))
+}
 
-    // 最近 N 周趋势：总量 / 完成 / 进行中 / 带入 / 带入完成。
+/// 生成「任务周 id 落在起止周范围内」的 SQL 条件片段与对应参数。
+/// 片段形如 `week_id IN (SELECT id FROM weeks WHERE 1=1 [AND start_date >= ?] [AND start_date <= ?])`，
+/// 需按使用处补上前缀（如 `t.`）。
+fn week_id_in_range_condition(
+    start_bound: Option<&str>,
+    end_bound: Option<&str>,
+) -> (String, Vec<Box<dyn rusqlite::types::ToSql>>) {
+    let mut sql = String::from("week_id IN (SELECT id FROM weeks WHERE 1=1");
+    let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+    if let Some(bound) = start_bound {
+        sql.push_str(" AND start_date >= ?");
+        params.push(Box::new(bound.to_string()));
+    }
+    if let Some(bound) = end_bound {
+        sql.push_str(" AND start_date <= ?");
+        params.push(Box::new(bound.to_string()));
+    }
+    sql.push(')');
+    (sql, params)
+}
+
+/// 一次性聚合「统计 / 复盘」视图需要的全部数据（可限定起止周范围，缺省为全部历史）。
+pub fn statistics_overview(
+    conn: &Connection,
+    start_week_id: Option<&str>,
+    end_week_id: Option<&str>,
+) -> Result<StatisticsOverview, String> {
+    let start_bound = resolve_week_bound(conn, start_week_id)?;
+    let end_bound = resolve_week_bound(conn, end_week_id)?;
+
+    // 周趋势：范围内各周总量 / 完成 / 进行中 / 带入 / 带入完成。
+    let mut week_sql = String::from(
+        "SELECT w.id,
+                COUNT(t.id) AS total,
+                COALESCE(SUM(CASE WHEN t.status = 'closed' THEN 1 ELSE 0 END), 0) AS done,
+                COALESCE(SUM(CASE WHEN t.status = 'in_progress' THEN 1 ELSE 0 END), 0) AS open,
+                COALESCE(SUM(CASE WHEN t.carried_from_task_id IS NOT NULL THEN 1 ELSE 0 END), 0) AS carried,
+                COALESCE(SUM(CASE WHEN t.status = 'closed' AND t.carried_from_task_id IS NOT NULL THEN 1 ELSE 0 END), 0) AS carried_done
+         FROM weeks w LEFT JOIN tasks t ON t.week_id = w.id",
+    );
+    let mut week_conditions = Vec::new();
+    let mut week_params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+    if let Some(bound) = start_bound.as_deref() {
+        week_conditions.push("w.start_date >= ?");
+        week_params.push(Box::new(bound.to_string()));
+    }
+    if let Some(bound) = end_bound.as_deref() {
+        week_conditions.push("w.start_date <= ?");
+        week_params.push(Box::new(bound.to_string()));
+    }
+    if !week_conditions.is_empty() {
+        week_sql.push_str(" WHERE ");
+        week_sql.push_str(&week_conditions.join(" AND "));
+    }
+    // 上限 104 周（约两年），仅作防御性保护，正常不会触达。
+    week_sql.push_str(" GROUP BY w.id ORDER BY w.start_date DESC LIMIT 104");
     let weeks = {
         let mut stmt = conn
-            .prepare(
-                "SELECT w.id,
-                        COUNT(t.id) AS total,
-                        COALESCE(SUM(CASE WHEN t.status = 'closed' THEN 1 ELSE 0 END), 0) AS done,
-                        COALESCE(SUM(CASE WHEN t.status = 'in_progress' THEN 1 ELSE 0 END), 0) AS open,
-                        COALESCE(SUM(CASE WHEN t.carried_from_task_id IS NOT NULL THEN 1 ELSE 0 END), 0) AS carried,
-                        COALESCE(SUM(CASE WHEN t.status = 'closed' AND t.carried_from_task_id IS NOT NULL THEN 1 ELSE 0 END), 0) AS carried_done
-                 FROM weeks w LEFT JOIN tasks t ON t.week_id = w.id
-                 GROUP BY w.id
-                 ORDER BY w.start_date DESC
-                 LIMIT ?1",
-            )
+            .prepare(&week_sql)
             .map_err(|error| format!("准备周趋势统计失败：{error}"))?;
         let rows = stmt
-            .query_map(params![limit], |row| {
-                Ok(WeekTrendStat {
-                    week_id: row.get(0)?,
-                    total: row.get(1)?,
-                    done: row.get(2)?,
-                    open: row.get(3)?,
-                    carried: row.get(4)?,
-                    carried_done: row.get(5)?,
-                })
-            })
+            .query_map(
+                rusqlite::params_from_iter(week_params.iter().map(|value| value.as_ref())),
+                |row| {
+                    Ok(WeekTrendStat {
+                        week_id: row.get(0)?,
+                        total: row.get(1)?,
+                        done: row.get(2)?,
+                        open: row.get(3)?,
+                        carried: row.get(4)?,
+                        carried_done: row.get(5)?,
+                    })
+                },
+            )
             .map_err(|error| format!("查询周趋势统计失败：{error}"))?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|error| format!("读取周趋势统计失败：{error}"))?;
         rows
     };
 
-    // 全历史总量：任务 / 完成 / 进行中 / 带入。
-    let (total_tasks, total_done, total_open, total_carried) = conn
+    // 范围内任务过滤条件（各分布与总量查询共用）。
+    let (task_condition, task_params) =
+        week_id_in_range_condition(start_bound.as_deref(), end_bound.as_deref());
+
+    // 范围内总量：任务 / 完成 / 进行中 / 带入 / 拖期未完成。
+    let (total_tasks, total_done, total_open, total_carried, carried_open) = conn
         .query_row(
-            "SELECT COUNT(*),
-                    COALESCE(SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END), 0),
-                    COALESCE(SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END), 0),
-                    COALESCE(SUM(CASE WHEN carried_from_task_id IS NOT NULL THEN 1 ELSE 0 END), 0)
-             FROM tasks",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            &format!(
+                "SELECT COUNT(*),
+                        COALESCE(SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END), 0),
+                        COALESCE(SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END), 0),
+                        COALESCE(SUM(CASE WHEN carried_from_task_id IS NOT NULL THEN 1 ELSE 0 END), 0),
+                        COALESCE(SUM(CASE WHEN status = 'in_progress' AND carried_from_task_id IS NOT NULL THEN 1 ELSE 0 END), 0)
+                 FROM tasks t
+                 WHERE t.{task_condition}",
+            ),
+            rusqlite::params_from_iter(task_params.iter().map(|value| value.as_ref())),
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                ))
+            },
         )
         .map_err(|error| format!("统计任务总量失败：{error}"))?;
 
     // 按优先级分布。
     let by_priority = {
+        let sql = format!(
+            "SELECT priority, COUNT(*),
+                    COALESCE(SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END), 0)
+             FROM tasks t
+             WHERE t.{task_condition}
+             GROUP BY priority ORDER BY priority",
+        );
         let mut stmt = conn
-            .prepare(
-                "SELECT priority, COUNT(*),
-                        COALESCE(SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END), 0)
-                 FROM tasks GROUP BY priority ORDER BY priority",
-            )
+            .prepare(&sql)
             .map_err(|error| format!("准备优先级统计失败：{error}"))?;
         let rows = stmt
-            .query_map([], |row| {
-                Ok(PriorityStat {
-                    priority: row.get(0)?,
-                    count: row.get(1)?,
-                    done: row.get(2)?,
-                })
-            })
+            .query_map(
+                rusqlite::params_from_iter(task_params.iter().map(|value| value.as_ref())),
+                |row| {
+                    Ok(PriorityStat {
+                        priority: row.get(0)?,
+                        count: row.get(1)?,
+                        done: row.get(2)?,
+                    })
+                },
+            )
             .map_err(|error| format!("查询优先级统计失败：{error}"))?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|error| format!("读取优先级统计失败：{error}"))?;
@@ -315,21 +394,28 @@ pub fn statistics_overview(conn: &Connection, limit: i64) -> Result<StatisticsOv
 
     // 按标签分布（按数量降序）。
     let by_tag = {
+        let sql = format!(
+            "SELECT tags.name, COUNT(*)
+             FROM task_tags JOIN tags ON tags.id = task_tags.tag_id
+             WHERE task_tags.task_id IN (
+                 SELECT t.id FROM tasks t WHERE t.{task_condition}
+             )
+             GROUP BY tags.name
+             ORDER BY COUNT(*) DESC, tags.name",
+        );
         let mut stmt = conn
-            .prepare(
-                "SELECT tags.name, COUNT(*)
-                 FROM task_tags JOIN tags ON tags.id = task_tags.tag_id
-                 GROUP BY tags.name
-                 ORDER BY COUNT(*) DESC, tags.name",
-            )
+            .prepare(&sql)
             .map_err(|error| format!("准备标签统计失败：{error}"))?;
         let rows = stmt
-            .query_map([], |row| {
-                Ok(NamedCount {
-                    name: row.get(0)?,
-                    count: row.get(1)?,
-                })
-            })
+            .query_map(
+                rusqlite::params_from_iter(task_params.iter().map(|value| value.as_ref())),
+                |row| {
+                    Ok(NamedCount {
+                        name: row.get(0)?,
+                        count: row.get(1)?,
+                    })
+                },
+            )
             .map_err(|error| format!("查询标签统计失败：{error}"))?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|error| format!("读取标签统计失败：{error}"))?;
@@ -338,21 +424,26 @@ pub fn statistics_overview(conn: &Connection, limit: i64) -> Result<StatisticsOv
 
     // 按负责人分布（未指定负责人最后；其余按数量降序）。
     let by_owner = {
+        let sql = format!(
+            "SELECT COALESCE(owners.name, ''), COUNT(*)
+             FROM tasks t LEFT JOIN owners ON owners.id = t.owner_id
+             WHERE t.{task_condition}
+             GROUP BY owners.name
+             ORDER BY (owners.name IS NULL) ASC, COUNT(*) DESC, owners.name",
+        );
         let mut stmt = conn
-            .prepare(
-                "SELECT COALESCE(owners.name, ''), COUNT(*)
-                 FROM tasks LEFT JOIN owners ON owners.id = tasks.owner_id
-                 GROUP BY owners.name
-                 ORDER BY (owners.name IS NULL) ASC, COUNT(*) DESC, owners.name",
-            )
+            .prepare(&sql)
             .map_err(|error| format!("准备负责人统计失败：{error}"))?;
         let rows = stmt
-            .query_map([], |row| {
-                Ok(NamedCount {
-                    name: row.get(0)?,
-                    count: row.get(1)?,
-                })
-            })
+            .query_map(
+                rusqlite::params_from_iter(task_params.iter().map(|value| value.as_ref())),
+                |row| {
+                    Ok(NamedCount {
+                        name: row.get(0)?,
+                        count: row.get(1)?,
+                    })
+                },
+            )
             .map_err(|error| format!("查询负责人统计失败：{error}"))?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|error| format!("读取负责人统计失败：{error}"))?;
@@ -361,21 +452,26 @@ pub fn statistics_overview(conn: &Connection, limit: i64) -> Result<StatisticsOv
 
     // 按分派人分布（未指定分派人最后；其余按数量降序）。
     let by_assigner = {
+        let sql = format!(
+            "SELECT COALESCE(assigners.name, ''), COUNT(*)
+             FROM tasks t LEFT JOIN assigners ON assigners.id = t.assigner_id
+             WHERE t.{task_condition}
+             GROUP BY assigners.name
+             ORDER BY (assigners.name IS NULL) ASC, COUNT(*) DESC, assigners.name",
+        );
         let mut stmt = conn
-            .prepare(
-                "SELECT COALESCE(assigners.name, ''), COUNT(*)
-                 FROM tasks LEFT JOIN assigners ON assigners.id = tasks.assigner_id
-                 GROUP BY assigners.name
-                 ORDER BY (assigners.name IS NULL) ASC, COUNT(*) DESC, assigners.name",
-            )
+            .prepare(&sql)
             .map_err(|error| format!("准备分派人统计失败：{error}"))?;
         let rows = stmt
-            .query_map([], |row| {
-                Ok(NamedCount {
-                    name: row.get(0)?,
-                    count: row.get(1)?,
-                })
-            })
+            .query_map(
+                rusqlite::params_from_iter(task_params.iter().map(|value| value.as_ref())),
+                |row| {
+                    Ok(NamedCount {
+                        name: row.get(0)?,
+                        count: row.get(1)?,
+                    })
+                },
+            )
             .map_err(|error| format!("查询分派人统计失败：{error}"))?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|error| format!("读取分派人统计失败：{error}"))?;
@@ -388,6 +484,7 @@ pub fn statistics_overview(conn: &Connection, limit: i64) -> Result<StatisticsOv
         total_done,
         total_open,
         total_carried,
+        carried_open,
         by_priority,
         by_tag,
         by_owner,
@@ -891,7 +988,7 @@ mod tests {
             .unwrap();
         crate::domain::close_task(&mut conn, "20260803-20260809", done_id).unwrap();
 
-        let stats = statistics_overview(&conn, 12).unwrap();
+        let stats = statistics_overview(&conn, None, None).unwrap();
 
         // 周趋势：新 → 旧。
         assert_eq!(stats.weeks.len(), 2);
@@ -921,6 +1018,8 @@ mod tests {
         assert_eq!(stats.total_done, 2);
         assert_eq!(stats.total_open, 2);
         assert_eq!(stats.total_carried, 1);
+        // 拖期未完成：第 1 周唯一的带入任务已关闭，不应计入积压。
+        assert_eq!(stats.carried_open, 0);
 
         // 优先级分布（含完成数）。
         assert_eq!(
@@ -966,12 +1065,108 @@ mod tests {
     #[test]
     fn statistics_overview_empty_database() {
         let conn = db::open_in_memory();
-        let stats = statistics_overview(&conn, 12).unwrap();
+        let stats = statistics_overview(&conn, None, None).unwrap();
         assert!(stats.weeks.is_empty());
         assert_eq!(stats.total_tasks, 0);
         assert_eq!(stats.total_done, 0);
         assert!(stats.by_priority.is_empty());
         assert!(stats.by_tag.is_empty());
         assert!(stats.by_owner.is_empty());
+    }
+
+    #[test]
+    fn statistics_overview_filters_by_week_range() {
+        let mut conn = db::open_in_memory();
+        insert_week_helper(&conn, "20260727-20260802", "20260727", "20260802");
+        insert_week_helper(&conn, "20260803-20260809", "20260803", "20260809");
+        insert_week_helper(&conn, "20260810-20260816", "20260810", "20260816");
+
+        // 第 1 周：进行中的带入任务（拖期）。
+        create_task(
+            &conn,
+            "20260727-20260802",
+            CreateTaskInput {
+                title: "旧周带入未完成".into(),
+                description: String::new(),
+                parent_id: None,
+                priority: 0,
+                execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                assigner_name: None,
+                tag_names: vec!["旧标签".into()],
+            },
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE tasks SET carried_from_task_id = 888 WHERE week_id = '20260727-20260802'",
+            [],
+        )
+        .unwrap();
+        // 第 2 周：已完成的普通任务。
+        let week2_done = create_task(
+            &conn,
+            "20260803-20260809",
+            CreateTaskInput {
+                title: "周内已完成".into(),
+                description: String::new(),
+                parent_id: None,
+                priority: 2,
+                execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
+                owner_name: Some("小明".into()),
+                assigner_name: None,
+                tag_names: vec!["工作".into()],
+            },
+        )
+        .unwrap();
+        crate::domain::close_task(&mut conn, "20260803-20260809", week2_done.id).unwrap();
+        // 第 3 周：进行中的普通任务。
+        create_task(
+            &conn,
+            "20260810-20260816",
+            CreateTaskInput {
+                title: "新周进行中".into(),
+                description: String::new(),
+                parent_id: None,
+                priority: 1,
+                execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                assigner_name: None,
+                tag_names: Vec::new(),
+            },
+        )
+        .unwrap();
+
+        // 只统计第 2、3 周：排除旧周带入任务。
+        let stats =
+            statistics_overview(&conn, Some("20260803-20260809"), Some("20260810-20260816"))
+                .unwrap();
+        assert_eq!(
+            stats
+                .weeks
+                .iter()
+                .map(|week| week.week_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["20260810-20260816", "20260803-20260809"]
+        );
+        assert_eq!(stats.total_tasks, 2);
+        assert_eq!(stats.total_done, 1);
+        assert_eq!(stats.total_open, 1);
+        assert_eq!(stats.total_carried, 0);
+        assert_eq!(stats.carried_open, 0);
+        assert!(stats.by_tag.iter().all(|item| item.name != "旧标签"));
+        assert!(stats.by_owner.iter().any(|item| item.name == "小明"));
+
+        // 只统计第 1 周：仅旧周带入任务，标记为拖期未完成。
+        let single =
+            statistics_overview(&conn, Some("20260727-20260802"), Some("20260727-20260802"))
+                .unwrap();
+        assert_eq!(single.total_tasks, 1);
+        assert_eq!(single.total_open, 1);
+        assert_eq!(single.total_carried, 1);
+        assert_eq!(single.carried_open, 1);
+
+        // 不存在的周 id 视为无边界：等同全量。
+        let defensive = statistics_overview(&conn, Some("29990101-29990107"), None).unwrap();
+        assert_eq!(defensive.total_tasks, 3);
     }
 }

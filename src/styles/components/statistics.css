@@ -4,6 +4,17 @@
   padding:20px 24px 48px;
   display:flex;flex-direction:column;gap:16px;
 }
+/* ---- 顶部时间范围过滤条 ---- */
+.stats-toolbar{
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  padding:0 2px;
+}
+.stats-toolbar-range{
+  display:flex;align-items:center;gap:10px;
+}
+.stats-toolbar-sep{font-size:12px;color:var(--text-3)}
+
+/* ---- 总览数字卡 ---- */
 .stats-overview{
   display:flex;align-items:stretch;gap:12px;flex-wrap:wrap;
 }
@@ -41,56 +52,89 @@
   display:block;height:100%;border-radius:999px;
   background:var(--success);transition:width .3s ease;
 }
+.stats-completion-note{font-size:11px;color:var(--text-4);line-height:1.4}
+
+/* ---- 通用面板 ---- */
 .stats-panel{
   background:var(--surface);border:1px solid var(--border);
   border-radius:6px;padding:14px 16px;
 }
 .stats-panel-title{
   font-size:12px;font-weight:600;color:var(--text-2);
-  letter-spacing:.5px;margin-bottom:12px;
+  letter-spacing:.5px;margin-bottom:14px;
+  display:flex;align-items:baseline;gap:8px;
+}
+.stats-panel-sub{font-size:11px;font-weight:400;color:var(--text-4)}
+
+/* ---- 周完成率柱状图 ---- */
+.stats-trend-bars{
+  display:flex;align-items:flex-end;gap:6px;
+  height:170px;padding:6px 2px 0;
+}
+.stats-trend-bar{
+  flex:1;min-width:22px;height:100%;
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  cursor:default;
+}
+.stats-trend-pct{
+  font-size:10px;color:var(--text-3);font-family:var(--mono);
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+.stats-trend-track{
+  flex:1;width:100%;min-height:0;
+  display:flex;align-items:flex-end;justify-content:center;
+  border-radius:3px;background:var(--surface-2);
+}
+.stats-trend-fill{
+  display:block;width:min(22px,72%);min-height:2px;
+  border-radius:2px 2px 0 0;transition:height .3s ease;
+}
+.stats-trend-fill.good{background:var(--success)}
+.stats-trend-fill.mid{background:var(--brand)}
+.stats-trend-fill.low{background:var(--warning)}
+.stats-trend-week{
+  font-size:10px;color:var(--text-4);white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+}
+
+/* ---- 复盘问题卡 ---- */
+.stats-issues{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:12px;
+}
+.stats-issue{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 14px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:6px;
+}
+.stats-issue-glyph{
+  flex:none;width:30px;height:30px;border-radius:6px;
+  display:grid;place-items:center;
+}
+.stats-issue-glyph.warning{background:var(--warning-soft);color:var(--warning);border:1px solid var(--warning-border)}
+.stats-issue-glyph.danger{background:var(--danger-soft);color:var(--danger);border:1px solid var(--danger-border)}
+.stats-issue-text{
+  display:flex;flex-direction:column;gap:2px;min-width:0;
+}
+.stats-issue-label{font-size:11px;color:var(--text-3);white-space:nowrap}
+.stats-issue-value{
+  font-size:20px;font-weight:700;font-family:var(--mono);
+  font-variant-numeric:tabular-nums;color:var(--text-1);line-height:1;
+}
+.stats-issue-value.warning{color:var(--warning)}
+.stats-issue-value.danger{color:var(--danger)}
+.stats-issue-value.success{color:var(--success)}
+.stats-issue-hint{
+  flex:1;text-align:right;font-size:10.5px;color:var(--text-4);
+  line-height:1.4;min-width:56px;
 }
 .stats-grid{
   display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
   gap:12px;align-items:start;
 }
-.stats-week-list{display:flex;flex-direction:column}
-.stats-week-row{
-  display:flex;align-items:center;gap:12px;
-  min-height:38px;border-bottom:1px solid var(--border);
-  font-size:12px;
-}
-.stats-week-row:last-child{border-bottom:none}
-.stats-week-id{
-  flex:none;width:150px;
-  font-family:var(--mono);font-size:11.5px;font-weight:600;
-  font-variant-numeric:tabular-nums;color:var(--text-1);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.stats-week-range{
-  flex:none;width:110px;
-  font-size:11px;color:var(--text-4);
-  font-variant-numeric:tabular-nums;white-space:nowrap;
-}
-.stats-week-track{flex:1;min-width:60px}
-.stats-week-progress{
-  display:block;height:5px;border-radius:999px;
-  background:var(--surface-2);border:1px solid var(--border);overflow:hidden;
-}
-.stats-week-progress-bar{
-  display:block;height:100%;border-radius:999px;
-  background:var(--success);transition:width .3s ease;
-}
-.stats-week-meta{
-  flex:none;min-width:96px;text-align:right;
-  font-size:11px;color:var(--text-3);font-variant-numeric:tabular-nums;
-  display:inline-flex;align-items:center;justify-content:flex-end;gap:8px;
-}
-.stats-week-meta b{color:var(--text-1);font-weight:600}
-.stats-week-carried{
-  font-size:10.5px;color:var(--warning);background:var(--warning-soft);
-  border:1px solid var(--warning-border);border-radius:999px;
-  padding:0 7px;line-height:16px;white-space:nowrap;
-}
+
+/* ---- 分布行 ---- */
 .stats-dist{display:flex;flex-direction:column;gap:8px}
 .stats-dist-row{
   display:flex;align-items:center;gap:10px;min-height:24px;

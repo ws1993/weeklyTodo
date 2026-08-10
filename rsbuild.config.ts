@@ -28,7 +28,7 @@ export default defineConfig({
   },
   server: {
     host: '127.0.0.1',
-    port: 1421,
+    port: 5173,
     // Keep the port stable so Tauri's devUrl does not miss the server.
     strictPort: true,
   },

@@ -84,6 +84,8 @@ pub struct StatisticsOverview {
     pub total_done: i64,
     pub total_open: i64,
     pub total_carried: i64,
+    /// 范围内进行中且属带入的任务数（拖期未完成）。
+    pub carried_open: i64,
     pub by_priority: Vec<PriorityStat>,
     pub by_tag: Vec<NamedCount>,
     pub by_owner: Vec<NamedCount>,

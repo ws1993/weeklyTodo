@@ -121,6 +121,8 @@ export interface StatisticsOverview {
   totalDone: number;
   totalOpen: number;
   totalCarried: number;
+  /** 范围内进行中且属带入的任务数（拖期未完成）。 */
+  carriedOpen: number;
   byPriority: PriorityStat[];
   byTag: NamedCount[];
   byOwner: NamedCount[];

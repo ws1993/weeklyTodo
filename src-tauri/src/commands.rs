@@ -372,12 +372,15 @@ pub async fn week_summaries() -> Result<Vec<(String, i64, i64)>, String> {
     queries::week_summaries(&conn)
 }
 
-/// 历史统计 / 复盘视图的一次性聚合数据（近 N 周趋势 + 各维度分布）。
+/// 历史统计 / 复盘视图的一次性聚合数据（可按起止周过滤，缺省为全部历史）。
 #[tauri::command]
-pub async fn statistics_overview(limit: Option<i64>) -> Result<StatisticsOverview, String> {
+pub async fn statistics_overview(
+    start_week_id: Option<String>,
+    end_week_id: Option<String>,
+) -> Result<StatisticsOverview, String> {
     let config = resolve_storage()?;
     let conn = open_conn(&config)?;
-    queries::statistics_overview(&conn, limit.unwrap_or(12))
+    queries::statistics_overview(&conn, start_week_id.as_deref(), end_week_id.as_deref())
 }
 
 /// Current storage directory.
