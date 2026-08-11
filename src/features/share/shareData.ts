@@ -25,11 +25,11 @@ export interface ShareTaskRow {
 
 export interface ShareData {
   rows: ShareTaskRow[];
-  /** 分享集合中的任务总数。 */
+  /** 分享集合中的叶子任务总数（父任务不计入统计）。 */
   totalTasks: number;
-  /** 分享集合中的已完成数。 */
+  /** 叶子任务中的已完成数。 */
   doneTasks: number;
-  /** 完成率（0-100 整数）。 */
+  /** 叶子任务完成率（0-100 整数）。 */
   doneRatio: number;
   /** 分享集合覆盖的分组轨道数。 */
   groupCount: number;
@@ -103,7 +103,6 @@ export function buildShareData(
   // 3. 按分组轨道聚合，输出有序扁平行（根轨道有任一有效任务即纳入）。
   const rows: ShareTaskRow[] = [];
   const groupTitles = new Set<string>();
-  let doneTasks = 0;
 
   for (const root of sortedChildren(tasks, null)) {
     if (!subtreeHasEffective(tasks, root.id, effective)) {
@@ -122,9 +121,6 @@ export function buildShareData(
           continue;
         }
         if (included) {
-          if (task.status === 'closed') {
-            doneTasks += 1;
-          }
           rows.push({
             id: task.id,
             title: task.title,
@@ -149,9 +145,6 @@ export function buildShareData(
     // 兜底：该轨道没有任何任务行，但根任务自身被选中
     // （例如选中了一个没有子任务的叶子根任务）——把根任务输出为唯一的一行。
     if (rows.length === rowsBefore && effective.has(root.id)) {
-      if (root.status === 'closed') {
-        doneTasks += 1;
-      }
       rows.push({
         id: root.id,
         title: root.title,
@@ -170,7 +163,11 @@ export function buildShareData(
     }
   }
 
-  const totalTasks = rows.length;
+  // 统计口径：任务总数与完成率只计算叶子节点（无子任务的行），
+  // 与任务树中「非叶子任务不展示执行方式/负责人」的口径保持一致。
+  const leafRows = rows.filter((row) => !row.hasChildren);
+  const totalTasks = leafRows.length;
+  const doneTasks = leafRows.filter((row) => row.closed).length;
   return {
     rows,
     totalTasks,

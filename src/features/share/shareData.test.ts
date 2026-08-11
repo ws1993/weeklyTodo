@@ -75,6 +75,10 @@ describe('buildShareData', () => {
     );
     expect(data.rows.map((row) => row.id)).toEqual([2, 3]);
     expect(data.rows.map((row) => row.depth)).toEqual([0, 1]);
+    // 统计只算叶子节点：子A1 有子任务，只有 孙A1 计入任务总数。
+    expect(data.totalTasks).toBe(1);
+    expect(data.doneTasks).toBe(0);
+    expect(data.doneRatio).toBe(0);
   });
 
   it('为非叶子任务标记真实子任务，用于隐藏执行方式和负责人', () => {
@@ -151,8 +155,25 @@ describe('buildShareData', () => {
       WEEK_ID,
     );
     expect(data.rows.map((row) => row.id)).toEqual([2, 3, 7]);
+    // 统计只算叶子节点：孙A1（开放）与 根C（已完成）各占一席，父任务 子A1 不计入。
     expect(data.doneTasks).toBe(1);
-    expect(data.totalTasks).toBe(3);
-    expect(data.doneRatio).toBe(33);
+    expect(data.totalTasks).toBe(2);
+    expect(data.doneRatio).toBe(50);
+  });
+
+  it('选中包含已关闭子任务的根时，统计仍只算叶子节点', () => {
+    const tasks = buildForest();
+    const closedChild = makeTask({ id: 10, title: '子A2', parentId: 1, status: 'closed' });
+    const data = buildShareData(
+      [...tasks, closedChild],
+      new Set([1, 10]),
+      true,
+      new Map(),
+      WEEK_ID,
+    );
+    expect(data.rows.map((row) => row.id)).toEqual([2, 3, 10]);
+    expect(data.totalTasks).toBe(2);
+    expect(data.doneTasks).toBe(1);
+    expect(data.doneRatio).toBe(50);
   });
 });
