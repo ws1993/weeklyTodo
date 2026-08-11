@@ -40,3 +40,11 @@
 @media (max-width:560px){
   .webdav-recovery-head,.webdav-version-row,.webdav-recovery-paused{align-items:flex-start;flex-direction:column}
 }
+
+/* 备份保留设置 */
+.webdav-backup-retention{display:flex;flex-direction:column;gap:6px}
+.webdav-backup-retention-warning{
+  color:#e05252;font-size:11.5px;font-weight:500;line-height:1.4;
+  padding:6px 10px;background:rgba(224,82,82,.08);
+  border:1px solid rgba(224,82,82,.32);border-radius:var(--radius);
+}

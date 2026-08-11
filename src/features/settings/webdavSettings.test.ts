@@ -19,6 +19,7 @@ describe('webdavSettings', () => {
       syncOnStartup: false,
       syncIntervalHours: 0,
       autoSyncPausedAfterRestore: false,
+      backupRetention: 20,
     });
   });
 

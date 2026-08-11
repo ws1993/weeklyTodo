@@ -11,7 +11,15 @@ export interface WebDavSettings {
   lastSyncStatus?: string;
   /** 恢复远端版本后暂停自动同步，直到用户显式恢复。 */
   autoSyncPausedAfterRestore: boolean;
+  /** WebDAV备份文件保留数量。'unlimited'表示无限制。 */
+  backupRetention: BackupRetention;
 }
+
+/** 备份保留数量选项类型 */
+export type BackupRetention = 10 | 20 | 30 | 'unlimited';
+
+/** 备份保留数量选项列表 */
+export const BACKUP_RETENTION_OPTIONS: BackupRetention[] = [10, 20, 30, 'unlimited'];
 
 export const SYNC_INTERVAL_HOURS_OPTIONS = [0, 1, 2, 4, 6, 12, 24];
 
@@ -24,6 +32,7 @@ export function createDefaultWebDavSettings(): WebDavSettings {
     syncOnStartup: false,
     syncIntervalHours: 0,
     autoSyncPausedAfterRestore: false,
+    backupRetention: 20,
   };
 }
 
@@ -41,6 +50,16 @@ export function isValidWebDavUrl(url: string): boolean {
 
 export function isValidIntervalHours(value: number): boolean {
   return SYNC_INTERVAL_HOURS_OPTIONS.includes(value);
+}
+
+export function isValidBackupRetention(value: unknown): value is BackupRetention {
+  if (value === 'unlimited') {
+    return true;
+  }
+  if (typeof value === 'number') {
+    return BACKUP_RETENTION_OPTIONS.includes(value as BackupRetention);
+  }
+  return false;
 }
 
 export function loadWebDavSettings(): WebDavSettings {
@@ -63,6 +82,9 @@ export function loadWebDavSettings(): WebDavSettings {
         ? Number(parsed.syncIntervalHours)
         : 0,
       autoSyncPausedAfterRestore: Boolean(parsed.autoSyncPausedAfterRestore),
+      backupRetention: isValidBackupRetention(parsed.backupRetention)
+        ? parsed.backupRetention
+        : 20,
     };
   } catch {
     return createDefaultWebDavSettings();

@@ -134,7 +134,7 @@ export function App() {
     }
     webdavSyncInFlight = true;
     try {
-      const result = await syncWebDavAutomatically(settings.url, settings.username);
+      const result = await syncWebDavAutomatically(settings.url, settings.username, settings.backupRetention);
       const nextSettings = {
         ...loadWebDavSettings(),
         lastSyncedAt: result.direction === 'skipped' ? settings.lastSyncedAt : new Date().toISOString(),

@@ -11,8 +11,8 @@ import {
 } from '../../api/nativeBridge';
 import { DropdownSelect, ToggleSwitch } from '../../components/QueryControls';
 import type { RemoteDatabaseVersion } from '../../shared/contracts/types';
-import type { WebDavSettings } from './webdavSettings';
-import { isValidWebDavUrl, SYNC_INTERVAL_HOURS_OPTIONS } from './webdavSettings';
+import type { WebDavSettings, BackupRetention } from './webdavSettings';
+import { isValidWebDavUrl, SYNC_INTERVAL_HOURS_OPTIONS, BACKUP_RETENTION_OPTIONS } from './webdavSettings';
 
 interface WebDavSyncPanelProps {
   settings: WebDavSettings;
@@ -23,6 +23,11 @@ interface WebDavSyncPanelProps {
 const intervalOptions = SYNC_INTERVAL_HOURS_OPTIONS.map((hours) => ({
   value: String(hours),
   label: hours === 0 ? '关闭' : `每 ${hours} 小时`,
+}));
+
+const backupRetentionOptions = BACKUP_RETENTION_OPTIONS.map((option) => ({
+  value: String(option),
+  label: option === 'unlimited' ? '无限制' : `保留 ${option} 个`,
 }));
 
 export function WebDavSyncPanel({ settings, onChange, onDatabaseRestored }: WebDavSyncPanelProps) {
@@ -108,7 +113,7 @@ export function WebDavSyncPanel({ settings, onChange, onDatabaseRestored }: WebD
       if (!persisted) {
         return;
       }
-      const result = await syncWebDav(settings.url, settings.username);
+      const result = await syncWebDav(settings.url, settings.username, settings.backupRetention);
       const backupText =
         result.backupFiles.length > 0 ? `；备份：${result.backupFiles.join('、')}` : '';
       setNotice(`${result.message}${backupText}`);
@@ -349,6 +354,23 @@ export function WebDavSyncPanel({ settings, onChange, onDatabaseRestored }: WebD
           value={String(settings.syncIntervalHours)}
           onChange={(value) => patchSettings({ syncIntervalHours: Number(value) })}
         />
+        <div className="webdav-backup-retention">
+          <DropdownSelect
+            label="备份保留数量"
+            allowAll={false}
+            options={backupRetentionOptions}
+            value={String(settings.backupRetention)}
+            onChange={(value) => {
+              const newValue = value === 'unlimited' ? 'unlimited' : Number(value);
+              patchSettings({ backupRetention: newValue as BackupRetention });
+            }}
+          />
+          {settings.backupRetention === 'unlimited' && (
+            <span className="webdav-backup-retention-warning">
+              无限备份可能占用大量存储空间，请谨慎选择
+            </span>
+          )}
+        </div>
       </div>
 
       {settings.autoSyncPausedAfterRestore && (

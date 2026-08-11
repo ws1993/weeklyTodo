@@ -76,10 +76,15 @@ pub fn decide_direction(local_modified_utc: i64, remote_modified_utc: i64) -> Op
 }
 
 /// Run one sync against the configured WebDAV directory.
-pub async fn sync_now(data_dir: &str, url: &str, username: &str) -> Result<SyncResult, String> {
+pub async fn sync_now(
+    data_dir: &str,
+    url: &str,
+    username: &str,
+    backup_retention: Option<i32>,
+) -> Result<SyncResult, String> {
     let password = credentials::load_password(username)?
         .ok_or_else(|| "尚未保存该账号的密码，请在同步设置中填写密码后重试".to_string())?;
-    sync_now_with_mode_and_password(data_dir, url, username, &password, SyncMode::Manual).await
+    sync_now_with_mode_and_password(data_dir, url, username, &password, SyncMode::Manual, backup_retention).await
 }
 
 /// Run an automatic synchronization. Empty local databases never overwrite existing remote data.
@@ -87,10 +92,11 @@ pub async fn sync_automatically(
     data_dir: &str,
     url: &str,
     username: &str,
+    backup_retention: Option<i32>,
 ) -> Result<SyncResult, String> {
     let password = credentials::load_password(username)?
         .ok_or_else(|| "尚未保存该账号的密码，请在同步设置中填写密码后重试".to_string())?;
-    sync_now_with_mode_and_password(data_dir, url, username, &password, SyncMode::Automatic).await
+    sync_now_with_mode_and_password(data_dir, url, username, &password, SyncMode::Automatic, backup_retention).await
 }
 
 /// Core sync engine; the password is supplied by the caller (testable).
@@ -99,8 +105,9 @@ pub async fn sync_now_with_password(
     url: &str,
     username: &str,
     password: &str,
+    backup_retention: Option<i32>,
 ) -> Result<SyncResult, String> {
-    sync_now_with_mode_and_password(data_dir, url, username, password, SyncMode::Manual).await
+    sync_now_with_mode_and_password(data_dir, url, username, password, SyncMode::Manual, backup_retention).await
 }
 
 /// Core synchronization implementation with an explicit scheduling mode.
@@ -110,6 +117,7 @@ pub async fn sync_now_with_mode_and_password(
     username: &str,
     password: &str,
     mode: SyncMode,
+    backup_retention: Option<i32>,
 ) -> Result<SyncResult, String> {
     let base_url = webdav::normalize_dir_url(url)?;
     let client = webdav::build_client()?;
@@ -201,11 +209,19 @@ pub async fn sync_now_with_mode_and_password(
         }
     };
 
+    // Clean up old backups based on retention limit
+    let deleted_files = cleanup_old_backups(&client, &base_url, username, password, backup_retention).await?;
+    
+    let mut final_message = message;
+    if !deleted_files.is_empty() {
+        final_message.push_str(&format!("；已清理 {} 个旧备份", deleted_files.len()));
+    }
+
     Ok(SyncResult {
         direction: direction.to_string(),
         backup_files,
         synced_at: Utc::now().to_rfc3339(),
-        message,
+        message: final_message,
     })
 }
 
@@ -245,6 +261,53 @@ fn local_database_is_empty_or_missing(database_path: &Path) -> Result<bool, Stri
         }
     }
     Ok(true)
+}
+
+/// Clean up old backup files based on the retention limit.
+/// Returns the names of deleted files.
+async fn cleanup_old_backups(
+    client: &reqwest::Client,
+    base_url: &str,
+    username: &str,
+    password: &str,
+    retention_limit: Option<i32>,
+) -> Result<Vec<String>, String> {
+    // If retention_limit is None, it means unlimited retention - skip cleanup
+    let limit = match retention_limit {
+        Some(l) if l > 0 => l as usize,
+        _ => return Ok(Vec::new()),
+    };
+
+    let versions = webdav::list_database_versions(client, base_url, username, password).await?;
+    
+    // Filter out the current database file, only consider backups
+    let mut backup_versions: Vec<_> = versions
+        .into_iter()
+        .filter(|v| !v.is_current && v.file_name.ends_with(".bak"))
+        .collect();
+    
+    // Sort by last modified time, newest first
+    backup_versions.sort_by(|a, b| b.last_modified_utc.cmp(&a.last_modified_utc));
+    
+    // If we have more backups than the limit, delete the oldest ones
+    let mut deleted_files = Vec::new();
+    if backup_versions.len() > limit {
+        let files_to_delete = backup_versions.split_off(limit);
+        for version in files_to_delete {
+            let file_url = format!("{base_url}{}", version.file_name);
+            match webdav::delete_file(client, &file_url, username, password).await {
+                Ok(()) => {
+                    deleted_files.push(version.file_name);
+                }
+                Err(error) => {
+                    // Log error but continue cleanup - don't fail the sync
+                    eprintln!("警告：删除旧备份文件失败：{error}");
+                }
+            }
+        }
+    }
+    
+    Ok(deleted_files)
 }
 
 /// Restore an explicitly selected, server-listed database version over local storage.
@@ -380,7 +443,7 @@ mod tests {
 
         // 1) 首次同步：空远端 -> 上传。
         let url = server.base_url("weeklytodo");
-        let first = sync_now_with_password(data_dir.to_str().unwrap(), &url, "alice", "secret")
+        let first = sync_now_with_password(data_dir.to_str().unwrap(), &url, "alice", "secret", None)
             .await
             .unwrap();
         assert_eq!(first.direction, "upload");
@@ -389,7 +452,7 @@ mod tests {
         assert_eq!(&uploaded[..16], b"SQLite format 3\0");
 
         // 2) 立即再次同步：无任何改动 -> noop（验证不会反复翻转）。
-        let idle = sync_now_with_password(data_dir.to_str().unwrap(), &url, "alice", "secret")
+        let idle = sync_now_with_password(data_dir.to_str().unwrap(), &url, "alice", "secret", None)
             .await
             .unwrap();
         assert_eq!(idle.direction, "noop");
@@ -397,7 +460,7 @@ mod tests {
         // 3) 本地新增数据并稍等，再同步：本地较新 -> 上传并备份远端旧版。
         std::thread::sleep(std::time::Duration::from_millis(1100));
         add_sample_task(&data_dir);
-        let local = sync_now_with_password(data_dir.to_str().unwrap(), &url, "alice", "secret")
+        let local = sync_now_with_password(data_dir.to_str().unwrap(), &url, "alice", "secret", None)
             .await
             .unwrap();
         assert_eq!(local.direction, "upload");
@@ -419,7 +482,7 @@ mod tests {
         checkpoint_db(&remote_data_dir).unwrap();
         let remote_edit = std::fs::read(remote_data_dir.join(db::DB_FILE_NAME)).unwrap();
         server.put_file("weeklytodo/weeklytodo.db", remote_edit.clone());
-        let remote = sync_now_with_password(data_dir.to_str().unwrap(), &url, "alice", "secret")
+        let remote = sync_now_with_password(data_dir.to_str().unwrap(), &url, "alice", "secret", None)
             .await
             .unwrap();
         assert_eq!(remote.direction, "download");
@@ -452,6 +515,7 @@ mod tests {
             "alice",
             "secret",
             SyncMode::Automatic,
+            None,
         )
         .await
         .unwrap();

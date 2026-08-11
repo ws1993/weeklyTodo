@@ -519,16 +519,24 @@ pub async fn webdav_clear_credentials(username: String) -> Result<(), String> {
 
 /// Run one file-level sync against the configured WebDAV directory.
 #[tauri::command]
-pub async fn webdav_sync_now(url: String, username: String) -> Result<SyncResult, String> {
+pub async fn webdav_sync_now(
+    url: String,
+    username: String,
+    backup_retention: Option<i32>,
+) -> Result<SyncResult, String> {
     let config = resolve_storage()?;
-    sync::sync_now(&config.data_dir, &url, &username).await
+    sync::sync_now(&config.data_dir, &url, &username, backup_retention).await
 }
 
 /// Run one scheduler-driven sync with the empty-database overwrite guard enabled.
 #[tauri::command]
-pub async fn webdav_sync_automatic(url: String, username: String) -> Result<SyncResult, String> {
+pub async fn webdav_sync_automatic(
+    url: String,
+    username: String,
+    backup_retention: Option<i32>,
+) -> Result<SyncResult, String> {
     let config = resolve_storage()?;
-    sync::sync_automatically(&config.data_dir, &url, &username).await
+    sync::sync_automatically(&config.data_dir, &url, &username, backup_retention).await
 }
 
 /// List the current remote database and its timestamped backups.

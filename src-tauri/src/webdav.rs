@@ -422,6 +422,26 @@ pub async fn fetch_remote_bytes(
         .map_err(|error| format!("读取远端备份内容失败：{error}"))
 }
 
+/// Delete a remote file from the server with DELETE.
+pub async fn delete_file(
+    client: &reqwest::Client,
+    url: &str,
+    username: &str,
+    password: &str,
+) -> Result<(), String> {
+    let response = client
+        .delete(url)
+        .basic_auth(username, Some(password))
+        .send()
+        .await
+        .map_err(|error| format!("删除远端备份文件失败：{error}"))?;
+    if response.status().is_success() || response.status().as_u16() == 404 {
+        Ok(())
+    } else {
+        Err(format!("删除远端备份文件失败：HTTP {}", response.status()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

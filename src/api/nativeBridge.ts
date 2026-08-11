@@ -350,13 +350,33 @@ export async function clearWebDavCredentials(username: string): Promise<void> {
 }
 
 /** 执行一次文件级同步，密码由 Rust 侧从系统凭据管理器读取。 */
-export async function syncWebDav(url: string, username: string): Promise<SyncResult> {
-  return invokeCommand<SyncResult>('webdav_sync_now', { url, username });
+export async function syncWebDav(
+  url: string,
+  username: string,
+  backupRetention?: number | 'unlimited',
+): Promise<SyncResult> {
+  // 将 'unlimited' 转换为 null，数字直接传递
+  const retentionLimit = backupRetention === 'unlimited' ? null : backupRetention;
+  return invokeCommand<SyncResult>('webdav_sync_now', {
+    url,
+    username,
+    backupRetention: retentionLimit,
+  });
 }
 
 /** Runs scheduler-driven synchronization with the empty-local overwrite guard enabled. */
-export async function syncWebDavAutomatically(url: string, username: string): Promise<SyncResult> {
-  return invokeCommand<SyncResult>('webdav_sync_automatic', { url, username });
+export async function syncWebDavAutomatically(
+  url: string,
+  username: string,
+  backupRetention?: number | 'unlimited',
+): Promise<SyncResult> {
+  // 将 'unlimited' 转换为 null，数字直接传递
+  const retentionLimit = backupRetention === 'unlimited' ? null : backupRetention;
+  return invokeCommand<SyncResult>('webdav_sync_automatic', {
+    url,
+    username,
+    backupRetention: retentionLimit,
+  });
 }
 
 /** Lists the current remote database and timestamped restore points. */
