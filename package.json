@@ -1,6 +1,6 @@
 {
   "name": "weekly-todo",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "private": true,
   "type": "module",
   "packageManager": "npm@11.6.2",
