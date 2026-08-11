@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>分享图模板 3 · 白画廊（设计师定制：原研哉「白」× 瑞士网格）</title>
+<!--
+  Design decisions:
+  - 方向：最佳设计师定制 —— 原研哉「白」的空寂 × Massimo Vignelli 瑞士网格
+  - 视觉 DNA：近全白 #FAFAFA 底 + 纯黑 #0A0A0A 字 + 极淡灰发丝分隔 + 单 accent（品牌蓝 #1557D0）
+  - 克制：留白即构图，不用容器边框堆叠，信息靠间距与网格线组织
+  - 布局：左上角周 id（等宽字）→ 巨号周标题 → 统计数字（tabular）→ 分组轨道（发丝分隔）→ 任务行（无徽章堆叠，用克制的语义色点与极小标签）
+  - 分组语义：轨道名前的小方块用分组色（10px 实心方），安静地承载分组色板
+  - 字体：正文细字重（300/400）+ Cascadia Mono 等宽字做数字/标签
+  - 文字：white-space 正常换行，永不截断省略
+  - 宽度 800px，高度自适应
+  - 数据为示例（模拟真实周任务），最终由应用真实数据填充
+-->
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #EDEFF3;
+    padding: 56px 0;
+    font-family: "Segoe UI Variable", "Microsoft YaHei UI", -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    color: #0A0A0A;
+  }
+  .card {
+    width: 800px;
+    margin: 0 auto;
+    background: #FAFAFA;
+    border: 1px solid #ECECEC;
+    padding: 52px 64px 44px;
+  }
+
+  /* ---- Header ---- */
+  .header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #E8E8E8;
+  }
+  .week-id {
+    font-family: "Cascadia Mono", Consolas, monospace;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    color: #888888;
+  }
+  .week-range {
+    font-size: 12px;
+    color: #888888;
+    letter-spacing: 0.02em;
+  }
+  .week-title {
+    margin-top: 30px;
+    font-size: 30px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    line-height: 1.35;
+  }
+  .week-title .brand {
+    color: #1557D0;
+    font-weight: 500;
+  }
+
+  /* ---- Stats ---- */
+  .stats {
+    display: flex;
+    gap: 56px;
+    margin-top: 28px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid #E8E8E8;
+  }
+  .stat b {
+    display: block;
+    font-size: 22px;
+    font-weight: 400;
+    font-family: "Cascadia Mono", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    color: #0A0A0A;
+    line-height: 1.2;
+  }
+  .stat b.accent { color: #1557D0; }
+  .stat span {
+    display: block;
+    margin-top: 5px;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: #9A9A9A;
+  }
+
+  /* ---- Tracks ---- */
+  .track {
+    padding: 24px 0 6px;
+    border-bottom: 1px solid #E8E8E8;
+  }
+  .track-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .track-square {
+    width: 9px;
+    height: 9px;
+    background: var(--gcolor, #4A6FD1);
+    flex: none;
+  }
+  .track-name {
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+  }
+  .track-count {
+    margin-left: auto;
+    font-size: 11px;
+    color: #9A9A9A;
+    font-family: "Cascadia Mono", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- Task rows ---- */
+  .task-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 7px 0;
+    font-size: 13px;
+    line-height: 1.6;
+    word-break: break-word;
+    color: #1A1A1A;
+  }
+  .task-row.depth-0 { padding-left: 0; }
+  .task-row.depth-1 { padding-left: 28px; }
+  .task-row.depth-2 { padding-left: 56px; }
+  .task-row.depth-3 { padding-left: 84px; }
+  .guide {
+    flex: none;
+    font-family: "Cascadia Mono", Consolas, monospace;
+    font-size: 10px;
+    color: #CCCCCC;
+    margin-top: 5px;
+  }
+  .task-title { flex: 1; min-width: 0; word-break: break-word; }
+  .task-title.closed { color: #B0B0B0; text-decoration: line-through; }
+  .task-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    font-size: 11px;
+  }
+  .meta-item {
+    font-family: "Cascadia Mono", Consolas, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    color: #8A8A8A;
+    white-space: nowrap;
+  }
+  .meta-item.p0 { color: #B42333; }
+  .meta-item.p1 { color: #9B5D00; }
+  .meta-item.p2 { color: #1557D0; }
+  .meta-item.p3 { color: #B0B0B0; }
+  .meta-item.owner { color: #9B5D00; font-family: inherit; letter-spacing: 0.02em; }
+  .meta-item.assigner { color: #5A4B9E; font-family: inherit; letter-spacing: 0.02em; }
+  .meta-item.self { color: #8A8A8A; font-family: inherit; }
+
+  /* ---- Footer ---- */
+  .footer {
+    margin-top: 26px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    color: #9A9A9A;
+    letter-spacing: 0.04em;
+  }
+  .footer .brand {
+    color: #1557D0;
+  }
+  .footer .divider { flex: 1; height: 1px; background: #E8E8E8; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="header-top">
+      <span class="week-id">20260810-20260816</span>
+      <span class="week-range">二〇二六年八月十日 — 八月十六日</span>
+    </div>
+
+    <div class="week-title">
+      「产品迭代 · <span class="brand">冲量周</span>」
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b>8</b><span>已完成</span></div>
+      <div class="stat"><b>13</b><span>任务总数</span></div>
+      <div class="stat"><b class="accent">61%</b><span>完成率</span></div>
+      <div class="stat"><b>3</b><span>分组</span></div>
+    </div>
+
+    <div class="track">
+      <div class="track-head">
+        <span class="track-square" style="--gcolor:#E05A3E"></span>
+        <span class="track-name">产品迭代</span>
+        <span class="track-count">3/4 完成</span>
+      </div>
+      <div class="task-row depth-0">
+        <span class="guide">一</span>
+        <span class="task-title">发布 v1.1 版本并整理发版清单</span>
+        <span class="task-meta">
+          <span class="meta-item p0">P0</span>
+          <span class="meta-item owner">跟进 · 张三</span>
+        </span>
+      </div>
+      <div class="task-row depth-1">
+        <span class="guide">·</span>
+        <span class="task-title">修复登录页在窄屏下的布局塌陷问题</span>
+        <span class="task-meta">
+          <span class="meta-item p1">P1</span>
+          <span class="meta-item self">自己做</span>
+          <span class="meta-item">前端</span>
+        </span>
+      </div>
+      <div class="task-row depth-1">
+        <span class="guide">·</span>
+        <span class="task-title">导出功能回归测试，重点覆盖 WebDAV 同步链路</span>
+        <span class="task-meta">
+          <span class="meta-item p2">P2</span>
+          <span class="meta-item">测试</span>
+        </span>
+      </div>
+      <div class="task-row depth-0">
+        <span class="guide">二</span>
+        <span class="task-title closed">更新项目技术文档到 docs/tech-stack-reference.md</span>
+        <span class="task-meta">
+          <span class="meta-item p2">P2</span>
+          <span class="meta-item">文档</span>
+        </span>
+      </div>
+    </div>
+
+    <div class="track">
+      <div class="track-head">
+        <span class="track-square" style="--gcolor:#3B8FBF"></span>
+        <span class="track-name">团队协作</span>
+        <span class="track-count">3/5 完成</span>
+      </div>
+      <div class="task-row depth-0">
+        <span class="guide">一</span>
+        <span class="task-title">周会材料整理与数据准备</span>
+        <span class="task-meta">
+          <span class="meta-item p1">P1</span>
+          <span class="meta-item assigner">分派 · 李四</span>
+        </span>
+      </div>
+      <div class="task-row depth-1">
+        <span class="guide">·</span>
+        <span class="task-title">汇总上周各分组完成情况并生成图表</span>
+        <span class="task-meta">
+          <span class="meta-item p2">P2</span>
+          <span class="meta-item self">自己做</span>
+        </span>
+      </div>
+      <div class="task-row depth-0">
+        <span class="guide">二</span>
+        <span class="task-title closed">新人 onboarding 文档补齐验收标准</span>
+        <span class="task-meta">
+          <span class="meta-item p2">P2</span>
+          <span class="meta-item">文档</span>
+        </span>
+      </div>
+    </div>
+
+    <div class="track">
+      <div class="track-head">
+        <span class="track-square" style="--gcolor:#4F9E5A"></span>
+        <span class="track-name">个人成长</span>
+        <span class="track-count">2/4 完成</span>
+      </div>
+      <div class="task-row depth-0">
+        <span class="guide">一</span>
+        <span class="task-title">读完《设计中的设计》并整理读书笔记</span>
+        <span class="task-meta">
+          <span class="meta-item p2">P2</span>
+          <span class="meta-item self">自己做</span>
+          <span class="meta-item">阅读</span>
+        </span>
+      </div>
+      <div class="task-row depth-1">
+        <span class="guide">·</span>
+        <span class="task-title">挑选 3 个可用到产品设计中的原则写成卡片</span>
+        <span class="task-meta">
+          <span class="meta-item p3">P3</span>
+        </span>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span class="brand">周计划</span>
+      <span>· 任务分享</span>
+      <span class="divider"></span>
+    </div>
+  </div>
+</body>
+</html>

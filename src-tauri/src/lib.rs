@@ -84,6 +84,7 @@ pub fn run() {
             commands::webdav_sync_automatic,
             commands::webdav_list_versions,
             commands::webdav_restore_version,
+            commands::save_share_png,
         ])
         .run(tauri::generate_context!())
         .expect("error while running weeklytodo");

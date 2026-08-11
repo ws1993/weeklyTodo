@@ -4791,6 +4791,7 @@ dependencies = [
 name = "weekly-todo"
 version = "1.0.13"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "filetime",
  "futures-util",

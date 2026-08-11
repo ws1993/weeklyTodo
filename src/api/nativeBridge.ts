@@ -172,6 +172,23 @@ export async function resetGroupColor(name: string): Promise<GroupColor> {
   return invokeCommand<GroupColor>('reset_group_color', { name });
 }
 
+/**
+ * 通过系统保存对话框把分享图 PNG 写入文件。
+ * 返回保存路径；用户取消时返回 null。
+ */
+export async function saveSharePng(
+  pngDataUrl: string,
+  suggestedName: string,
+): Promise<string | null> {
+  if (!isTauriRuntime()) {
+    throw new Error('当前不在桌面运行时中，无法保存文件');
+  }
+  return invokeCommand<string | null>('save_share_png', {
+    pngDataUrl,
+    suggestedName,
+  });
+}
+
 export async function closeTask(weekId: string, taskId: number): Promise<Task> {
   return invokeCommand<Task>('close_task', { weekId, taskId });
 }

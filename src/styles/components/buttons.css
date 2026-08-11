@@ -24,6 +24,11 @@
 .btn-sm{height:28px;padding:0 10px;font-size:12px}
 .btn-ghost{background:var(--surface);border-color:var(--border)}
 .btn-ghost:hover{background:var(--surface-2)}
+.btn.active{
+  color:var(--brand);
+  border-color:var(--brand-border);
+  background:var(--brand-soft);
+}
 .btn svg{width:15px;height:15px;flex:none}
 .icon-btn{width:30px;height:30px;padding:0;justify-content:center}
 .icon-btn svg{width:17px;height:17px}

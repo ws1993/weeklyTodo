@@ -297,6 +297,23 @@ export function TrashIcon({ size = 14 }: { size?: number }) {
   );
 }
 
+/** 分享：右上角发出的共享箭头，用于「任务分享」入口。 */
+export function ShareIcon({ size = 15 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <circle cx="18" cy="5" r="3" stroke="currentColor" strokeWidth="1.7" />
+      <circle cx="6" cy="12" r="3" stroke="currentColor" strokeWidth="1.7" />
+      <circle cx="18" cy="19" r="3" stroke="currentColor" strokeWidth="1.7" />
+      <path
+        d="M8.6 10.8 15.4 6.7M8.6 13.2l6.8 4.1"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
 export function GrassIcon({ width = 120 }: { width?: number }) {
   return (
     <svg width={width} height={12} viewBox="0 0 120 12" fill="none" aria-hidden="true">

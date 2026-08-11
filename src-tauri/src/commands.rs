@@ -563,3 +563,93 @@ pub async fn webdav_restore_version(
     let config = resolve_storage()?;
     sync::restore_database_version(&config.data_dir, &url, &username, &file_name).await
 }
+
+/// Save a share card (base64 PNG data URL) to a user-chosen file via the system save dialog.
+/// Returns the saved path; `None` when the user cancels the dialog.
+#[tauri::command]
+pub async fn save_share_png(
+    app: AppHandle,
+    png_data_url: String,
+    suggested_name: String,
+) -> Result<Option<String>, String> {
+    use base64::Engine;
+
+    const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
+
+    let base64_body = png_data_url
+        .strip_prefix("data:image/png;base64,")
+        .unwrap_or(&png_data_url);
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(base64_body)
+        .map_err(|error| format!("PNG 数据解码失败：{error}"))?;
+    // 防呆校验：预览/渲染异常时可能拿到非 PNG 内容，避免错误数据落盘。
+    if !bytes.starts_with(PNG_SIGNATURE) {
+        return Err("生成内容不是有效的 PNG 图片，已放弃保存".to_string());
+    }
+
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let file_name = sanitize_share_file_name(&suggested_name);
+    app.dialog()
+        .file()
+        .set_title("保存分享图片")
+        .add_filter("PNG 图片", &["png"])
+        .set_file_name(&file_name)
+        .save_file(move |file_path| {
+            let _ = tx.send(file_path);
+        });
+
+    let file_path = rx.await.map_err(|_| "保存对话框未返回结果".to_string())?;
+    let Some(file_path) = file_path else {
+        return Ok(None); // 用户取消
+    };
+    let path = file_path
+        .into_path()
+        .map_err(|error| format!("无法解析保存路径：{error}"))?;
+
+    write_share_png_atomically(&path, &bytes)?;
+    Ok(Some(path.to_string_lossy().to_string()))
+}
+
+/// 清洗建议文件名：去掉 Windows 非法字符并保证 .png 扩展名。
+fn sanitize_share_file_name(name: &str) -> String {
+    let cleaned: String = name
+        .chars()
+        .map(|ch| match ch {
+            '\\' | '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            _ => ch,
+        })
+        .collect();
+    let trimmed = cleaned.trim();
+    if trimmed.is_empty() {
+        return "weeklytodo-share.png".to_string();
+    }
+    if trimmed.to_ascii_lowercase().ends_with(".png") {
+        trimmed.to_string()
+    } else {
+        format!("{trimmed}.png")
+    }
+}
+
+/// 以「临时文件 + fsync + rename」原子写 PNG，避免半写文件残留。
+fn write_share_png_atomically(path: &std::path::Path, bytes: &[u8]) -> Result<(), String> {
+    use std::io::Write;
+
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "无法确定保存文件名".to_string())?;
+    let temp_path = path.with_file_name(format!("{file_name}.sharetmp"));
+
+    let mut temp_file =
+        std::fs::File::create(&temp_path).map_err(|error| format!("创建临时文件失败：{error}"))?;
+    temp_file
+        .write_all(bytes)
+        .map_err(|error| format!("写入临时文件失败：{error}"))?;
+    temp_file
+        .sync_all()
+        .map_err(|error| format!("同步临时文件失败：{error}"))?;
+    drop(temp_file);
+
+    std::fs::rename(&temp_path, path).map_err(|error| format!("保存图片失败：{error}"))?;
+    Ok(())
+}

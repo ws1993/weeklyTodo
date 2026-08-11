@@ -72,6 +72,19 @@
 .task-check svg{width:12px;height:12px;opacity:0;transition:opacity .1s}
 .task-check.done{background:var(--success);border-color:var(--success)}
 .task-check.done svg{opacity:1}
+/* 分享多选模式：行首选择复选框（选中态用品牌色填充）。 */
+.task-select{
+  width:18px;height:18px;border-radius:3px;border:1.5px solid #B9C4D8;
+  background:var(--surface);display:grid;place-items:center;cursor:pointer;
+  flex:none;color:#fff;padding:0;
+  transition:border-color .12s,background .12s,color .12s;
+}
+.task-select:hover{border-color:var(--brand)}
+.task-select svg{width:12px;height:12px;opacity:0;transition:opacity .1s}
+.task-select.checked{background:var(--brand);border-color:var(--brand)}
+.task-select.checked svg{opacity:1}
+.tree-row.selected{background:var(--brand-soft)}
+.tree-row.selected:hover{background:var(--brand-soft)}
 .node-glyph{display:none}
 .node-title-wrap{flex:1;min-width:0;display:flex;align-items:center;gap:6px}
 .node-title{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;line-height:1.5}

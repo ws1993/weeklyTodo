@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>分享图模板 2 · Cycle 暗色（标杆迁移：Linear Cycle）</title>
+<!--
+  Design decisions:
+  - 方向：标杆迁移 Linear Cycle（周期任务视图的业界标杆，真实世界获奖设计）
+  - 视觉 DNA：近黑底 #0A0C10 + 发丝分隔线 + tabular 数据 + 单 accent
+  - accent 用项目品牌蓝 #1557D0 提亮为 #5B8DEF，避免「均匀深蓝底+霓虹 glow」AI slop
+  - 布局：顶部 Cycle 大标题 + 统计 bento 区 → 任务列表（发丝线分隔、等宽编号、优先级色点）
+  - 分组语义：轨道名左侧用分组色细竖线（发丝级 2px），克制承载分组信息
+  - 字体：无衬线正文 + Cascadia Mono 等宽数字/编号
+  - 文字：white-space 正常换行，永不截断省略
+  - 宽度 800px，高度自适应
+  - 数据为示例（模拟真实周任务），最终由应用真实数据填充
+-->
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0A0C10;
+    padding: 48px 0;
+    font-family: "Segoe UI Variable", "Microsoft YaHei UI", -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    color: #E8ECF3;
+  }
+  .card {
+    width: 800px;
+    margin: 0 auto;
+    background: #0D1016;
+    border: 1px solid #1C2230;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  /* ---- Header ---- */
+  .header {
+    padding: 30px 32px 26px;
+    border-bottom: 1px solid #1C2230;
+    background: radial-gradient(120% 160% at 100% 0%, rgba(91, 141, 239, 0.10) 0%, transparent 55%);
+  }
+  .header-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .cycle-label {
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    color: #6C7690;
+    text-transform: uppercase;
+  }
+  .week-range {
+    font-size: 12px;
+    color: #6C7690;
+    font-family: "Cascadia Mono", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .week-title {
+    margin-top: 10px;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: #F2F5FA;
+  }
+
+  /* ---- Stats bento ---- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-top: 22px;
+  }
+  .stat {
+    padding: 14px 16px;
+    background: #131722;
+    border: 1px solid #1C2230;
+    border-radius: 8px;
+  }
+  .stat b {
+    display: block;
+    font-size: 22px;
+    font-weight: 600;
+    font-family: "Cascadia Mono", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    color: #F2F5FA;
+    line-height: 1.15;
+  }
+  .stat b.accent { color: #5B8DEF; }
+  .stat span {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: #6C7690;
+  }
+
+  /* ---- Track sections ---- */
+  .tracks { padding: 8px 32px 12px; }
+  .track { padding: 18px 0 6px; }
+  .track-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 6px;
+    padding-left: 12px;
+    border-left: 2px solid var(--gcolor, #4A6FD1);
+  }
+  .track-index {
+    font-family: "Cascadia Mono", Consolas, monospace;
+    font-size: 11px;
+    color: #46506A;
+    flex: none;
+  }
+  .track-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #D8DEEA;
+  }
+  .track-count {
+    margin-left: auto;
+    font-size: 11px;
+    color: #46506A;
+    font-family: "Cascadia Mono", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- Task rows ---- */
+  .task-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 8px 0 8px 14px;
+    border-bottom: 1px solid #161B26;
+    font-size: 13px;
+    line-height: 1.5;
+    word-break: break-word;
+    color: #C6CDDA;
+  }
+  .task-row:last-child { border-bottom: none; }
+  .task-row.depth-1 { padding-left: 38px; }
+  .task-row.depth-2 { padding-left: 62px; }
+  .task-row.depth-3 { padding-left: 86px; }
+  .priority-dot {
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-top: 7px;
+    background: #46506A;
+  }
+  .priority-dot.p0 { background: #E5484D; box-shadow: 0 0 0 3px rgba(229, 72, 77, 0.18); }
+  .priority-dot.p1 { background: #F5A524; box-shadow: 0 0 0 3px rgba(245, 165, 36, 0.15); }
+  .priority-dot.p2 { background: #5B8DEF; box-shadow: 0 0 0 3px rgba(91, 141, 239, 0.16); }
+  .priority-dot.p3 { background: #39414F; }
+  .task-title { flex: 1; min-width: 0; word-break: break-word; }
+  .task-title.closed { color: #4B5468; text-decoration: line-through; }
+  .task-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 8px;
+    border-radius: 5px;
+    font-size: 11px;
+    line-height: 20px;
+    white-space: nowrap;
+    background: #131722;
+    border: 1px solid #1C2230;
+    color: #8892A8;
+  }
+  .badge.mono { font-family: "Cascadia Mono", Consolas, monospace; }
+  .badge.owner { color: #F5C76D; border-color: #3A2F17; background: #221E12; font-weight: 600; }
+  .badge.assigner { color: #A99BE8; border-color: #2C2547; background: #1C1830; font-weight: 600; }
+  .badge.self { color: #8892A8; }
+  .badge.closed-tag { color: #4B5468; }
+
+  /* ---- Footer ---- */
+  .footer {
+    padding: 18px 32px 22px;
+    border-top: 1px solid #1C2230;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #46506A;
+    font-size: 11px;
+  }
+  .footer .brand {
+    color: #5B8DEF;
+    font-weight: 600;
+  }
+  .footer .divider { flex: 1; height: 1px; background: #161B26; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="header-top">
+        <span class="cycle-label">Weekly Cycle · 20260810</span>
+        <span class="week-range">2026.08.10 — 08.16</span>
+      </div>
+      <div class="week-title">「产品迭代 · 冲量周」</div>
+      <div class="stats">
+        <div class="stat"><b>8</b><span>已完成</span></div>
+        <div class="stat"><b>13</b><span>任务总数</span></div>
+        <div class="stat"><b class="accent">61%</b><span>完成率</span></div>
+        <div class="stat"><b>3</b><span>分组轨道</span></div>
+      </div>
+    </div>
+
+    <div class="tracks">
+      <div class="track" style="--gcolor:#E05A3E">
+        <div class="track-head">
+          <span class="track-index">01</span>
+          <span class="track-name">产品迭代</span>
+          <span class="track-count">3/4</span>
+        </div>
+        <div class="task-row depth-0">
+          <span class="priority-dot p0"></span>
+          <span class="task-title">发布 v1.1 版本并整理发版清单</span>
+          <span class="task-meta">
+            <span class="badge mono">P0</span>
+            <span class="badge owner">跟进·张三</span>
+          </span>
+        </div>
+        <div class="task-row depth-1">
+          <span class="priority-dot p1"></span>
+          <span class="task-title">修复登录页在窄屏下的布局塌陷问题</span>
+          <span class="task-meta">
+            <span class="badge mono">P1</span>
+            <span class="badge self">自己</span>
+            <span class="badge">前端</span>
+          </span>
+        </div>
+        <div class="task-row depth-1">
+          <span class="priority-dot p2"></span>
+          <span class="task-title">导出功能回归测试，重点覆盖 WebDAV 同步链路</span>
+          <span class="task-meta">
+            <span class="badge mono">P2</span>
+            <span class="badge">测试</span>
+          </span>
+        </div>
+        <div class="task-row depth-0">
+          <span class="priority-dot p2"></span>
+          <span class="task-title closed">更新项目技术文档到 docs/tech-stack-reference.md</span>
+          <span class="task-meta">
+            <span class="badge mono closed-tag">P2</span>
+            <span class="badge closed-tag">文档</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="track" style="--gcolor:#3B8FBF">
+        <div class="track-head">
+          <span class="track-index">02</span>
+          <span class="track-name">团队协作</span>
+          <span class="track-count">3/5</span>
+        </div>
+        <div class="task-row depth-0">
+          <span class="priority-dot p1"></span>
+          <span class="task-title">周会材料整理与数据准备</span>
+          <span class="task-meta">
+            <span class="badge mono">P1</span>
+            <span class="badge assigner">分派·李四</span>
+          </span>
+        </div>
+        <div class="task-row depth-1">
+          <span class="priority-dot p2"></span>
+          <span class="task-title">汇总上周各分组完成情况并生成图表</span>
+          <span class="task-meta">
+            <span class="badge mono">P2</span>
+            <span class="badge self">自己</span>
+          </span>
+        </div>
+        <div class="task-row depth-0">
+          <span class="priority-dot p2"></span>
+          <span class="task-title closed">新人 onboarding 文档补齐验收标准</span>
+          <span class="task-meta">
+            <span class="badge mono closed-tag">P2</span>
+            <span class="badge closed-tag">文档</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="track" style="--gcolor:#4F9E5A">
+        <div class="track-head">
+          <span class="track-index">03</span>
+          <span class="track-name">个人成长</span>
+          <span class="track-count">2/4</span>
+        </div>
+        <div class="task-row depth-0">
+          <span class="priority-dot p2"></span>
+          <span class="task-title">读完《设计中的设计》并整理读书笔记</span>
+          <span class="task-meta">
+            <span class="badge mono">P2</span>
+            <span class="badge self">自己</span>
+            <span class="badge">阅读</span>
+          </span>
+        </div>
+        <div class="task-row depth-1">
+          <span class="priority-dot p3"></span>
+          <span class="task-title">挑选 3 个可用到产品设计中的原则写成卡片</span>
+          <span class="task-meta">
+            <span class="badge mono">P3</span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span class="brand">周计划</span>
+      <span>· 任务分享</span>
+      <span class="divider"></span>
+      <span>Weekly Cycle</span>
+    </div>
+  </div>
+</body>
+</html>

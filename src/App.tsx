@@ -11,6 +11,7 @@ import { CreateWeekModal } from './components/CreateWeekModal';
 import { UpdateModal } from './features/update/UpdateModal';
 import { SettingsOverlay } from './features/settings/SettingsOverlay';
 import { CloseBehaviorModal } from './components/CloseBehaviorModal';
+import { ShareModal } from './features/share/ShareModal';
 import {
   checkForAppUpdate,
   exitApp,
@@ -18,7 +19,8 @@ import {
   onCloseRequested,
   syncWebDavAutomatically,
 } from './api/nativeBridge';
-import { ChartIcon, LogoIcon, PlusIcon, SettingsIcon } from './components/ForestIcons';
+import { ChartIcon, LogoIcon, PlusIcon, SettingsIcon, ShareIcon } from './components/ForestIcons';
+import { descendantIds, incompleteOnlyVisibleIds } from './utils/tree';
 import {
   isSyncDue,
   loadWebDavSettings,
@@ -62,6 +64,10 @@ export function App() {
   );
   // 勾选后任务树仅显示未完成的任务（当前会话内有效）。
   const [showIncompleteOnly, setShowIncompleteOnly] = useState(false);
+  // 分享多选模式：进入后行首显示复选框，可选择多个任务一起生成分享图。
+  const [shareMode, setShareMode] = useState(false);
+  const [shareSelectedIds, setShareSelectedIds] = useState<Set<number>>(() => new Set());
+  const [shareOpen, setShareOpen] = useState(false);
 
   // 点击关闭按钮（×）时，按设置处理：询问 / 最小化到托盘 / 退出。
   useEffect(() => {
@@ -153,6 +159,62 @@ export function App() {
     } finally {
       webdavSyncInFlight = false;
     }
+  };
+
+  const startShare = () => {
+    setShareSelectedIds(new Set());
+    setShareMode(true);
+  };
+
+  const exitShare = () => {
+    setShareMode(false);
+    setShareSelectedIds(new Set());
+    setShareOpen(false);
+  };
+
+  const toggleShareSelect = (taskId: number) => {
+    if (!tree) {
+      return;
+    }
+    setShareSelectedIds((prev) => {
+      const next = new Set(prev);
+      const task = tree.tasks.find((item) => item.id === taskId);
+      if (!task) {
+        return next;
+      }
+      if (next.has(taskId)) {
+        // 取消：连同该任务下已选的子树一起取消。
+        next.delete(taskId);
+        for (const id of descendantIds(tree.tasks, taskId)) {
+          next.delete(id);
+        }
+      } else {
+        // 选中：父任务自动带未关闭子树，视觉与分享图内容一致。
+        next.add(taskId);
+        if (task.status === 'in_progress') {
+          const addOpenSubtree = (parentId: number) => {
+            for (const child of tree.tasks) {
+              if (child.parentId === parentId && child.status === 'in_progress') {
+                next.add(child.id);
+                addOpenSubtree(child.id);
+              }
+            }
+          };
+          addOpenSubtree(taskId);
+        }
+      }
+      return next;
+    });
+  };
+
+  const selectAllVisible = () => {
+    if (!tree) {
+      return;
+    }
+    const visibleIds = showIncompleteOnly
+      ? incompleteOnlyVisibleIds(tree.tasks)
+      : new Set(tree.tasks.map((task) => task.id));
+    setShareSelectedIds(visibleIds);
   };
 
   if (loading) {
@@ -251,26 +313,54 @@ export function App() {
                       <div className="week-progress-bar" style={{ width: `${doneRatio}%` }} />
                     </div>
                   </div>
+                  <button
+                    className={`btn btn-ghost btn-sm${shareMode ? ' active' : ''}`}
+                    title="选择多个任务一起生成分享图"
+                    onClick={shareMode ? exitShare : startShare}
+                  >
+                    <ShareIcon size={15} />
+                    {shareMode ? '取消分享' : '分享'}
+                  </button>
                 </div>
               </section>
 
               <section className="tree-card">
                 <div className="tree-toolbar">
-                  <span className="tree-title">任务树</span>
-                  <span className="tree-hint">点击复选框切换完成状态 · 拖拽行调整层级与顺序 · 悬停行查看操作</span>
-                  <ToggleSwitch
-                    label="仅看未完成"
-                    checked={showIncompleteOnly}
-                    onChange={setShowIncompleteOnly}
-                  />
-                  <button
-                    className="btn btn-primary"
-                    title="新建任务"
-                    onClick={() => setNewTaskRequest((request) => request + 1)}
-                  >
-                    <PlusIcon size={15} />
-                    新建任务
-                  </button>
+                  {shareMode ? (
+                    <>
+                      <span className="tree-title">已选 {shareSelectedIds.size} 项</span>
+                      <span className="tree-hint">勾选要分享的任务 · 父任务自动带上未关闭子任务</span>
+                      <button className="btn btn-ghost btn-sm" onClick={selectAllVisible}>
+                        全选可见
+                      </button>
+                      <button
+                        className="btn btn-primary"
+                        disabled={shareSelectedIds.size === 0}
+                        onClick={() => setShareOpen(true)}
+                      >
+                        <ShareIcon size={15} />
+                        生成分享图
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="tree-title">任务树</span>
+                      <span className="tree-hint">点击复选框切换完成状态 · 拖拽行调整层级与顺序 · 悬停行查看操作</span>
+                      <ToggleSwitch
+                        label="仅看未完成"
+                        checked={showIncompleteOnly}
+                        onChange={setShowIncompleteOnly}
+                      />
+                      <button
+                        className="btn btn-primary"
+                        title="新建任务"
+                        onClick={() => setNewTaskRequest((request) => request + 1)}
+                      >
+                        <PlusIcon size={15} />
+                        新建任务
+                      </button>
+                    </>
+                  )}
                 </div>
                 <div className="tree">
                   {tree && (
@@ -280,6 +370,9 @@ export function App() {
                       locateRequest={locateRequest}
                       showIncompleteOnly={showIncompleteOnly}
                       groupColors={groupColors}
+                      selectionMode={shareMode}
+                      selectedIds={shareSelectedIds}
+                      onToggleSelect={toggleShareSelect}
                     />
                   )}
                 </div>
@@ -317,6 +410,14 @@ export function App() {
         preloaded={preloadedUpdate}
       />
       <CloseBehaviorModal open={closeAskOpen} onClose={() => setCloseAskOpen(false)} />
+      <ShareModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        tasks={tree?.tasks ?? []}
+        weekId={activeWeekId}
+        groupColors={groupColors}
+        selectedIds={shareSelectedIds}
+      />
     </ConfigProvider>
   );
 }

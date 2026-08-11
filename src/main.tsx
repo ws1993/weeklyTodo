@@ -20,6 +20,7 @@ import './styles/components/webdav-sync.css';
 import './styles/components/management.css';
 import './styles/components/query-view.css';
 import './styles/components/statistics.css';
+import './styles/components/share-card.css';
 import './styles/components/states.css';
 import { App } from './App';
 

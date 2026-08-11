@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>分享图模板 1 · 彩虹轨道（轮盘命中「实用主义彩虹分类文档」）</title>
+<!--
+  Design decisions:
+  - 方向：Utility-First Colorful Docs（Tailwind 文档风）迁移到「周计划分享图」
+  - 轮盘命中风格第 15 号，还原度 98%
+  - 色彩：Sky 蓝品牌（--brand #1557D0）贯通 + 分组 12 色板作为「轨道分类色条」
+  - 字体：项目系统字栈（无衬线）+ Cascadia Mono 等宽字做优先级
+  - 布局：顶部标题栏（周标题 + 统计）→ 分组轨道卡片 → 每组内任务行（缩进层级）
+  - 反 AI slop：不用紫渐变 / emoji / 圆角卡+左 accent；分组色条承载「轨道」语义
+  - 文字：white-space 正常换行，永不截断省略
+  - 宽度 800px，高度自适应
+  - 数据为示例（模拟真实周任务），最终由应用真实数据填充
+-->
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #F2F6FA;
+    padding: 48px 0;
+    font-family: "Segoe UI Variable", "Microsoft YaHei UI", -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    color: #172033;
+  }
+  .card {
+    width: 800px;
+    margin: 0 auto;
+    background: #FFFFFF;
+    border: 1px solid #E1E7F0;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(23, 32, 51, 0.04);
+  }
+
+  /* ---- Header ---- */
+  .header {
+    background: linear-gradient(180deg, #1557D0 0%, #1557D0 100%);
+    color: #FFFFFF;
+    padding: 28px 32px 24px;
+    position: relative;
+  }
+  .header::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 4px;
+    background: repeating-linear-gradient(
+      90deg,
+      #E05A3E 0, #E05A3E 60px,
+      #E0A03D 60px, #E0A03D 120px,
+      #A9B84A 120px, #A9B84A 180px,
+      #4F9E5A 180px, #4F9E5A 240px,
+      #2E9E7C 240px, #2E9E7C 300px,
+      #3B8FBF 300px, #3B8FBF 360px,
+      #4A6FD1 360px, #4A6FD1 420px,
+      #C05FA0 420px, #C05FA0 480px
+    );
+  }
+  .header-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .week-id {
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    opacity: 0.85;
+  }
+  .week-range {
+    font-size: 12px;
+    opacity: 0.8;
+  }
+  .week-title {
+    margin-top: 10px;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+  .stats {
+    display: flex;
+    gap: 28px;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+  }
+  .stat b {
+    display: block;
+    font-size: 20px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .stat span {
+    font-size: 11px;
+    opacity: 0.8;
+    margin-top: 3px;
+  }
+
+  /* ---- Track groups ---- */
+  .tracks {
+    padding: 20px 24px 8px;
+  }
+  .track {
+    margin-bottom: 20px;
+    border: 1px solid #E1E7F0;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .track-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: #F7F9FC;
+    border-bottom: 1px solid #E1E7F0;
+  }
+  .track-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex: none;
+  }
+  .track-name {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .track-count {
+    margin-left: auto;
+    font-size: 11px;
+    color: #8B95A7;
+    font-family: "Cascadia Mono", Consolas, monospace;
+  }
+
+  /* ---- Task rows ---- */
+  .task-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 9px 16px 9px 0;
+    margin-left: 16px;
+    border-bottom: 1px solid #EEF2F7;
+    font-size: 13px;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+  .task-row:last-child {
+    border-bottom: none;
+  }
+  .task-row.depth-0 { padding-left: 16px; }
+  .task-row.depth-1 { padding-left: 34px; }
+  .task-row.depth-2 { padding-left: 52px; }
+  .task-row.depth-3 { padding-left: 70px; }
+  .tree-guide {
+    flex: none;
+    color: #CDD7E6;
+    font-family: "Cascadia Mono", Consolas, monospace;
+    font-size: 11px;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .task-title {
+    flex: 1;
+    min-width: 0;
+    word-break: break-word;
+  }
+  .task-title.closed {
+    color: #8B95A7;
+    text-decoration: line-through;
+  }
+  .task-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    line-height: 20px;
+    white-space: nowrap;
+    font-family: "Cascadia Mono", Consolas, monospace;
+  }
+  .badge.p0 { color: #B42333; background: #FDEBEC; border: 1px solid #F3C9CD; }
+  .badge.p1 { color: #9B5D00; background: #FFF6E0; border: 1px solid #F0DFB8; }
+  .badge.p2 { color: #1557D0; background: #EAF1FF; border: 1px solid #C9DBF7; }
+  .badge.p3 { color: #8B95A7; background: transparent; border: 1px solid #E1E7F0; }
+  .badge.owner { color: #9B5D00; background: #FFF6E0; border: 1px solid #F0DFB8; font-weight: 600; font-family: inherit; }
+  .badge.assigner { color: #5A4B9E; background: #F0EDF9; border: 1px solid #D6CEEA; font-weight: 600; font-family: inherit; }
+  .badge.self { color: #647086; background: #F7F9FC; border: 1px solid #E1E7F0; font-family: inherit; }
+  .badge.tag { color: #647086; background: #F7F9FC; border: 1px solid #E1E7F0; font-family: inherit; }
+
+  /* ---- Footer ---- */
+  .footer {
+    padding: 14px 24px 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #8B95A7;
+    font-size: 11px;
+  }
+  .footer .dot { width: 5px; height: 5px; border-radius: 50%; background: #1557D0; }
+  .footer .divider { flex: 1; height: 1px; background: #E1E7F0; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="header-top">
+        <span class="week-id">20260810-20260816</span>
+        <span class="week-range">2026年8月10日 — 8月16日</span>
+      </div>
+      <div class="week-title">「产品迭代 · 冲量周」</div>
+      <div class="stats">
+        <div class="stat"><b>8</b><span>完成</span></div>
+        <div class="stat"><b>13</b><span>任务总数</span></div>
+        <div class="stat"><b>61%</b><span>完成率</span></div>
+        <div class="stat"><b>3</b><span>分组轨道</span></div>
+      </div>
+    </div>
+
+    <div class="tracks">
+      <!-- Track 1 -->
+      <div class="track">
+        <div class="track-head">
+          <span class="track-dot" style="background:#E05A3E"></span>
+          <span class="track-name">产品迭代</span>
+          <span class="track-count">4 项 · 3 完成</span>
+        </div>
+        <div class="task-row depth-0">
+          <span class="tree-guide">◆</span>
+          <span class="task-title">发布 v1.1 版本并整理发版清单</span>
+          <span class="task-meta">
+            <span class="badge p0">P0</span>
+            <span class="badge owner">跟进·张三</span>
+          </span>
+        </div>
+        <div class="task-row depth-1">
+          <span class="tree-guide">├─</span>
+          <span class="task-title">修复登录页在窄屏下的布局塌陷问题</span>
+          <span class="task-meta">
+            <span class="badge p1">P1</span>
+            <span class="badge self">自己</span>
+            <span class="badge tag">前端</span>
+          </span>
+        </div>
+        <div class="task-row depth-1">
+          <span class="tree-guide">├─</span>
+          <span class="task-title">导出功能回归测试，重点覆盖 WebDAV 同步链路</span>
+          <span class="task-meta">
+            <span class="badge p2">P2</span>
+            <span class="badge tag">测试</span>
+          </span>
+        </div>
+        <div class="task-row depth-0">
+          <span class="tree-guide">◆</span>
+          <span class="task-title closed">更新项目技术文档到 docs/tech-stack-reference.md</span>
+          <span class="task-meta">
+            <span class="badge p2">P2</span>
+            <span class="badge tag">文档</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Track 2 -->
+      <div class="track">
+        <div class="track-head">
+          <span class="track-dot" style="background:#3B8FBF"></span>
+          <span class="track-name">团队协作</span>
+          <span class="track-count">5 项 · 3 完成</span>
+        </div>
+        <div class="task-row depth-0">
+          <span class="tree-guide">◆</span>
+          <span class="task-title">周会材料整理与数据准备</span>
+          <span class="task-meta">
+            <span class="badge p1">P1</span>
+            <span class="badge assigner">分派·李四</span>
+          </span>
+        </div>
+        <div class="task-row depth-1">
+          <span class="tree-guide">├─</span>
+          <span class="task-title">汇总上周各分组完成情况并生成图表</span>
+          <span class="task-meta">
+            <span class="badge p2">P2</span>
+            <span class="badge self">自己</span>
+          </span>
+        </div>
+        <div class="task-row depth-0">
+          <span class="tree-guide">◆</span>
+          <span class="task-title closed">新人 onboarding 文档补齐验收标准</span>
+          <span class="task-meta">
+            <span class="badge p2">P2</span>
+            <span class="badge tag">文档</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Track 3 -->
+      <div class="track">
+        <div class="track-head">
+          <span class="track-dot" style="background:#4F9E5A"></span>
+          <span class="track-name">个人成长</span>
+          <span class="track-count">4 项 · 2 完成</span>
+        </div>
+        <div class="task-row depth-0">
+          <span class="tree-guide">◆</span>
+          <span class="task-title">读完《设计中的设计》并整理读书笔记</span>
+          <span class="task-meta">
+            <span class="badge p2">P2</span>
+            <span class="badge self">自己</span>
+            <span class="badge tag">阅读</span>
+          </span>
+        </div>
+        <div class="task-row depth-1">
+          <span class="tree-guide">└─</span>
+          <span class="task-title">挑选 3 个可用到产品设计中的原则写成卡片</span>
+          <span class="task-meta">
+            <span class="badge p3">P3</span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span class="dot"></span>
+      <span>来自「周计划」 · 任务分享</span>
+      <span class="divider"></span>
+    </div>
+  </div>
+</body>
+</html>

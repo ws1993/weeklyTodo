@@ -32,6 +32,12 @@ interface TaskTreeProps {
   showIncompleteOnly?: boolean;
   /** 分组颜色映射，用于轨道式分组的彩色左边框。 */
   groupColors?: GroupColor[];
+  /** 进入分享多选模式：行首复选框代替完成状态勾选框，隐藏悬停操作。 */
+  selectionMode?: boolean;
+  /** 已选任务 id 集合（多选模式下使用）。 */
+  selectedIds?: Set<number>;
+  /** 切换某个任务的选中状态（多选模式下使用）。 */
+  onToggleSelect?: (taskId: number) => void;
 }
 
 interface DropIndicator {
@@ -56,6 +62,9 @@ export function TaskTree({
   locateRequest = null,
   showIncompleteOnly = false,
   groupColors = [],
+  selectionMode = false,
+  selectedIds,
+  onToggleSelect,
 }: TaskTreeProps) {
   const addTask = useAppStore((state) => state.addTask);
   const moveTask = useAppStore((state) => state.moveTask);
@@ -202,6 +211,9 @@ export function TaskTree({
           drag={dragProps}
           visibleTaskIds={visibleTaskIds}
           groupColor={colorMap.get(task.title)}
+          selectionMode={selectionMode}
+          selectedIds={selectedIds}
+          onToggleSelect={onToggleSelect}
         />
       ))}
 
@@ -214,7 +226,7 @@ export function TaskTree({
         />
       )}
 
-      {addingParentId === null ? (
+      {selectionMode ? null : addingParentId === null ? (
         <div className="add-inline" style={{ marginTop: 10, paddingLeft: 14 }}>
           <button className="btn btn-ghost btn-sm" onClick={() => setAddingParentId('root')}>
             <PlusIcon size={13} />
@@ -277,6 +289,12 @@ interface TaskNodeProps {
   visibleTaskIds?: Set<number> | null;
   /** 该任务所属分组的颜色（仅根任务传递）。 */
   groupColor?: string;
+  /** 分享多选模式下，行首显示选择复选框。 */
+  selectionMode?: boolean;
+  /** 已选任务 id 集合。 */
+  selectedIds?: Set<number>;
+  /** 切换选中状态。 */
+  onToggleSelect?: (taskId: number) => void;
 }
 
 function TaskNode({
@@ -289,6 +307,9 @@ function TaskNode({
   drag,
   visibleTaskIds = null,
   groupColor,
+  selectionMode = false,
+  selectedIds,
+  onToggleSelect,
 }: TaskNodeProps) {
   const toggleTask = useAppStore((state) => state.toggleTask);
   const editTask = useAppStore((state) => state.editTask);
@@ -312,6 +333,7 @@ function TaskNode({
   const closed = task.status === 'closed';
   // 「非叶子」以真实子任务判断（不受「仅看未完成」过滤影响），用于隐藏执行方式/负责人。
   const hasAnyChildren = allTasks.some((item) => item.parentId === task.id);
+  const isSelected = selectedIds?.has(task.id) ?? false;
 
   // 定位目标位于本节点子树内时，强制展开以便目标可见。
   useEffect(() => {
@@ -363,6 +385,7 @@ function TaskNode({
     drop ? `drop-${drop}` : '',
     hasChildren ? 'collapsible' : '',
     !closed && isLeaf ? 'leaf-active' : '',
+    selectionMode && isSelected ? 'selected' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -432,22 +455,30 @@ function TaskNode({
           if (drag.suppressNextClick()) {
             return;
           }
+          // 多选模式下，点击行主体不触发折叠/展开（避免误选）。
+          if (selectionMode) {
+            return;
+          }
           // 行主体（复选框以前）作为收起/展开交互区，避免误触打开任务详情。
           if (hasChildren) {
             setExpanded((value) => !value);
           }
         }}
-        draggable={!editing}
+        draggable={!editing && !selectionMode}
         onDragEnter={handleDragEnter}
-        onDragStart={(event) => {
-          event.dataTransfer.effectAllowed = 'move';
-          event.dataTransfer.setData('text/plain', String(task.id));
-          drag.startDrag(task.id);
-        }}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onDragEnd={drag.endDrag}
+        onDragStart={
+          selectionMode
+            ? undefined
+            : (event) => {
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', String(task.id));
+                drag.startDrag(task.id);
+              }
+        }
+        onDragOver={selectionMode ? undefined : handleDragOver}
+        onDragLeave={selectionMode ? undefined : handleDragLeave}
+        onDrop={selectionMode ? undefined : handleDrop}
+        onDragEnd={selectionMode ? undefined : drag.endDrag}
       >
         <button
           className={`task-toggle ${hasChildren ? (expanded ? 'open' : '') : 'leaf'}`}
@@ -462,16 +493,30 @@ function TaskNode({
           {hasChildren && <ChevronRightIcon size={15} />}
         </button>
 
-        <button
-          className={`task-check ${closed ? 'done' : ''}`}
-          title={closed ? '重新打开' : '标记完成'}
-          onClick={(event) => {
-            event.stopPropagation();
-            void toggleTask(task.id);
-          }}
-        >
-          {closed && <CheckIcon size={12} />}
-        </button>
+        {selectionMode ? (
+          <button
+            className={`task-select${isSelected ? ' checked' : ''}`}
+            title={isSelected ? '取消选择' : '选择此任务'}
+            aria-pressed={isSelected}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleSelect?.(task.id);
+            }}
+          >
+            {isSelected && <CheckIcon size={12} />}
+          </button>
+        ) : (
+          <button
+            className={`task-check ${closed ? 'done' : ''}`}
+            title={closed ? '重新打开' : '标记完成'}
+            onClick={(event) => {
+              event.stopPropagation();
+              void toggleTask(task.id);
+            }}
+          >
+            {closed && <CheckIcon size={12} />}
+          </button>
+        )}
 
         <span
           className="node-title-wrap"
@@ -500,7 +545,10 @@ function TaskNode({
               }}
             />
           ) : (
-            <span className="node-title" onDoubleClick={() => setEditing(true)}>
+            <span
+              className="node-title"
+              onDoubleClick={selectionMode ? undefined : () => setEditing(true)}
+            >
               {task.title}
             </span>
           )}
@@ -508,17 +556,21 @@ function TaskNode({
 
         <span
           className="node-meta"
-          title="双击打开任务详情"
+          title={selectionMode ? undefined : '双击打开任务详情'}
           onClick={(event) => {
             // 单击也拦截：既避免误触行的折叠/展开，也让真双击的两次 click 不引起闪烁。
             event.stopPropagation();
           }}
-          onDoubleClick={(event) => {
-            // 徽章区是独立的双击热区：单击不参与行的折叠/展开，
-            // 否则双击会先触发两次 click 导致子树先折叠再展开、产生闪烁。
-            event.stopPropagation();
-            onOpenSettings(task);
-          }}
+          onDoubleClick={
+            selectionMode
+              ? undefined
+              : (event) => {
+                  // 徽章区是独立的双击热区：单击不参与行的折叠/展开，
+                  // 否则双击会先触发两次 click 导致子树先折叠再展开、产生闪烁。
+                  event.stopPropagation();
+                  onOpenSettings(task);
+                }
+          }
         >
           {task.carriedFromTaskId != null && <span className="tag tag-carry">带入</span>}
           {closed && <span className="tag tag-closed">已完成</span>}
@@ -543,65 +595,69 @@ function TaskNode({
           {extraTagCount > 0 && <span className="tag tag-extra">+{extraTagCount}</span>}
         </span>
 
-        <span className="row-spacer" />
-        <span className="task-actions">
-          <button
-            className="add-btn"
-            title="添加子任务"
-            onClick={(event) => {
-              event.stopPropagation();
-              setShowInlineAdd(true);
-            }}
-          >
-            <PlusIcon size={12} />
-          </button>
-          <button
-            className="edit-btn"
-            title="重命名"
-            aria-label="重命名"
-            onClick={(event) => {
-              event.stopPropagation();
-              setEditing(true);
-            }}
-          >
-            <RenameIcon size={14} />
-          </button>
-          <button
-            className="edit-btn"
-            title="任务设置"
-            aria-label="打开任务设置"
-            onClick={(event) => {
-              event.stopPropagation();
-              onOpenSettings(task);
-            }}
-          >
-            <SettingsIcon size={14} />
-          </button>
-          <button
-            className={`edit-btn danger ${confirmingDelete ? 'armed' : ''}`}
-            title={
-              confirmingDelete
-                ? `再次点击确认删除（含 ${deleteSubtreeSize} 项）`
-                : '删除任务'
-            }
-            onClick={(event) => {
-              event.stopPropagation();
-              if (confirmingDelete) {
-                void deleteTask(task.id);
-              } else {
-                setConfirmingDelete(true);
-                window.setTimeout(() => setConfirmingDelete(false), 3000);
-              }
-            }}
-            onMouseLeave={() => {
-              if (confirmingDelete) {
-                setConfirmingDelete(false);
-              }
-            }}
-          >
-            {confirmingDelete ? <CrossIcon size={14} /> : <TrashIcon size={14} />}
-          </button>
-        </span>
+        {!selectionMode && (
+          <>
+            <span className="row-spacer" />
+            <span className="task-actions">
+              <button
+                className="add-btn"
+                title="添加子任务"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setShowInlineAdd(true);
+                }}
+              >
+                <PlusIcon size={12} />
+              </button>
+              <button
+                className="edit-btn"
+                title="重命名"
+                aria-label="重命名"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setEditing(true);
+                }}
+              >
+                <RenameIcon size={14} />
+              </button>
+              <button
+                className="edit-btn"
+                title="任务设置"
+                aria-label="打开任务设置"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onOpenSettings(task);
+                }}
+              >
+                <SettingsIcon size={14} />
+              </button>
+              <button
+                className={`edit-btn danger ${confirmingDelete ? 'armed' : ''}`}
+                title={
+                  confirmingDelete
+                    ? `再次点击确认删除（含 ${deleteSubtreeSize} 项）`
+                    : '删除任务'
+                }
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (confirmingDelete) {
+                    void deleteTask(task.id);
+                  } else {
+                    setConfirmingDelete(true);
+                    window.setTimeout(() => setConfirmingDelete(false), 3000);
+                  }
+                }}
+                onMouseLeave={() => {
+                  if (confirmingDelete) {
+                    setConfirmingDelete(false);
+                  }
+                }}
+              >
+                {confirmingDelete ? <CrossIcon size={14} /> : <TrashIcon size={14} />}
+              </button>
+            </span>
+          </>
+        )}
       </div>
 
       {hasChildren && expanded && (
@@ -615,6 +671,9 @@ function TaskNode({
               depth={depth + 1}
               drag={drag}
               visibleTaskIds={visibleTaskIds}
+              selectionMode={selectionMode}
+              selectedIds={selectedIds}
+              onToggleSelect={onToggleSelect}
             />
           ))}
         </div>
