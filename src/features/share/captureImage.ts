@@ -2,25 +2,44 @@ import { toPng } from 'html-to-image';
 import { saveSharePng } from '../../api/nativeBridge';
 import { scaleShareCardDimension } from './shareLayout';
 
-const SHARE_PNG_PIXEL_RATIO = 2;
-
 /**
- * 将分享卡片渲染为 2x 高清 PNG dataURL。
+ * 将分享卡片渲染为与预览完全一致的 PNG dataURL。
  *
- * 卡片始终先按完整尺寸排版，再以与预览一致的比例缩小最终 PNG 画布。
+ * 预览通过 CSS `zoom: 0.58` 缩放显示卡片。若直接截取该 DOM，html-to-image
+ * 会把祖先 zoom 写进克隆样式，且 canvas 尺寸会被 pixelRatio 二次放大，
+ * 导致成品比预览大 2 倍（组件变大、相互压盖）。因此导出前先把 zoom 容器
+ * 临时还原为自然尺寸，再按预览比例输出画布，保证所见即所得。
+ *
+ * 在预览比例基础上再放大 SHARE_PNG_EXPORT_UPSCALE 倍输出：布局与预览完全
+ * 一致，但图片更大（卡片 800px 宽 → 预览 464px → 导出约 928px）。
  */
+const SHARE_PNG_EXPORT_UPSCALE = 2;
+
 export async function captureShareCard(node: HTMLElement): Promise<string> {
-  const cardWidth = node.scrollWidth;
-  const cardHeight = node.scrollHeight;
-  return toPng(node, {
-    pixelRatio: SHARE_PNG_PIXEL_RATIO,
-    cacheBust: false,
-    backgroundColor: '#FFFFFF',
-    width: cardWidth,
-    height: cardHeight,
-    canvasWidth: scaleShareCardDimension(cardWidth),
-    canvasHeight: scaleShareCardDimension(cardHeight),
-  });
+  const zoomHost = node.parentElement;
+  const previousZoom = zoomHost?.style.zoom ?? '';
+  if (zoomHost) {
+    zoomHost.style.zoom = '1';
+  }
+  try {
+    const cardWidth = node.scrollWidth;
+    const cardHeight = node.scrollHeight;
+    return await toPng(node, {
+      // pixelRatio 固定为 1：canvasWidth/canvasHeight 已按预览比例和导出放大倍数
+      // 计算好，库内部会把 canvas 尺寸再乘 pixelRatio 并把 SVG 拉伸填满画布。
+      pixelRatio: 1,
+      cacheBust: false,
+      backgroundColor: '#FFFFFF',
+      width: cardWidth,
+      height: cardHeight,
+      canvasWidth: scaleShareCardDimension(cardWidth) * SHARE_PNG_EXPORT_UPSCALE,
+      canvasHeight: scaleShareCardDimension(cardHeight) * SHARE_PNG_EXPORT_UPSCALE,
+    });
+  } finally {
+    if (zoomHost) {
+      zoomHost.style.zoom = previousZoom;
+    }
+  }
 }
 
 function dataUrlToBlob(dataUrl: string): Blob {

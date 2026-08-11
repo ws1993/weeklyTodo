@@ -16,7 +16,7 @@ function trackCount(rowCount: number, doneCount: number): string {
 }
 
 /**
- * 分享图卡片：任务按分组分卡展示，徽章承载优先级、负责人和标签。
+ * 分享图卡片：任务按分组分卡展示，头部标题为跟进人，徽章承载优先级、执行方式和标签。
  */
 export function TemplateRainbowTrack({ data, settings }: TemplateRainbowTrackProps) {
   // 按轨道分组（rows 已按根任务顺序连续排列）。
@@ -30,6 +30,17 @@ export function TemplateRainbowTrack({ data, settings }: TemplateRainbowTrackPro
     }
   }
 
+  // 头部标题 = 跟进人（多个用顿号分隔）；无跟进任务时回退为「周计划」。
+  const followUpOwners = Array.from(
+    new Set(
+      data.rows
+        .filter((row) => !row.hasChildren && row.executionMode === 'follow_up' && row.ownerName)
+        .map((row) => row.ownerName as string),
+    ),
+  );
+  const headerTitle =
+    followUpOwners.length > 0 ? `「${followUpOwners.join('、')}的任务」` : '「周计划」';
+
   return (
     <div className="share-card">
       {settings.showWeekHeader && (
@@ -38,7 +49,7 @@ export function TemplateRainbowTrack({ data, settings }: TemplateRainbowTrackPro
             <span className="share-week-id">{data.weekId}</span>
             <span className="share-week-range">{data.weekRangeCn}</span>
           </div>
-          <div className="share-week-title">「周计划 · {data.weekId}」</div>
+          <div className="share-week-title">{headerTitle}</div>
           <div className="share-stats">
             <div className="share-stat">
               <b>{data.doneTasks}</b>
@@ -103,27 +114,13 @@ function TaskRow({ row, settings }: { row: ShareTaskRow; settings: ShareSettings
       </span>,
     );
   }
-  if (settings.showAssignments && !row.hasChildren) {
-    if (row.assignerName) {
-      meta.push(
-        <span className="share-badge assigner" key="assigner">
-          分派·{row.assignerName}
-        </span>,
-      );
-    }
-    if (row.executionMode === 'follow_up' && row.ownerName) {
-      meta.push(
-        <span className="share-badge owner" key="owner">
-          跟进·{row.ownerName}
-        </span>,
-      );
-    } else if (row.executionMode === 'self') {
-      meta.push(
-        <span className="share-badge self" key="self">
-          自己
-        </span>,
-      );
-    }
+  // 跟进人已上移到头部标题；行内仅保留「自己」执行方式标识。
+  if (settings.showAssignments && !row.hasChildren && row.executionMode === 'self') {
+    meta.push(
+      <span className="share-badge self" key="self">
+        自己
+      </span>,
+    );
   }
   if (settings.showTags) {
     row.tags.slice(0, 4).forEach((tag) => {

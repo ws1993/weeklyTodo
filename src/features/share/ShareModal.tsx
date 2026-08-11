@@ -34,7 +34,7 @@ const FIELD_OPTIONS: FieldOption[] = [
   { key: 'showWeekHeader', label: '周头部信息' },
   { key: 'showDescription', label: '任务描述' },
   { key: 'showPriority', label: '优先级' },
-  { key: 'showAssignments', label: '执行方式 / 负责人 / 分派人' },
+  { key: 'showAssignments', label: '执行方式（自己）' },
   { key: 'showTags', label: '标签' },
   { key: 'showGroupColors', label: '分组色条' },
   { key: 'includeCompleted', label: '包含已完成任务' },
