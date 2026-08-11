@@ -101,13 +101,15 @@
 .tag-assign-combo{color:var(--assigner);border-color:var(--assigner-border);background:var(--assigner-soft);letter-spacing:.3px;font-weight:600}
 .tag-label{color:var(--text-2);border:1px solid var(--border);background:var(--surface-2);letter-spacing:.3px}
 .tag-extra{color:var(--text-3);border:1px solid var(--border);background:transparent;letter-spacing:.3px}
-/* 优先级/标签徽章区的双击热区：悬停给出可点提示，负外边距抵消内边距、不改变原有布局。 */
+/* 优先级/标签徽章区的双击热区：悬停给出可点提示，负外边距抵消内边距、不改变原有布局。
+   左侧 200px 为标题预留显示空间（194px = 200px − 6px 原有的负外边距）。 */
 .node-meta{
   display:inline-flex;align-items:center;gap:10px;flex:none;cursor:pointer;
-  padding:2px 6px;margin:-2px -6px;border-radius:999px;transition:background .12s;
+  padding:2px 6px;margin:-2px -6px -2px 194px;border-radius:999px;transition:background .12s;
 }
 .node-meta:hover{background:var(--brand-soft)}
-.row-spacer{flex:1}
+/* 固定间隙即可：标题占满剩余宽度，操作按钮仍贴右缘。 */
+.row-spacer{flex:0 0 24px}
 .task-actions{display:inline-flex;align-items:center;gap:4px;opacity:0;transition:opacity .12s}
 .tree-row:hover .task-actions{opacity:1}
 .add-btn,.edit-btn{
