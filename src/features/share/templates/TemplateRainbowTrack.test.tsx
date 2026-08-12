@@ -87,4 +87,18 @@ describe('TemplateRainbowTrack', () => {
 
     expect(screen.getByText('自己')).toBeTruthy();
   });
+
+  it('counts only leaf rows in the track header, like the top stats', () => {
+    const rows = [
+      // 父任务（有子任务）不计入轨道计数。
+      makeRow({ id: 1, title: '父任务', hasChildren: true }),
+      makeRow({ id: 2, title: '叶子A', hasChildren: false, closed: false }),
+      makeRow({ id: 3, title: '叶子B', hasChildren: false, closed: true }),
+    ];
+    render(
+      <TemplateRainbowTrack data={makeData(rows)} settings={createDefaultShareSettings()} />,
+    );
+
+    expect(screen.getByText('2 项 · 1 完成')).toBeTruthy();
+  });
 });

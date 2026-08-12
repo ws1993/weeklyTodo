@@ -73,7 +73,9 @@ export function TemplateRainbowTrack({ data, settings }: TemplateRainbowTrackPro
 
       <div className="share-tracks">
         {tracks.map((track) => {
-          const doneCount = track.rows.filter((row) => row.closed).length;
+          // 轨道计数与顶部统计口径一致：只算叶子节点（无子任务的行）。
+          const leafRows = track.rows.filter((row) => !row.hasChildren);
+          const doneCount = leafRows.filter((row) => row.closed).length;
           return (
             <div className="share-track" key={track.title}>
               {settings.showGroupColors && (
@@ -84,7 +86,7 @@ export function TemplateRainbowTrack({ data, settings }: TemplateRainbowTrackPro
                   />
                   <span className="share-track-name">{track.title}</span>
                   <span className="share-track-count">
-                    {trackCount(track.rows.length, doneCount)}
+                    {trackCount(leafRows.length, doneCount)}
                   </span>
                 </div>
               )}
