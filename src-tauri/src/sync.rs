@@ -24,6 +24,10 @@ pub struct SyncResult {
     pub synced_at: String,
     /// Human-readable summary.
     pub message: String,
+    /// Local file mtime (UTC seconds) recorded as baseline for next sync comparison.
+    pub local_baseline_mtime: Option<i64>,
+    /// Remote file mtime (UTC seconds) recorded as baseline for next sync comparison.
+    pub remote_baseline_mtime: Option<i64>,
 }
 
 /// Selects whether synchronization is scheduler-driven or explicitly requested.
@@ -75,12 +79,46 @@ pub fn decide_direction(local_modified_utc: i64, remote_modified_utc: i64) -> Op
     Some(local_modified_utc > remote_modified_utc)
 }
 
+/// Decide the sync direction using baselines recorded after the last successful sync.
+///
+/// `pre_checkpoint_mtime` is the local file mtime captured *before* this sync run
+/// touches the database (i.e. before `checkpoint_db`), so it reflects the true
+/// state of the local file without interference from the current startup.
+///
+/// Returns the same semantics as `decide_direction`.
+pub fn decide_direction_with_baseline(
+    pre_checkpoint_mtime: Option<i64>,
+    remote_modified_utc: i64,
+    local_baseline: Option<i64>,
+    remote_baseline: Option<i64>,
+) -> Option<bool> {
+    match (pre_checkpoint_mtime, local_baseline, remote_baseline) {
+        (Some(local_mtime), Some(local_base), Some(remote_base)) => {
+            let local_changed = local_mtime != local_base;
+            let remote_changed = remote_modified_utc != remote_base;
+            match (local_changed, remote_changed) {
+                (false, false) => None,
+                (false, true) => Some(false),
+                (true, false) => Some(true),
+                // Both changed: fall back to mtime comparison.
+                (true, true) => decide_direction(local_mtime, remote_modified_utc),
+            }
+        }
+        // No baselines yet (first sync): fall back to direct mtime comparison.
+        _ => pre_checkpoint_mtime
+            .map(|local_mtime| decide_direction(local_mtime, remote_modified_utc))
+            .unwrap_or(None),
+    }
+}
+
 /// Run one sync against the configured WebDAV directory.
 pub async fn sync_now(
     data_dir: &str,
     url: &str,
     username: &str,
     backup_retention: Option<i32>,
+    local_baseline_mtime: Option<i64>,
+    remote_baseline_mtime: Option<i64>,
 ) -> Result<SyncResult, String> {
     let password = credentials::load_password(username)?
         .ok_or_else(|| "尚未保存该账号的密码，请在同步设置中填写密码后重试".to_string())?;
@@ -91,6 +129,8 @@ pub async fn sync_now(
         &password,
         SyncMode::Manual,
         backup_retention,
+        local_baseline_mtime,
+        remote_baseline_mtime,
     )
     .await
 }
@@ -101,6 +141,8 @@ pub async fn sync_automatically(
     url: &str,
     username: &str,
     backup_retention: Option<i32>,
+    local_baseline_mtime: Option<i64>,
+    remote_baseline_mtime: Option<i64>,
 ) -> Result<SyncResult, String> {
     let password = credentials::load_password(username)?
         .ok_or_else(|| "尚未保存该账号的密码，请在同步设置中填写密码后重试".to_string())?;
@@ -111,6 +153,8 @@ pub async fn sync_automatically(
         &password,
         SyncMode::Automatic,
         backup_retention,
+        local_baseline_mtime,
+        remote_baseline_mtime,
     )
     .await
 }
@@ -122,6 +166,8 @@ pub async fn sync_now_with_password(
     username: &str,
     password: &str,
     backup_retention: Option<i32>,
+    local_baseline_mtime: Option<i64>,
+    remote_baseline_mtime: Option<i64>,
 ) -> Result<SyncResult, String> {
     sync_now_with_mode_and_password(
         data_dir,
@@ -130,6 +176,8 @@ pub async fn sync_now_with_password(
         password,
         SyncMode::Manual,
         backup_retention,
+        local_baseline_mtime,
+        remote_baseline_mtime,
     )
     .await
 }
@@ -142,6 +190,8 @@ pub async fn sync_now_with_mode_and_password(
     password: &str,
     mode: SyncMode,
     backup_retention: Option<i32>,
+    local_baseline_mtime: Option<i64>,
+    remote_baseline_mtime: Option<i64>,
 ) -> Result<SyncResult, String> {
     let base_url = webdav::normalize_dir_url(url)?;
     let client = webdav::build_client()?;
@@ -150,6 +200,13 @@ pub async fn sync_now_with_mode_and_password(
     let local_path = Path::new(data_dir).join(db::DB_FILE_NAME);
     let file_url = format!("{base_url}{}", db::DB_FILE_NAME);
     let remote = webdav::probe_file(&client, &file_url, username, password).await?;
+
+    // Capture the local file mtime BEFORE any DB operations (checkpoint, etc.)
+    // so that ensure_current_week or WAL checkpoint in this startup don't pollute it.
+    let pre_checkpoint_mtime = std::fs::metadata(&local_path)
+        .ok()
+        .and_then(|metadata| metadata.modified().ok())
+        .map(system_time_to_utc_seconds);
 
     // Do not create or checkpoint an empty local database before this decision.
     if mode == SyncMode::Automatic
@@ -162,37 +219,39 @@ pub async fn sync_now_with_mode_and_password(
     }
 
     checkpoint_db(Path::new(data_dir))?;
-    let local_modified = std::fs::metadata(&local_path)
-        .ok()
-        .and_then(|metadata| metadata.modified().ok())
-        .map(system_time_to_utc_seconds);
 
     let mut backup_files: Vec<String> = Vec::new();
-    let (direction, message) = match (local_modified, remote) {
+    let (direction, new_local_baseline, new_remote_baseline) = match (pre_checkpoint_mtime, &remote) {
         (None, None) => {
             return Err("本地和远端都没有数据库文件".to_string());
         }
-        (None, Some(_)) => {
+        (None, Some(remote_info)) => {
             webdav::download_file(&client, &file_url, &local_path, username, password).await?;
-            // 校准本地 mtime，避免下次比较时因毫秒/秒级偏差被误判。
             sync_local_mtime_to_remote(&client, &file_url, &local_path, username, password).await;
-            ("download", "已从远端下载数据库".to_string())
+            let synced_local_mtime = read_file_mtime_utc(&local_path);
+            ("download", synced_local_mtime, Some(remote_info.last_modified_utc))
         }
         (Some(_), None) => {
             webdav::upload_file(&client, &file_url, &local_path, username, password).await?;
             sync_local_mtime_to_remote(&client, &file_url, &local_path, username, password).await;
-            ("upload", "已将本地数据库上传到远端".to_string())
+            let synced_local_mtime = read_file_mtime_utc(&local_path);
+            ("upload", synced_local_mtime, synced_local_mtime)
         }
-        (Some(local_modified_utc), Some(remote_info)) => {
-            match decide_direction(local_modified_utc, remote_info.last_modified_utc) {
-                None => ("noop", "两端数据库一致，无需同步".to_string()),
+        (Some(local_mtime), Some(remote_info)) => {
+            let direction = decide_direction_with_baseline(
+                Some(local_mtime),
+                remote_info.last_modified_utc,
+                local_baseline_mtime,
+                remote_baseline_mtime,
+            );
+            match direction {
+                None => ("noop", Some(local_mtime), Some(remote_info.last_modified_utc)),
                 Some(true) => {
                     if local_database_is_empty_or_missing(&local_path)? {
                         return Ok(skipped_sync_result(
                             "已跳过同步：本地数据库为空，已阻止覆盖 WebDAV 现有数据。请先恢复远端版本。",
                         ));
                     }
-                    // 本地更新：先把远端旧版备份，再上传本地版本。
                     let backup_name =
                         next_available_backup_filename(&client, &base_url, username, password)
                             .await?;
@@ -206,13 +265,14 @@ pub async fn sync_now_with_mode_and_password(
                         .await?;
                     sync_local_mtime_to_remote(&client, &file_url, &local_path, username, password)
                         .await;
+                    let synced_local_mtime = read_file_mtime_utc(&local_path);
                     (
                         "upload",
-                        "本地版本更新，已将远端旧版本备份后上传".to_string(),
+                        synced_local_mtime,
+                        synced_local_mtime,
                     )
                 }
                 Some(false) => {
-                    // 远端更新：先把本地旧版备份到远端，再下载覆盖本地。
                     let backup_name =
                         next_available_backup_filename(&client, &base_url, username, password)
                             .await?;
@@ -224,20 +284,29 @@ pub async fn sync_now_with_mode_and_password(
                         .await?;
                     sync_local_mtime_to_remote(&client, &file_url, &local_path, username, password)
                         .await;
+                    let synced_local_mtime = read_file_mtime_utc(&local_path);
                     (
                         "download",
-                        "远端版本更新，本地旧版已备份并下载新版本".to_string(),
+                        synced_local_mtime,
+                        Some(remote_info.last_modified_utc),
                     )
                 }
             }
         }
     };
 
+    let direction_messages = match direction {
+        "noop" => "两端数据库一致，无需同步",
+        "upload" => "本地版本更新，已将远端旧版本备份后上传",
+        "download" => "远端版本更新，本地旧版已备份并下载新版本",
+        _ => direction,
+    };
+
     // Clean up old backups based on retention limit
     let deleted_files =
         cleanup_old_backups(&client, &base_url, username, password, backup_retention).await?;
 
-    let mut final_message = message;
+    let mut final_message = direction_messages.to_string();
     if !deleted_files.is_empty() {
         final_message.push_str(&format!("；已清理 {} 个旧备份", deleted_files.len()));
     }
@@ -247,7 +316,17 @@ pub async fn sync_now_with_mode_and_password(
         backup_files,
         synced_at: Utc::now().to_rfc3339(),
         message: final_message,
+        local_baseline_mtime: new_local_baseline,
+        remote_baseline_mtime: new_remote_baseline,
     })
+}
+
+/// Read a file's mtime as UTC seconds, returning `None` on any error.
+fn read_file_mtime_utc(path: &Path) -> Option<i64> {
+    std::fs::metadata(path)
+        .ok()
+        .and_then(|metadata| metadata.modified().ok())
+        .map(system_time_to_utc_seconds)
 }
 
 fn skipped_sync_result(message: &str) -> SyncResult {
@@ -256,6 +335,8 @@ fn skipped_sync_result(message: &str) -> SyncResult {
         backup_files: Vec::new(),
         synced_at: Utc::now().to_rfc3339(),
         message: message.to_string(),
+        local_baseline_mtime: None,
+        remote_baseline_mtime: None,
     }
 }
 
@@ -469,7 +550,7 @@ mod tests {
         // 1) 首次同步：空远端 -> 上传。
         let url = server.base_url("weeklytodo");
         let first =
-            sync_now_with_password(data_dir.to_str().unwrap(), &url, "alice", "secret", None)
+            sync_now_with_password(data_dir.to_str().unwrap(), &url, "alice", "secret", None, None, None)
                 .await
                 .unwrap();
         assert_eq!(first.direction, "upload");
@@ -479,7 +560,7 @@ mod tests {
 
         // 2) 立即再次同步：无任何改动 -> noop（验证不会反复翻转）。
         let idle =
-            sync_now_with_password(data_dir.to_str().unwrap(), &url, "alice", "secret", None)
+            sync_now_with_password(data_dir.to_str().unwrap(), &url, "alice", "secret", None, None, None)
                 .await
                 .unwrap();
         assert_eq!(idle.direction, "noop");
@@ -488,7 +569,7 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(1100));
         add_sample_task(&data_dir);
         let local =
-            sync_now_with_password(data_dir.to_str().unwrap(), &url, "alice", "secret", None)
+            sync_now_with_password(data_dir.to_str().unwrap(), &url, "alice", "secret", None, None, None)
                 .await
                 .unwrap();
         assert_eq!(local.direction, "upload");
@@ -511,7 +592,7 @@ mod tests {
         let remote_edit = std::fs::read(remote_data_dir.join(db::DB_FILE_NAME)).unwrap();
         server.put_file("weeklytodo/weeklytodo.db", remote_edit.clone());
         let remote =
-            sync_now_with_password(data_dir.to_str().unwrap(), &url, "alice", "secret", None)
+            sync_now_with_password(data_dir.to_str().unwrap(), &url, "alice", "secret", None, None, None)
                 .await
                 .unwrap();
         assert_eq!(remote.direction, "download");
@@ -544,6 +625,8 @@ mod tests {
             "alice",
             "secret",
             SyncMode::Automatic,
+            None,
+            None,
             None,
         )
         .await

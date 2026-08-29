@@ -140,13 +140,21 @@ export function App() {
     }
     webdavSyncInFlight = true;
     try {
-      const result = await syncWebDavAutomatically(settings.url, settings.username, settings.backupRetention);
+      const result = await syncWebDavAutomatically(
+        settings.url,
+        settings.username,
+        settings.backupRetention,
+        settings.localBaselineMtime,
+        settings.remoteBaselineMtime,
+      );
       const nextSettings = {
         ...loadWebDavSettings(),
         lastSyncedAt: result.direction === 'skipped' ? settings.lastSyncedAt : new Date().toISOString(),
         lastSyncStatus: `${result.direction === 'skipped' ? '已跳过自动同步' : `同步完成（${result.direction}）`}${
           result.backupFiles.length > 0 ? `，备份 ${result.backupFiles.length} 个` : ''
         }${result.direction === 'skipped' ? `：${result.message}` : ''}`,
+        localBaselineMtime: result.localBaselineMtime ?? settings.localBaselineMtime,
+        remoteBaselineMtime: result.remoteBaselineMtime ?? settings.remoteBaselineMtime,
       };
       saveWebDavSettings(nextSettings);
       // 远端较新并已覆盖本地时，刷新当前界面数据。

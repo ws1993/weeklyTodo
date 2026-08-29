@@ -113,7 +113,13 @@ export function WebDavSyncPanel({ settings, onChange, onDatabaseRestored }: WebD
       if (!persisted) {
         return;
       }
-      const result = await syncWebDav(settings.url, settings.username, settings.backupRetention);
+      const result = await syncWebDav(
+        settings.url,
+        settings.username,
+        settings.backupRetention,
+        settings.localBaselineMtime,
+        settings.remoteBaselineMtime,
+      );
       const backupText =
         result.backupFiles.length > 0 ? `；备份：${result.backupFiles.join('、')}` : '';
       setNotice(`${result.message}${backupText}`);
@@ -121,6 +127,8 @@ export function WebDavSyncPanel({ settings, onChange, onDatabaseRestored }: WebD
         lastSyncedAt: result.direction === 'skipped' ? settings.lastSyncedAt : new Date().toISOString(),
         lastSyncStatus:
           result.direction === 'skipped' ? `同步已跳过：${result.message}` : `同步完成（${result.direction}）`,
+        localBaselineMtime: result.localBaselineMtime ?? settings.localBaselineMtime,
+        remoteBaselineMtime: result.remoteBaselineMtime ?? settings.remoteBaselineMtime,
       });
     } catch (syncError) {
       const message = String(syncError);
@@ -173,6 +181,8 @@ export function WebDavSyncPanel({ settings, onChange, onDatabaseRestored }: WebD
         autoSyncPausedAfterRestore: true,
         lastSyncedAt: undefined,
         lastSyncStatus: `已恢复 ${result.restoredFileName}；自动同步已暂停`,
+        localBaselineMtime: undefined,
+        remoteBaselineMtime: undefined,
       });
       await onDatabaseRestored();
       setArmedRestoreFileName(null);

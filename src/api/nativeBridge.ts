@@ -337,6 +337,8 @@ export interface SyncResult {
   backupFiles: string[];
   syncedAt: string;
   message: string;
+  localBaselineMtime?: number | null;
+  remoteBaselineMtime?: number | null;
 }
 
 /** 校验 WebDAV 配置连通性（会创建缺失的同步目录）。 */
@@ -371,13 +373,16 @@ export async function syncWebDav(
   url: string,
   username: string,
   backupRetention?: number | 'unlimited',
+  localBaselineMtime?: number | null,
+  remoteBaselineMtime?: number | null,
 ): Promise<SyncResult> {
-  // 将 'unlimited' 转换为 null，数字直接传递
   const retentionLimit = backupRetention === 'unlimited' ? null : backupRetention;
   return invokeCommand<SyncResult>('webdav_sync_now', {
     url,
     username,
     backupRetention: retentionLimit,
+    localBaselineMtime: localBaselineMtime ?? null,
+    remoteBaselineMtime: remoteBaselineMtime ?? null,
   });
 }
 
@@ -386,13 +391,16 @@ export async function syncWebDavAutomatically(
   url: string,
   username: string,
   backupRetention?: number | 'unlimited',
+  localBaselineMtime?: number | null,
+  remoteBaselineMtime?: number | null,
 ): Promise<SyncResult> {
-  // 将 'unlimited' 转换为 null，数字直接传递
   const retentionLimit = backupRetention === 'unlimited' ? null : backupRetention;
   return invokeCommand<SyncResult>('webdav_sync_automatic', {
     url,
     username,
     backupRetention: retentionLimit,
+    localBaselineMtime: localBaselineMtime ?? null,
+    remoteBaselineMtime: remoteBaselineMtime ?? null,
   });
 }
 

@@ -523,9 +523,19 @@ pub async fn webdav_sync_now(
     url: String,
     username: String,
     backup_retention: Option<i32>,
+    local_baseline_mtime: Option<i64>,
+    remote_baseline_mtime: Option<i64>,
 ) -> Result<SyncResult, String> {
     let config = resolve_storage()?;
-    sync::sync_now(&config.data_dir, &url, &username, backup_retention).await
+    sync::sync_now(
+        &config.data_dir,
+        &url,
+        &username,
+        backup_retention,
+        local_baseline_mtime,
+        remote_baseline_mtime,
+    )
+    .await
 }
 
 /// Run one scheduler-driven sync with the empty-database overwrite guard enabled.
@@ -534,9 +544,19 @@ pub async fn webdav_sync_automatic(
     url: String,
     username: String,
     backup_retention: Option<i32>,
+    local_baseline_mtime: Option<i64>,
+    remote_baseline_mtime: Option<i64>,
 ) -> Result<SyncResult, String> {
     let config = resolve_storage()?;
-    sync::sync_automatically(&config.data_dir, &url, &username, backup_retention).await
+    sync::sync_automatically(
+        &config.data_dir,
+        &url,
+        &username,
+        backup_retention,
+        local_baseline_mtime,
+        remote_baseline_mtime,
+    )
+    .await
 }
 
 /// List the current remote database and its timestamped backups.

@@ -13,6 +13,10 @@ export interface WebDavSettings {
   autoSyncPausedAfterRestore: boolean;
   /** WebDAV备份文件保留数量。'unlimited'表示无限制。 */
   backupRetention: BackupRetention;
+  /** 上次同步后记录的本地文件 mtime（UTC 秒），用于基线比较判断本地是否变更。 */
+  localBaselineMtime?: number;
+  /** 上次同步后记录的远端文件 mtime（UTC 秒），用于基线比较判断远端是否变更。 */
+  remoteBaselineMtime?: number;
 }
 
 /** 备份保留数量选项类型 */
