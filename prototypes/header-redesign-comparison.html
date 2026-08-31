@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>周计划 · 头部交互与视觉优化方案对比原型</title>
+<style>
+:root {
+  --bg: #F8FAFC;
+  --bg-sidebar: #FFFFFF;
+  --surface: #FFFFFF;
+  --surface-2: #F1F5F9;
+  --surface-elevated: #FFFFFF;
+  --bg-subtle: #F1F5F9;
+  --bg-hover: #F8FAFC;
+  --bg-active: #EEF2F6;
+
+  --border-subtle: rgba(226, 232, 240, 0.8);
+  --border: #E2E8F0;
+  --border-strong: #CBD5E1;
+  --border-focus: #3B82F6;
+
+  --text-1: #0F172A;
+  --text-2: #475569;
+  --text-3: #64748B;
+  --text-4: #94A3B8;
+
+  --brand: #2563EB;
+  --brand-hover: #1D4ED8;
+  --brand-soft: #EFF6FF;
+  --brand-border: #BFDBFE;
+  --brand-glow: rgba(37, 99, 235, 0.15);
+
+  --success: #10B981;
+  --success-soft: #ECFDF5;
+  --success-border: #A7F3D0;
+  --warning: #F59E0B;
+  --warning-soft: #FFFBEB;
+  --warning-border: #FDE68A;
+  --danger: #EF4444;
+  --danger-soft: #FEF2F2;
+  --danger-border: #FECACA;
+  --purple: #8B5CF6;
+  --purple-soft: #F5F3FF;
+
+  --p0-color: #EF4444;
+  --p0-bg: #FEF2F2;
+  --p0-border: #FECACA;
+  --p1-color: #F97316;
+  --p1-bg: #FFF7ED;
+  --p1-border: #FFEDD5;
+  --p2-color: #2563EB;
+  --p2-bg: #EFF6FF;
+  --p2-border: #DBEAFE;
+  --p3-color: #64748B;
+  --p3-bg: #F8FAFC;
+  --p3-border: #E2E8F0;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+
+  --font: "Plus Jakarta Sans", "Segoe UI Variable", "Microsoft YaHei UI", -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 2px 4px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 4px 12px -2px rgba(15, 23, 42, 0.07);
+}
+
+[data-theme="dark"] {
+  --bg: #0B0F17;
+  --bg-sidebar: #111722;
+  --surface: #141C2B;
+  --surface-2: #192233;
+  --surface-elevated: #1A2438;
+  --bg-subtle: #192233;
+  --bg-hover: #1E293B;
+  --bg-active: #243248;
+
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border: #243044;
+  --border-strong: #334155;
+  --border-focus: #60A5FA;
+
+  --text-1: #F8FAFC;
+  --text-2: #CBD5E1;
+  --text-3: #94A3B8;
+  --text-4: #64748B;
+
+  --brand: #3B82F6;
+  --brand-hover: #60A5FA;
+  --brand-soft: rgba(59, 130, 246, 0.15);
+  --brand-border: rgba(59, 130, 246, 0.35);
+  --brand-glow: rgba(59, 130, 246, 0.3);
+
+  --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.4);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text-1);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ================== 顶部方案切换控制面板 ================== */
+.meta-control-bar {
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 8px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex: none;
+  z-index: 100;
+  border-bottom: 1px solid #1e293b;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+}
+
+.meta-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.meta-badge {
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+.meta-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+.meta-subtitle {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.scheme-selector {
+  display: flex;
+  background: #1e293b;
+  padding: 3px;
+  border-radius: 8px;
+  gap: 4px;
+}
+.scheme-tab {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 5px 14px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+.scheme-tab:hover {
+  color: #f8fafc;
+  background: rgba(255,255,255,0.06);
+}
+.scheme-tab.active {
+  background: #3b82f6;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.4);
+}
+.scheme-tab .tag-recommend {
+  background: #10b981;
+  color: #fff;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.meta-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.meta-theme-btn {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #cbd5e1;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.meta-theme-btn:hover {
+  background: #334155;
+  color: #fff;
+}
+
+/* ================== 方案说明横幅 ================== */
+.scheme-desc-banner {
+  background: #eff6ff;
+  border-bottom: 1px solid #bfdbfe;
+  padding: 8px 20px;
+  font-size: 12.5px;
+  color: #1e40af;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
+}
+[data-theme="dark"] .scheme-desc-banner {
+  background: rgba(59,130,246,0.12);
+  border-bottom-color: rgba(59,130,246,0.25);
+  color: #93c5fd;
+}
+.banner-text b {
+  color: #1d4ed8;
+  font-weight: 700;
+}
+[data-theme="dark"] .banner-text b {
+  color: #60a5fa;
+}
+.height-saved-badge {
+  background: #dcfce7;
+  color: #15803d;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 11.5px;
+  border: 1px solid #86efac;
+}
+
+/* ================== 主界面容器 ================== */
+.app-viewport {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+.app-container {
+  display: none;
+  height: 100%;
+  width: 100%;
+  grid-template-columns: 240px minmax(0, 1fr) 280px;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.app-container.active {
+  display: grid;
+}
+
+/* 通用布局区 */
+.common-rail {
+  grid-area: rail;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.common-main {
+  grid-area: main;
+  background: var(--bg);
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+}
+.common-panel {
+  grid-area: panel;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* 通用按钮与图标小件 */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-1);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.btn:hover {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+}
+.btn-primary {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+  font-weight: 600;
+}
+.btn-primary:hover {
+  background: var(--brand-hover);
+  border-color: var(--brand-hover);
+}
+.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-2);
+}
+.btn-ghost:hover {
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+.btn-icon {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  justify-content: center;
+}
+
+/* 通用周列表 & 当前行动内容区模拟 */
+.rail-head {
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-3);
+}
+.rail-item {
+  padding: 8px 12px;
+  margin: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text-2);
+}
+.rail-item.active {
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-weight: 600;
+}
+.panel-head {
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 700;
+}
+.panel-count {
+  font-size: 11px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  padding: 1px 6px;
+  border-radius: 99px;
+}
+.action-card {
+  margin: 8px 10px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 12px;
+}
+
+/* 模拟任务树内容 */
+.mock-tree {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-xs);
+}
+.mock-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 13px;
+  transition: background 0.15s;
+}
+.mock-tree-row:hover {
+  background: var(--surface-2);
+}
+.mock-check {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1.5px solid var(--border-strong);
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+}
+.mock-check.done {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+}
+.tag-p {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.tag-p0 { background: var(--p0-bg); color: var(--p0-color); border: 1px solid var(--p0-border); }
+.tag-p1 { background: var(--p1-bg); color: var(--p1-color); border: 1px solid var(--p1-border); }
+.tag-p2 { background: var(--p2-bg); color: var(--p2-color); border: 1px solid var(--p2-border); }
+
+/* =========================================================================
+   方案展示 0: 原版 (CURRENT)
+   ========================================================================= */
+#scheme-current {
+  grid-template-areas:
+    "topbar topbar topbar"
+    "rail main panel";
+  grid-template-rows: 56px minmax(0, 1fr);
+}
+.cur-topbar {
+  grid-area: topbar;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  gap: 12px;
+}
+.cur-week-stepper {
+  display: flex;
+  align-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 2px 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.cur-search-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 4px 10px;
+  color: var(--text-3);
+  font-size: 12px;
+  width: 150px;
+  height: 28px;
+}
+.cur-week-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+}
+.cur-week-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; bottom: 0; width: 4px;
+  background: linear-gradient(180deg, var(--brand), var(--purple));
+}
+.cur-tree-toolbar {
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+/* =========================================================================
+   方案展示 A: 统一控制台工作区 Header + 精简系统顶栏 (推荐)
+   ========================================================================= */
+#scheme-a {
+  grid-template-areas:
+    "topbar topbar topbar"
+    "rail main panel";
+  grid-template-rows: 46px minmax(0, 1fr);
+}
+.scheme-a-topbar {
+  grid-area: topbar;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  gap: 16px;
+}
+.a-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 14px;
+}
+.a-brand-glyph {
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, var(--brand), #6366f1);
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 12px;
+}
+.a-global-search {
+  flex: 0 1 320px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 4px 12px;
+  height: 28px;
+  font-size: 12px;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.a-global-search:hover {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--text-1);
+}
+.a-top-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.a-date-pill {
+  font-size: 12px;
+  color: var(--text-2);
+  padding-right: 8px;
+  border-right: 1px solid var(--border);
+}
+
+/* 方案 A 的统一工作区控制台 Header */
+.a-unified-header {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-shadow: var(--shadow-sm);
+  flex: none;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--bg-hover) 100%);
+}
+.a-head-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.a-week-badge-group {
+  display: flex;
+  align-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 2px 4px;
+}
+.a-stepper-label {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 0 8px;
+  color: var(--text-1);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.a-now-chip {
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--brand);
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 99px;
+}
+.a-date-range {
+  font-size: 12px;
+  color: var(--text-3);
+  font-family: var(--mono);
+}
+
+.a-head-center {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.a-view-pills {
+  display: flex;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px;
+}
+.a-view-pill {
+  border: none;
+  background: transparent;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.a-view-pill.active {
+  background: var(--surface);
+  color: var(--brand);
+  font-weight: 600;
+  box-shadow: var(--shadow-xs);
+}
+.a-progress-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-2);
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+}
+.a-progress-summary b {
+  font-family: var(--mono);
+  color: var(--text-1);
+}
+.a-dial-mini {
+  width: 26px;
+  height: 26px;
+}
+
+.a-head-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.a-incomplete-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+  padding-right: 6px;
+}
+
+/* =========================================================================
+   方案展示 B: All-in-TopBar (顶栏一体化，极致纵向空间)
+   ========================================================================= */
+#scheme-b {
+  grid-template-areas:
+    "topbar topbar topbar"
+    "rail main panel";
+  grid-template-rows: 52px minmax(0, 1fr);
+}
+.scheme-b-topbar {
+  grid-area: topbar;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  gap: 12px;
+}
+.b-left-cluster {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.b-center-cluster {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.b-right-cluster {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 方案 B 主区直接是任务树，无多余顶部卡片 */
+.scheme-b-tree-header {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface-2);
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* =========================================================================
+   方案展示 C: 三栏等高对齐 Header (Modern Multi-column Dashboard)
+   ========================================================================= */
+#scheme-c {
+  grid-template-areas:
+    "topbar topbar topbar"
+    "rail main panel";
+  grid-template-rows: 38px minmax(0, 1fr);
+}
+.scheme-c-window-bar {
+  grid-area: topbar;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.c-column-header {
+  height: 48px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  flex: none;
+}
+.c-main-header {
+  height: 48px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
+}
+</style>
+</head>
+<body>
+
+<!-- 顶部交互控制栏 -->
+<header class="meta-control-bar">
+  <div class="meta-title-group">
+    <span class="meta-badge">PROTOTYPE</span>
+    <span class="meta-title">周计划 · 页面头部优化方案对比</span>
+    <span class="meta-subtitle">点击下方标签切换体验不同头部设计</span>
+  </div>
+
+  <div class="scheme-selector">
+    <button class="scheme-tab" onclick="switchScheme('current', this)">
+      原版 (当前双层卡片)
+    </button>
+    <button class="scheme-tab active" onclick="switchScheme('a', this)">
+      方案 A · 统一工作区控制台 <span class="tag-recommend">推荐</span>
+    </button>
+    <button class="scheme-tab" onclick="switchScheme('b', this)">
+      方案 B · 顶栏一体化 (All-in-TopBar)
+    </button>
+    <button class="scheme-tab" onclick="switchScheme('c', this)">
+      方案 C · 三栏等高基准线
+    </button>
+  </div>
+
+  <div class="meta-actions">
+    <button class="meta-theme-btn" onclick="toggleTheme()">
+      🌓 切换明暗主题
+    </button>
+  </div>
+</header>
+
+<!-- 方案说明条 -->
+<div class="scheme-desc-banner" id="banner-desc">
+  <div class="banner-text" id="banner-text">
+    <b>方案 A (统一控制台 · 强烈推荐)</b>：顶栏精简为纯全局层 (46px)；主区将原分散的周卡片 + 任务工具栏合并为 <b>1 个精致的一体化工作区控制台 (52px)</b>，垂直高度直接节省 <b>68px</b>，信息层级分明，直观高效。
+  </div>
+  <span class="height-saved-badge" id="height-badge">🚀 纵向空间释放 +35%</span>
+</div>
+
+<main class="app-viewport">
+
+  <!-- ==================== 方案 0: 原版 (CURRENT) ==================== -->
+  <div class="app-container" id="scheme-current">
+    <header class="cur-topbar">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="btn btn-ghost btn-icon">☰</button>
+        <span style="font-weight:700;font-size:15px;">周计划</span>
+        <span style="color:var(--text-3);font-size:11px;">以周为单位的高效执行</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="cur-week-stepper">
+          <button class="btn btn-ghost btn-icon" style="height:24px;width:24px;">‹</button>
+          <span style="padding:0 6px;font-weight:600;">2026-W36</span>
+          <span style="background:var(--brand-soft);color:var(--brand);padding:1px 5px;border-radius:99px;font-size:10px;">本周</span>
+          <button class="btn btn-ghost btn-icon" style="height:24px;width:24px;">›</button>
+        </div>
+        <div class="cur-search-trigger">
+          <span>🔍</span> <span>搜索任务...</span> <kbd style="font-size:9px;background:var(--surface);padding:1px 4px;border:1px solid var(--border);border-radius:3px;">Ctrl K</kbd>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="display:flex;background:var(--surface-2);padding:2px;border-radius:6px;border:1px solid var(--border);">
+          <button class="btn btn-ghost" style="height:24px;padding:0 8px;font-size:11px;background:var(--surface);color:var(--brand);font-weight:600;">任务树</button>
+          <button class="btn btn-ghost" style="height:24px;padding:0 8px;font-size:11px;">看板</button>
+        </div>
+        <span style="font-size:12px;color:var(--text-2);">08/31 星期一</span>
+        <button class="btn btn-ghost" style="font-size:12px;">📊 统计</button>
+        <button class="btn btn-ghost btn-icon">⚙️</button>
+        <button class="btn btn-ghost" style="font-size:11px;">v1.0.17</button>
+      </div>
+    </header>
+
+    <aside class="common-rail">
+      <div class="rail-head"><span>周列表</span><span>12 周</span></div>
+      <div class="rail-item active">2026-W36 (本周)</div>
+      <div class="rail-item">2026-W35</div>
+      <div class="rail-item">2026-W34</div>
+    </aside>
+
+    <section class="common-main">
+      <!-- 现状的周卡片 -->
+      <div class="cur-week-card">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:18px;font-weight:700;font-family:var(--mono);">2026-W36</span>
+            <span style="background:var(--brand-soft);color:var(--brand);font-size:11px;padding:1px 8px;border-radius:99px;font-weight:600;">本周</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:4px;">08/31 ~ 09/06 · 承接自 2026-W35</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div style="text-align:right;font-size:12px;color:var(--text-2);">
+            <b>12</b> 项任务 · <b>4</b> 已完成 · <b>8</b> 进行中
+          </div>
+          <div style="width:40px;height:40px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--brand);display:grid;place-items:center;font-size:10px;font-weight:700;">33%</div>
+          <button class="btn btn-ghost">↗ 分享</button>
+        </div>
+      </div>
+
+      <!-- 现状的任务树及卡片头部 -->
+      <div class="mock-tree">
+        <div class="cur-tree-toolbar">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-weight:700;font-size:13px;">任务树</span>
+            <span style="font-size:11px;color:var(--text-3);">拖拽排序 · 悬停编辑</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <label style="font-size:12px;color:var(--text-2);display:flex;align-items:center;gap:4px;">
+              <input type="checkbox"> 仅看未完成
+            </label>
+            <button class="btn btn-primary">+ 新建主任务</button>
+          </div>
+        </div>
+        <div class="mock-tree-row"><div class="mock-check done">✓</div><span style="flex:1;">优化页面头部视觉与交互结构</span><span class="tag-p tag-p0">P0</span></div>
+        <div class="mock-tree-row"><div class="mock-check"></div><span style="flex:1;">支持深色与浅色自适应主题</span><span class="tag-p tag-p1">P1</span></div>
+        <div class="mock-tree-row"><div class="mock-check"></div><span style="flex:1;">完成多周查询性能优化</span><span class="tag-p tag-p2">P2</span></div>
+      </div>
+    </section>
+
+    <aside class="common-panel">
+      <div class="panel-head"><span>⚡ 当前行动</span><span class="panel-count">5</span></div>
+      <div class="action-card"><strong>优化页面头部视觉</strong><div style="color:var(--text-3);font-size:11px;margin-top:4px;">周计划 › 界面重构</div></div>
+    </aside>
+  </div>
+
+
+  <!-- ==================== 方案 A: 统一控制台工作区 Header (推荐) ==================== -->
+  <div class="app-container active" id="scheme-a">
+    <!-- 极简轻量全局顶栏 (46px) -->
+    <header class="scheme-a-topbar">
+      <div class="a-brand">
+        <button class="btn btn-ghost btn-icon" title="折叠周列表">☰</button>
+        <span class="a-brand-glyph">✦</span>
+        <span>周计划</span>
+      </div>
+
+      <div class="a-global-search">
+        <span>🔍</span>
+        <span style="flex:1;">搜索所有任务或输入快捷指令...</span>
+        <kbd style="font-family:var(--mono);font-size:10px;background:var(--surface);border:1px solid var(--border-strong);padding:1px 5px;border-radius:4px;color:var(--text-3);">Ctrl K</kbd>
+      </div>
+
+      <div class="a-top-right">
+        <span class="a-date-pill">2026-08-31 星期一</span>
+        <button class="btn btn-ghost" title="统计复盘">📊 统计</button>
+        <button class="btn btn-ghost btn-icon" title="设置">⚙️</button>
+        <button class="btn btn-ghost" style="font-size:11px;color:var(--text-3);">v1.0.17</button>
+        <button class="btn btn-ghost btn-icon" title="折叠右侧行动栏">◨</button>
+      </div>
+    </header>
+
+    <aside class="common-rail">
+      <div class="rail-head"><span>周列表</span><span>12 周</span></div>
+      <div class="rail-item active">2026-W36 (本周)</div>
+      <div class="rail-item">2026-W35</div>
+      <div class="rail-item">2026-W34</div>
+    </aside>
+
+    <section class="common-main">
+      <!-- 统一工作区 Header 控制台 (合并周概览+视图切换+操作工具栏) -->
+      <div class="a-unified-header">
+        <!-- 左侧：周选择与时间区间 -->
+        <div class="a-head-left">
+          <div class="a-week-badge-group">
+            <button class="btn btn-ghost btn-icon" style="height:24px;width:24px;">‹</button>
+            <div class="a-stepper-label">
+              <span>2026-W36</span>
+              <span class="a-now-chip">本周</span>
+            </div>
+            <button class="btn btn-ghost btn-icon" style="height:24px;width:24px;">›</button>
+          </div>
+          <span class="a-date-range">08/31 ~ 09/06</span>
+        </div>
+
+        <!-- 中间：视图模式切换 & 统计进度 -->
+        <div class="a-head-center">
+          <div class="a-view-pills">
+            <button class="a-view-pill active">
+              <span>🌳</span> 任务树
+            </button>
+            <button class="a-view-pill">
+              <span>📋</span> 看板
+            </button>
+          </div>
+
+          <div class="a-progress-summary">
+            <span><b>4</b> / 12 完成</span>
+            <svg class="a-dial-mini" viewBox="0 0 36 36">
+              <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="var(--border)" stroke-width="3.5" />
+              <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="var(--brand)" stroke-dasharray="33, 100" stroke-width="3.5" stroke-linecap="round" />
+            </svg>
+          </div>
+        </div>
+
+        <!-- 右侧：过滤与操作 -->
+        <div class="a-head-right">
+          <label class="a-incomplete-toggle">
+            <input type="checkbox" style="cursor:pointer;">
+            <span>仅未完成</span>
+          </label>
+          <button class="btn btn-primary">
+            <span>+</span> 新建任务
+          </button>
+          <button class="btn btn-ghost" title="分享为图片">
+            <span>↗</span> 分享
+          </button>
+        </div>
+      </div>
+
+      <!-- 任务树主体 (顶部直接干净展示任务列表) -->
+      <div class="mock-tree">
+        <div class="mock-tree-row"><div class="mock-check done">✓</div><span style="flex:1;"><b>[架构]</b> 统一顶栏与工作区控制台设计</span><span class="tag-p tag-p0">P0</span></div>
+        <div class="mock-tree-row"><div class="mock-check"></div><span style="flex:1;"><b>[交互]</b> 视图模式与未完成过滤快捷响应</span><span class="tag-p tag-p1">P1</span></div>
+        <div class="mock-tree-row"><div class="mock-check"></div><span style="flex:1;"><b>[体验]</b> 一屏显示更多任务，减少视觉跳跃</span><span class="tag-p tag-p2">P2</span></div>
+        <div class="mock-tree-row"><div class="mock-check"></div><span style="flex:1;"><b>[性能]</b> 原生 Tauri 数据通信与本地持久化</span><span class="tag-p tag-p2">P2</span></div>
+      </div>
+    </section>
+
+    <aside class="common-panel">
+      <div class="panel-head"><span>⚡ 当前行动</span><span class="panel-count">5</span></div>
+      <div class="action-card"><strong>统一顶栏与工作区设计</strong><div style="color:var(--text-3);font-size:11px;margin-top:4px;">周计划 › 界面重构</div></div>
+    </aside>
+  </div>
+
+
+  <!-- ==================== 方案 B: All-in-TopBar (顶栏一体化) ==================== -->
+  <div class="app-container" id="scheme-b">
+    <header class="scheme-b-topbar">
+      <div class="b-left-cluster">
+        <button class="btn btn-ghost btn-icon">☰</button>
+        <span style="font-weight:700;font-size:14px;">周计划</span>
+        <!-- 周切换直接在顶栏 -->
+        <div class="a-week-badge-group" style="margin-left:6px;">
+          <button class="btn btn-ghost btn-icon" style="height:22px;width:22px;">‹</button>
+          <span style="font-family:var(--mono);font-size:12px;padding:0 6px;font-weight:700;">2026-W36</span>
+          <span class="a-now-chip">本周</span>
+          <button class="btn btn-ghost btn-icon" style="height:22px;width:22px;">›</button>
+        </div>
+      </div>
+
+      <div class="b-center-cluster">
+        <div class="a-view-pills">
+          <button class="a-view-pill active">任务树</button>
+          <button class="a-view-pill">看板</button>
+        </div>
+        <div class="cur-search-trigger" style="width:140px;">
+          <span>🔍</span> <span>搜索...</span>
+        </div>
+      </div>
+
+      <div class="b-right-cluster">
+        <span style="font-size:11px;color:var(--text-2);">4/12 (33%)</span>
+        <button class="btn btn-primary btn-sm" style="height:26px;">+ 新建</button>
+        <button class="btn btn-ghost btn-icon">📊</button>
+        <button class="btn btn-ghost btn-icon">⚙️</button>
+        <button class="btn btn-ghost btn-icon">◨</button>
+      </div>
+    </header>
+
+    <aside class="common-rail">
+      <div class="rail-head"><span>周列表</span><span>12 周</span></div>
+      <div class="rail-item active">2026-W36 (本周)</div>
+      <div class="rail-item">2026-W35</div>
+    </aside>
+
+    <section class="common-main" style="padding-top:10px;">
+      <!-- 主工作区零额外卡片，任务树占满 -->
+      <div class="mock-tree">
+        <div class="scheme-b-tree-header">
+          <span>08/31 ~ 09/06 · 承接自 2026-W35</span>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <label style="cursor:pointer;"><input type="checkbox"> 仅看未完成</label>
+            <button class="btn btn-ghost" style="height:24px;padding:0 6px;">↗ 分享</button>
+          </div>
+        </div>
+        <div class="mock-tree-row"><div class="mock-check done">✓</div><span style="flex:1;">极致纵向利用率设计</span><span class="tag-p tag-p0">P0</span></div>
+        <div class="mock-tree-row"><div class="mock-check"></div><span style="flex:1;">全顶栏集成所有快捷功能</span><span class="tag-p tag-p1">P1</span></div>
+        <div class="mock-tree-row"><div class="mock-check"></div><span style="flex:1;">适合高密度信息流用户</span><span class="tag-p tag-p2">P2</span></div>
+      </div>
+    </section>
+
+    <aside class="common-panel">
+      <div class="panel-head"><span>⚡ 当前行动</span><span class="panel-count">5</span></div>
+      <div class="action-card"><strong>极致纵向利用率设计</strong></div>
+    </aside>
+  </div>
+
+
+  <!-- ==================== 方案 C: 三栏等高基准线 ==================== -->
+  <div class="app-container" id="scheme-c">
+    <!-- 极轻量 Window 标题栏 (38px) -->
+    <header class="scheme-c-window-bar">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-weight:700;color:var(--text-1);">周计划</span>
+        <span>·</span>
+        <span>2026-W36 (08/31~09/06)</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span>🔍 全局搜索 (Ctrl+K)</span>
+        <span>⚙️ 设置</span>
+      </div>
+    </header>
+
+    <aside class="common-rail">
+      <div class="c-column-header">
+        <span style="font-weight:700;font-size:13px;">周列表</span>
+        <button class="btn btn-ghost" style="height:24px;padding:0 6px;">+ 新建</button>
+      </div>
+      <div class="rail-item active">2026-W36 (本周)</div>
+      <div class="rail-item">2026-W35</div>
+    </aside>
+
+    <section style="grid-area:main;display:flex;flex-direction:column;min-height:0;background:var(--bg);">
+      <!-- 中栏头部与左右两栏完全平齐 (48px) -->
+      <div class="c-main-header">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:15px;font-weight:700;">2026-W36</span>
+          <span class="a-now-chip">本周</span>
+          <div class="a-view-pills">
+            <button class="a-view-pill active">任务树</button>
+            <button class="a-view-pill">看板</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:12px;color:var(--text-3);">4/12</span>
+          <button class="btn btn-primary">+ 新建任务</button>
+        </div>
+      </div>
+
+      <div style="padding:14px 18px;flex:1;overflow-y:auto;">
+        <div class="mock-tree">
+          <div class="mock-tree-row"><div class="mock-check done">✓</div><span style="flex:1;">左右与中栏严格水平线对齐</span><span class="tag-p tag-p0">P0</span></div>
+          <div class="mock-tree-row"><div class="mock-check"></div><span style="flex:1;">多栏式桌面应用经典架构</span><span class="tag-p tag-p1">P1</span></div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="common-panel">
+      <div class="c-column-header">
+        <span style="font-weight:700;font-size:13px;">⚡ 当前行动</span>
+        <span class="panel-count">5</span>
+      </div>
+      <div class="action-card"><strong>多栏式桌面应用经典架构</strong></div>
+    </aside>
+  </div>
+
+</main>
+
+<script>
+const descriptions = {
+  current: {
+    text: '<b>原版 (当前双层卡片)</b>：顶栏 (56px) + 主区周卡片 (72px) + 任务树工具栏 (48px) = <b>176px</b> 堆叠，周信息在顶栏与主卡片重复出现两次，纵向空间挤压严重。',
+    badge: '⚠️ 现状基准'
+  },
+  a: {
+    text: '<b>方案 A (统一控制台 · 强烈推荐)</b>：顶栏精简为纯全局层 (46px)；主区将原分散的周卡片 + 任务工具栏合并为 <b>1 个精致的一体化工作区控制台 (52px)</b>，垂直高度直接节省 <b>68px</b>，信息层级分明，直观高效。',
+    badge: '🚀 空间释放 +35% · 推荐'
+  },
+  b: {
+    text: '<b>方案 B (顶栏一体化 All-in-TopBar)</b>：所有周控制、视图切换与新建按钮全部并入顶栏 (52px)，主工作区 <b>0px 头部额外占用</b>，最大化任务展示高度。',
+    badge: '⚡ 极致高密度'
+  },
+  c: {
+    text: '<b>方案 C (三栏等高基准线)</b>：极简窗口栏 (38px)，左栏、中栏、右栏在顶部以 <b>统一 48px 严格对齐基准线</b> 展开，符合传统桌面 IDE / 工作台多栏规范。',
+    badge: '📐 规整对齐'
+  }
+};
+
+function switchScheme(key, btn) {
+  document.querySelectorAll('.scheme-tab').forEach(tab => tab.classList.remove('active'));
+  document.querySelectorAll('.app-container').forEach(c => c.classList.remove('active'));
+  
+  if (btn) btn.classList.add('active');
+  const target = document.getElementById('scheme-' + key);
+  if (target) target.classList.add('active');
+
+  const desc = descriptions[key];
+  if (desc) {
+    document.getElementById('banner-text').innerHTML = desc.text;
+    document.getElementById('height-badge').innerText = desc.badge;
+  }
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+}
+</script>
+</body>
+</html>

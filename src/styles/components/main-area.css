@@ -1,127 +1,208 @@
-/* ---------- Main area ---------- */
+/* ---------- Main area (Scheme A: Unified Workspace Console) ---------- */
 .main {
   grid-area: main;
-  padding: 16px 20px;
+  padding: 14px 18px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   min-width: 0;
   min-height: 0;
   overflow: auto;
 }
 
-.week-card {
+/* ==================== 统一工作区控制台 Header ==================== */
+.workspace-header {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 16px 20px;
+  padding: 8px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
   flex: none;
   box-shadow: var(--shadow-sm);
   position: relative;
-  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  min-height: 50px;
 }
 
-.week-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: 4px;
-  background: linear-gradient(180deg, var(--brand) 0%, var(--purple) 100%);
+.workspace-header:hover {
+  border-color: var(--border-strong);
 }
 
-.week-header-title {
+/* --- Left: Week Stepper & Date Range --- */
+.ws-head-left {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 10px;
   min-width: 0;
-}
-
-.week-line1 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.week-header-id {
-  font-size: 19px;
-  font-weight: 700;
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--text-1);
-}
-
-.week-header-range {
-  font-size: 12px;
-  color: var(--text-2);
-  font-variant-numeric: tabular-nums;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.week-header-right {
-  display: flex;
-  align-items: center;
-  gap: 20px;
   flex: none;
 }
 
-.week-stats {
+.ws-stepper {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
-  align-items: flex-end;
+  align-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 2px 3px;
+  gap: 2px;
 }
 
-.week-stats-line {
-  font-size: 12px;
-  color: var(--text-2);
-}
-.week-stats-line b {
-  color: var(--text-1);
-  font-weight: 700;
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-}
-
-/* Radial Progress Ring */
-.progress-dial-wrap {
-  position: relative;
-  width: 46px;
-  height: 46px;
-  flex: none;
-}
-.progress-dial-svg {
-  transform: rotate(-90deg);
-}
-.progress-dial-text {
-  position: absolute;
-  inset: 0;
+.ws-stepper-btn {
+  border: none;
+  background: transparent;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.ws-stepper-btn:hover:not(:disabled) {
+  background: var(--surface);
+  color: var(--text-1);
+  box-shadow: var(--shadow-xs);
+}
+.ws-stepper-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.ws-stepper-label {
+  padding: 0 6px;
+  font-size: 13px;
   font-weight: 700;
   font-family: var(--mono);
   color: var(--text-1);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+.ws-stepper-label:hover {
+  color: var(--brand);
 }
 
+.ws-date-range {
+  font-size: 11.5px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.ws-carry-hint {
+  font-size: 11px;
+  color: var(--purple);
+  background: var(--purple-soft);
+  border: 1px solid var(--purple-border);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  font-weight: 500;
+}
+
+/* --- Center: View Mode Tabs & Progress Summary --- */
+.ws-head-center {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: none;
+}
+
+.ws-view-tabs {
+  display: flex;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 2px;
+  border-radius: var(--radius-md);
+}
+
+.ws-view-btn {
+  border: none;
+  background: transparent;
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+.ws-view-btn:hover {
+  color: var(--text-1);
+}
+.ws-view-btn.active {
+  background: var(--surface);
+  color: var(--brand);
+  font-weight: 600;
+  box-shadow: var(--shadow-xs);
+}
+
+.ws-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.ws-progress-text {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.ws-progress-text b {
+  font-family: var(--mono);
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.ws-dial-mini {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  transform: rotate(-90deg);
+}
+
+/* --- Right: Filtering & Actions --- */
+.ws-head-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.ws-share-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand);
+}
+
+/* Chips and Badges */
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
-  padding: 1px 8px;
+  font-size: 10.5px;
+  padding: 0 6px;
   border-radius: var(--radius-full);
   line-height: 16px;
   white-space: nowrap;

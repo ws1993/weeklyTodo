@@ -326,7 +326,7 @@ export function App() {
   return (
     <ConfigProvider theme={antdThemeConfig}>
       <div className={shellLayoutClass}>
-        {/* ==================== 顶栏 Header ==================== */}
+        {/* ==================== 顶栏 Header (Scheme A: 全局系统栏) ==================== */}
         <header className="topbar">
           <div className="topbar-brand">
             <button
@@ -338,46 +338,14 @@ export function App() {
               <PanelLeftIcon size={16} />
             </button>
             <span className="brand-glyph" onClick={() => void selectWeek(currentWeek)} title="回到本周">
-              <LogoIcon size={24} />
+              <LogoIcon size={22} />
             </span>
             <div className="topbar-title-group">
               <span className="topbar-title">周计划</span>
-              <span className="brand-dot" />
-              <span className="topbar-subtitle">以周为单位的高效执行</span>
             </div>
           </div>
 
           <div className="topbar-center">
-            {/* Quick Week Stepper */}
-            <div className="week-stepper">
-              <button
-                type="button"
-                className="stepper-btn"
-                disabled={!canGoPrev}
-                title="上一周"
-                onClick={handlePrevWeek}
-              >
-                <ChevronLeftIcon size={14} />
-              </button>
-              <div
-                className="stepper-label"
-                onClick={() => void selectWeek(currentWeek)}
-                title="点击快速返回当前周"
-              >
-                <span>{activeWeekId}</span>
-                {activeWeekId === currentWeek && <span className="stepper-badge-now">本周</span>}
-              </div>
-              <button
-                type="button"
-                className="stepper-btn"
-                disabled={!canGoNext}
-                title="下一周"
-                onClick={handleNextWeek}
-              >
-                <ChevronRightIcon size={14} />
-              </button>
-            </div>
-
             {/* Global Search Trigger (Ctrl+K) */}
             <div
               className="topbar-search-trigger"
@@ -385,32 +353,12 @@ export function App() {
               title="全局搜索任务与快捷指令 (Ctrl+K)"
             >
               <SearchIcon size={13} />
-              <span>搜索任务...</span>
+              <span>搜索所有任务或输入快捷指令...</span>
               <span className="search-kbd-hint">Ctrl K</span>
             </div>
           </div>
 
           <div className="topbar-actions">
-            {/* View Mode Switcher */}
-            <div className="view-mode-tabs">
-              <button
-                type="button"
-                className={`view-mode-btn ${viewMode === 'tree' ? 'active' : ''}`}
-                onClick={() => setViewMode('tree')}
-              >
-                <NetworkIcon size={13} />
-                任务树
-              </button>
-              <button
-                type="button"
-                className={`view-mode-btn ${viewMode === 'kanban' ? 'active' : ''}`}
-                onClick={() => setViewMode('kanban')}
-              >
-                <KanbanIcon size={13} />
-                看板
-              </button>
-            </div>
-
             <span className="today">{todayLabel()}</span>
             <span className="today-sep" />
 
@@ -474,33 +422,85 @@ export function App() {
               {/* Pomodoro Focus Banner (if active) */}
               <FocusBanner task={focusTask} onClose={() => setFocusTask(null)} />
 
-              {/* Week Overview Header Banner */}
-              <section className="week-card">
-                <div className="week-header-title">
-                  <div className="week-line1">
-                    <span className="week-header-id">{activeWeekId}</span>
-                    <span className={`chip ${activeWeekStatus.cls}`}>
-                      {activeWeekStatus.label}
-                    </span>
-                    {activeWeekId === currentWeekId && <span className="badge-now">本周</span>}
+              {/* Unified Workspace Header (Scheme A) */}
+              <section className="workspace-header">
+                {/* 左侧：周步进选择器 + 日期区间 */}
+                <div className="ws-head-left">
+                  <div className="ws-stepper">
+                    <button
+                      type="button"
+                      className="ws-stepper-btn"
+                      disabled={!canGoPrev}
+                      title="上一周"
+                      onClick={handlePrevWeek}
+                    >
+                      <ChevronLeftIcon size={14} />
+                    </button>
+                    <div
+                      className="ws-stepper-label"
+                      onClick={() => void selectWeek(currentWeek)}
+                      title="点击快速返回当前周"
+                    >
+                      <span>{activeWeekId}</span>
+                      {activeWeekId === currentWeekId ? (
+                        <span className="badge-now">本周</span>
+                      ) : (
+                        <span className={`chip ${activeWeekStatus.cls}`}>
+                          {activeWeekStatus.label}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      className="ws-stepper-btn"
+                      disabled={!canGoNext}
+                      title="下一周"
+                      onClick={handleNextWeek}
+                    >
+                      <ChevronRightIcon size={14} />
+                    </button>
                   </div>
-                  <span className="week-header-range">
+
+                  <span className="ws-date-range">
                     {formatCnRange(activeWeekId)}
-                    {tree?.week.carriedFromWeekId && ` · 承接自 ${tree.week.carriedFromWeekId}`}
+                    {tree?.week.carriedFromWeekId && (
+                      <span className="ws-carry-hint">
+                        自 {tree.week.carriedFromWeekId} 带入
+                        {carriedCount > 0 ? ` (${carriedCount}项)` : ''}
+                      </span>
+                    )}
                   </span>
                 </div>
 
-                <div className="week-header-right">
-                  <div className="week-stats">
-                    <div className="week-stats-line">
-                      <b>{totalTasks}</b> 项任务 · <b>{doneTasks}</b> 已完成 · <b>{openTasks}</b> 进行中
-                      {carriedCount > 0 && <span> · {carriedCount} 带入</span>}
-                    </div>
+                {/* 中间：视图模式切换 + 进度概览 */}
+                <div className="ws-head-center">
+                  <div className="ws-view-tabs">
+                    <button
+                      type="button"
+                      className={`ws-view-btn ${viewMode === 'tree' ? 'active' : ''}`}
+                      onClick={() => setViewMode('tree')}
+                    >
+                      <NetworkIcon size={13} />
+                      任务树
+                    </button>
+                    <button
+                      type="button"
+                      className={`ws-view-btn ${viewMode === 'kanban' ? 'active' : ''}`}
+                      onClick={() => setViewMode('kanban')}
+                    >
+                      <KanbanIcon size={13} />
+                      看板
+                    </button>
                   </div>
 
-                  {/* Radial Progress Dial */}
-                  <div className="progress-dial-wrap" title={`完成度 ${doneRatio}%`}>
-                    <svg className="progress-dial-svg" width="46" height="46" viewBox="0 0 46 46">
+                  <div
+                    className="ws-progress-wrap"
+                    title={`共 ${totalTasks} 项任务 · 已完成 ${doneTasks} · 进行中 ${openTasks} · 完成度 ${doneRatio}%`}
+                  >
+                    <span className="ws-progress-text">
+                      <b>{doneTasks}</b> / {totalTasks} 完成
+                    </span>
+                    <svg className="ws-dial-mini" viewBox="0 0 46 46">
                       <circle
                         cx="23"
                         cy="23"
@@ -522,65 +522,73 @@ export function App() {
                         style={{ transition: 'stroke-dashoffset 0.35s ease' }}
                       />
                     </svg>
-                    <div className="progress-dial-text">{doneRatio}%</div>
                   </div>
+                </div>
 
-                  <button
-                    type="button"
-                    className={`btn btn-ghost btn-sm${shareMode ? ' active' : ''}`}
-                    title="选择多个任务一起生成分享图"
-                    onClick={shareMode ? exitShare : startShare}
-                  >
-                    <ShareIcon size={15} />
-                    {shareMode ? '取消分享' : '分享'}
-                  </button>
+                {/* 右侧：过滤与操作 */}
+                <div className="ws-head-right">
+                  {shareMode ? (
+                    <>
+                      <span className="ws-share-info">已选 {shareSelectedIds.size} 项</span>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={selectAllVisible}
+                      >
+                        全选可见
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        disabled={shareSelectedIds.size === 0}
+                        onClick={() => setShareOpen(true)}
+                      >
+                        <ShareIcon size={14} />
+                        生成分享图
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={exitShare}
+                      >
+                        取消
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {viewMode === 'tree' && (
+                        <ToggleSwitch
+                          label="仅看未完成"
+                          checked={showIncompleteOnly}
+                          onChange={setShowIncompleteOnly}
+                        />
+                      )}
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        title="新建主任务"
+                        onClick={() => setNewTaskRequest((request) => request + 1)}
+                      >
+                        <PlusIcon size={14} />
+                        新建主任务
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        title="选择多个任务生成分享图"
+                        onClick={startShare}
+                      >
+                        <ShareIcon size={14} />
+                        分享
+                      </button>
+                    </>
+                  )}
                 </div>
               </section>
 
               {/* Main Task View (Tree vs Kanban) */}
               {viewMode === 'tree' ? (
                 <section className="tree-card">
-                  <div className="tree-toolbar">
-                    {shareMode ? (
-                      <>
-                        <span className="tree-title">已选 {shareSelectedIds.size} 项</span>
-                        <span className="tree-hint">勾选要分享的任务 · 父任务自动带上未关闭子任务</span>
-                        <button type="button" className="btn btn-ghost btn-sm" onClick={selectAllVisible}>
-                          全选可见
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          disabled={shareSelectedIds.size === 0}
-                          onClick={() => setShareOpen(true)}
-                        >
-                          <ShareIcon size={15} />
-                          生成分享图
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <span className="tree-title">任务树</span>
-                        <span className="tree-hint">
-                          点击复选框切换状态 · 拖拽调整顺序 · 悬停快捷添加/编辑/删除
-                        </span>
-                        <ToggleSwitch
-                          label="仅看未完成"
-                          checked={showIncompleteOnly}
-                          onChange={setShowIncompleteOnly}
-                        />
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          title="新建主任务"
-                          onClick={() => setNewTaskRequest((request) => request + 1)}
-                        >
-                          <PlusIcon size={15} />
-                          新建主任务
-                        </button>
-                      </>
-                    )}
-                  </div>
                   <div className="tree">
                     {tree && (
                       <TaskTree

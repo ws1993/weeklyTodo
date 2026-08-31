@@ -2,7 +2,7 @@
 .app-shell {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr) 320px;
-  grid-template-rows: 56px minmax(0, 1fr);
+  grid-template-rows: 48px minmax(0, 1fr);
   grid-template-areas:
     "topbar topbar topbar"
     "rail main panel";
