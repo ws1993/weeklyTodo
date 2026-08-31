@@ -63,4 +63,19 @@ describe('KanbanView', () => {
     fireEvent.click(screen.getByText('点击卡片测试'));
     expect(onSelectTask).toHaveBeenCalledWith(task);
   });
+
+  it('excludes non-leaf (parent) tasks and only displays leaf nodes', () => {
+    const parentTask = makeTask({ id: 100, title: '项目总体规划(父节点)' });
+    const childTask = makeTask({ id: 101, parentId: 100, title: '阶段一开发(叶子节点)' });
+
+    render(
+      <KanbanView
+        tasks={[parentTask, childTask]}
+        onSelectTask={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText('项目总体规划(父节点)')).toBeNull();
+    expect(screen.getByText('阶段一开发(叶子节点)')).toBeTruthy();
+  });
 });

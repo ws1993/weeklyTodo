@@ -1012,7 +1012,39 @@ fn copy_task_tags(conn: &Connection, source_id: i64, target_id: i64) -> Result<(
     Ok(())
 }
 
-/// Close a task and, when all siblings are closed, its ancestors (bottom-up).
+/// Recursively close all open descendants of a node.
+fn close_descendant_tree(
+    conn: &Connection,
+    week_id: &str,
+    parent_id: i64,
+    now: &str,
+) -> Result<(), String> {
+    let mut stmt = conn
+        .prepare("SELECT id, status FROM tasks WHERE parent_id = ?1 AND week_id = ?2")
+        .map_err(|error| format!("查询子任务失败：{error}"))?;
+    let children: Vec<(i64, String)> = stmt
+        .query_map(params![parent_id, week_id], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|error| format!("读取子任务失败：{error}"))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    for (child_id, child_status) in children {
+        if child_status != TASK_STATUS_CLOSED {
+            conn.execute(
+                "UPDATE tasks SET status = ?1, closed_at = ?2, updated_at = ?2 WHERE id = ?3",
+                params![TASK_STATUS_CLOSED, now, child_id],
+            )
+            .map_err(|error| format!("关闭子任务失败：{error}"))?;
+            record_event(conn, week_id, Some(child_id), EVENT_TYPE_CLOSE, None)?;
+        }
+        close_descendant_tree(conn, week_id, child_id, now)?;
+    }
+    Ok(())
+}
+
+/// Close a task, its descendants (top-down), and when all siblings are closed, its ancestors (bottom-up).
 pub fn close_task(conn: &mut Connection, week_id: &str, task_id: i64) -> Result<Task, String> {
     let mut current = get_task(conn, week_id, task_id)?.ok_or_else(|| "任务不存在".to_string())?;
     if current.status == TASK_STATUS_CLOSED {
@@ -1029,6 +1061,9 @@ pub fn close_task(conn: &mut Connection, week_id: &str, task_id: i64) -> Result<
     )
     .map_err(|error| format!("关闭任务失败：{error}"))?;
     record_event(&tx, week_id, Some(task_id), EVENT_TYPE_CLOSE, None)?;
+
+    // Cascade close all descendants (top-down).
+    close_descendant_tree(&tx, week_id, task_id, &now)?;
 
     // Cascade close ancestors when all children are closed.
     let mut ancestor_id = current.parent_id;
@@ -1062,6 +1097,38 @@ pub fn close_task(conn: &mut Connection, week_id: &str, task_id: i64) -> Result<
     current.status = TASK_STATUS_CLOSED.to_string();
     current.closed_at = Some(now);
     Ok(current)
+}
+
+/// Recursively reopen all closed descendants of a node.
+fn reopen_descendant_tree(
+    conn: &Connection,
+    week_id: &str,
+    parent_id: i64,
+    now: &str,
+) -> Result<(), String> {
+    let mut stmt = conn
+        .prepare("SELECT id, status FROM tasks WHERE parent_id = ?1 AND week_id = ?2")
+        .map_err(|error| format!("查询子任务失败：{error}"))?;
+    let children: Vec<(i64, String)> = stmt
+        .query_map(params![parent_id, week_id], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|error| format!("读取子任务失败：{error}"))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    for (child_id, child_status) in children {
+        if child_status == TASK_STATUS_CLOSED {
+            conn.execute(
+                "UPDATE tasks SET status = ?1, closed_at = NULL, updated_at = ?2 WHERE id = ?3",
+                params![TASK_STATUS_IN_PROGRESS, now, child_id],
+            )
+            .map_err(|error| format!("重新打开子任务失败：{error}"))?;
+            record_event(conn, week_id, Some(child_id), EVENT_TYPE_REOPEN, None)?;
+        }
+        reopen_descendant_tree(conn, week_id, child_id, now)?;
+    }
+    Ok(())
 }
 
 /// Reopen `task_id` and any closed ancestors up the chain, recording a reopen
@@ -1103,7 +1170,7 @@ fn reopen_closed_chain(conn: &Connection, week_id: &str, task_id: i64) -> Result
     Ok(())
 }
 
-/// Reopen a closed task and cascade to its closed ancestors.
+/// Reopen a closed task, cascade to its descendants (top-down), and cascade to its closed ancestors (bottom-up).
 pub fn reopen_task(conn: &mut Connection, week_id: &str, task_id: i64) -> Result<Task, String> {
     let current = get_task(conn, week_id, task_id)?.ok_or_else(|| "任务不存在".to_string())?;
     if current.status == TASK_STATUS_IN_PROGRESS {
@@ -1121,11 +1188,13 @@ pub fn reopen_task(conn: &mut Connection, week_id: &str, task_id: i64) -> Result
     .map_err(|error| format!("重新打开任务失败：{error}"))?;
     record_event(&tx, week_id, Some(task_id), EVENT_TYPE_REOPEN, None)?;
 
-    // Reopen closed ancestors so the reopened task keeps its context. The task
-    // itself is already open, so the chain walk starts from its own id.
+    // 1. Cascade reopen all descendants (top-down)
+    reopen_descendant_tree(&tx, week_id, task_id, &now)?;
+
+    // 2. Reopen closed ancestors so the reopened task keeps its context.
     reopen_closed_chain(&tx, week_id, task_id)?;
 
-    // Re-derive ancestor priorities now that the reopened task is active again.
+    // 3. Re-derive ancestor priorities now that the reopened task is active again.
     recompute_ancestor_priorities(&tx, week_id, task_id)?;
 
     tx.commit()
@@ -1629,7 +1698,7 @@ mod tests {
 
     #[test]
     fn open_descendant_of_closed_task_is_promoted() {
-        let mut conn = db::open_in_memory();
+        let conn = db::open_in_memory();
         seed_week(&conn, "20260727-20260802");
         seed_week(&conn, "20260803-20260809");
 
@@ -1643,8 +1712,12 @@ mod tests {
             Some(closed_root.id),
         );
         create_plain_task(&conn, "20260727-20260802", "开放叶", Some(closed_mid.id));
-        close_task(&mut conn, "20260727-20260802", closed_mid.id).unwrap();
-        close_task(&mut conn, "20260727-20260802", closed_root.id).unwrap();
+        // 直接更新数据库模拟历史陈旧数据中的异常父子状态
+        conn.execute(
+            "UPDATE tasks SET status = 'closed' WHERE id IN (?1, ?2)",
+            params![closed_root.id, closed_mid.id],
+        )
+        .unwrap();
 
         carry_over_week(&conn, "20260803-20260809", "20260727-20260802").unwrap();
         let target_tasks = list_tasks(&conn, "20260803-20260809").unwrap();
@@ -2642,5 +2715,70 @@ mod tests {
             .unwrap();
         assert_eq!(mid_now.priority, 0);
         assert_eq!(root_now.priority, 0);
+    }
+
+    #[test]
+    fn closing_parent_cascades_to_all_descendants() {
+        let mut conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+
+        let root = create_plain_task(&conn, "20260803-20260809", "主项目", None);
+        let mid = create_plain_task(&conn, "20260803-20260809", "模块A", Some(root.id));
+        let leaf1 = create_plain_task(&conn, "20260803-20260809", "子任务1", Some(mid.id));
+        let leaf2 = create_plain_task(&conn, "20260803-20260809", "子任务2", Some(mid.id));
+
+        // 仅勾选完成父级 root，预期向下联动关闭 mid, leaf1, leaf2
+        close_task(&mut conn, "20260803-20260809", root.id).unwrap();
+
+        assert_eq!(
+            get_task(&conn, "20260803-20260809", root.id).unwrap().unwrap().status,
+            TASK_STATUS_CLOSED
+        );
+        assert_eq!(
+            get_task(&conn, "20260803-20260809", mid.id).unwrap().unwrap().status,
+            TASK_STATUS_CLOSED
+        );
+        assert_eq!(
+            get_task(&conn, "20260803-20260809", leaf1.id).unwrap().unwrap().status,
+            TASK_STATUS_CLOSED
+        );
+        assert_eq!(
+            get_task(&conn, "20260803-20260809", leaf2.id).unwrap().unwrap().status,
+            TASK_STATUS_CLOSED
+        );
+    }
+
+    #[test]
+    fn reopening_parent_cascades_to_all_descendants() {
+        let mut conn = db::open_in_memory();
+        seed_week(&conn, "20260803-20260809");
+
+        let root = create_plain_task(&conn, "20260803-20260809", "主项目", None);
+        let mid = create_plain_task(&conn, "20260803-20260809", "模块A", Some(root.id));
+        let leaf1 = create_plain_task(&conn, "20260803-20260809", "子任务1", Some(mid.id));
+        let leaf2 = create_plain_task(&conn, "20260803-20260809", "子任务2", Some(mid.id));
+
+        // 先全部关闭
+        close_task(&mut conn, "20260803-20260809", root.id).unwrap();
+
+        // 重新打开父级 root，预期向下联动重新打开 mid, leaf1, leaf2
+        reopen_task(&mut conn, "20260803-20260809", root.id).unwrap();
+
+        assert_eq!(
+            get_task(&conn, "20260803-20260809", root.id).unwrap().unwrap().status,
+            TASK_STATUS_IN_PROGRESS
+        );
+        assert_eq!(
+            get_task(&conn, "20260803-20260809", mid.id).unwrap().unwrap().status,
+            TASK_STATUS_IN_PROGRESS
+        );
+        assert_eq!(
+            get_task(&conn, "20260803-20260809", leaf1.id).unwrap().unwrap().status,
+            TASK_STATUS_IN_PROGRESS
+        );
+        assert_eq!(
+            get_task(&conn, "20260803-20260809", leaf2.id).unwrap().unwrap().status,
+            TASK_STATUS_IN_PROGRESS
+        );
     }
 }

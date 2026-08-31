@@ -186,4 +186,26 @@ describe('QueryView 项目筛选 / 时间显示 / 行交互', () => {
       expect(mockedNativeBridge.deleteTask).toHaveBeenCalledWith('20260803-20260809', 1);
     });
   });
+
+  it('点击标题直接复制任务文本到剪贴板并显示提示', async () => {
+    const writeTextSpy = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: writeTextSpy,
+      },
+    });
+
+    render(<QueryView open onClose={() => undefined} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('准备周报')).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText('准备周报'));
+
+    expect(writeTextSpy).toHaveBeenCalledWith('准备周报');
+    await waitFor(() => {
+      expect(screen.getByText('已复制')).toBeTruthy();
+    });
+  });
 });

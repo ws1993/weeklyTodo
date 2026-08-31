@@ -385,7 +385,7 @@ export function App() {
               title="全局搜索任务与快捷指令 (Ctrl+K)"
             >
               <SearchIcon size={13} />
-              <span>搜索任务或按周筛选...</span>
+              <span>搜索任务...</span>
               <span className="search-kbd-hint">Ctrl K</span>
             </div>
           </div>

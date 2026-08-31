@@ -228,6 +228,39 @@
 .query-row-title{
   font-size:13px;font-weight:600;line-height:1.45;color:var(--text-1);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  cursor:copy;
+  display:inline-flex;align-items:center;gap:6px;
+  border-radius:var(--radius-xs);
+  padding:1px 5px;
+  margin:-1px -5px;
+  transition:all .15s ease;
+}
+.query-row-title:hover{
+  color:var(--brand);
+  background:var(--brand-soft);
+}
+.query-row-title .title-text{
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.query-row-title.copied{
+  color:var(--success);
+  background:var(--success-soft);
+}
+.query-row-copy-badge{
+  font-size:10px;font-weight:500;
+  color:var(--success);
+  background:var(--surface);
+  border:1px solid var(--success-border);
+  padding:0 5px;
+  height:17px;
+  border-radius:var(--radius-sm);
+  display:inline-flex;align-items:center;gap:3px;
+  flex:none;
+  animation:copyBadgePop .2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+@keyframes copyBadgePop{
+  0%{transform:scale(0.8);opacity:0}
+  100%{transform:scale(1);opacity:1}
 }
 .query-row-title.closed{color:var(--text-3);text-decoration:line-through;text-decoration-color:#C4CDDC;font-weight:400}
 .query-row-path{font-size:11px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

@@ -17,12 +17,18 @@ export function KanbanView({ tasks, onSelectTask, groupColors = [] }: KanbanView
   const colorMap = useMemo(() => groupColorMap(groupColors), [groupColors]);
 
   const columns = useMemo(() => {
+    // 找出所有作为父节点的任务 ID，仅保留纯叶子节点（具体执行项）
+    const parentIds = new Set(
+      tasks.map((t) => t.parentId).filter((id): id is number => id != null),
+    );
+    const leafTasks = tasks.filter((t) => !parentIds.has(t.id));
+
     const todo: Task[] = [];
     const highPriority: Task[] = [];
     const following: Task[] = [];
     const closed: Task[] = [];
 
-    tasks.forEach((task) => {
+    leafTasks.forEach((task) => {
       if (task.status === 'closed') {
         closed.push(task);
       } else if (task.executionMode === 'follow_up') {

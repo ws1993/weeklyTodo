@@ -69,6 +69,9 @@ pub fn query_tasks(conn: &Connection, filter: &QueryFilter) -> Result<Vec<QueryT
     if filter.carried_over_only.unwrap_or(false) {
         sql.push_str(" AND t.carried_from_task_id IS NOT NULL");
     }
+    if filter.leaf_only.unwrap_or(true) {
+        sql.push_str(" AND NOT EXISTS(SELECT 1 FROM tasks child WHERE child.parent_id = t.id)");
+    }
     if let Some(owner_id) = filter.owner_id {
         sql.push_str(" AND t.owner_id = ?");
         values.push(Box::new(owner_id));
@@ -723,6 +726,7 @@ mod tests {
         let rows = query_tasks(
             &conn,
             &QueryFilter {
+                leaf_only: Some(false),
                 ..Default::default()
             },
         )
@@ -732,6 +736,49 @@ mod tests {
         let child = rows.iter().find(|row| row.task.title == "子任务").unwrap();
         assert!(parent.has_children);
         assert!(!child.has_children);
+    }
+
+    #[test]
+    fn query_tasks_filters_to_leaf_nodes_by_default() {
+        let conn = db::open_in_memory();
+        insert_week_helper(&conn, "20260803-20260809", "20260803", "20260809");
+
+        let root = create_task(
+            &conn,
+            "20260803-20260809",
+            CreateTaskInput {
+                title: "父级项目".into(),
+                description: String::new(),
+                parent_id: None,
+                priority: 2,
+                execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                assigner_name: None,
+                tag_names: Vec::new(),
+            },
+        )
+        .unwrap();
+        create_task(
+            &conn,
+            "20260803-20260809",
+            CreateTaskInput {
+                title: "具体子任务".into(),
+                description: String::new(),
+                parent_id: Some(root.id),
+                priority: 2,
+                execution_mode: crate::domain::EXECUTION_MODE_SELF.into(),
+                owner_name: None,
+                assigner_name: None,
+                tag_names: Vec::new(),
+            },
+        )
+        .unwrap();
+
+        // 默认情况下只返回叶子节点任务，排除父节点
+        let rows = query_tasks(&conn, &QueryFilter::default()).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].task.title, "具体子任务");
+        assert_eq!(rows[0].root_title, "父级项目");
     }
 
     #[test]
@@ -818,7 +865,7 @@ mod tests {
         )
         .unwrap();
 
-        // 按项目「项目A」过滤：跨周命中，且每个结果都带正确 root_title。
+        // 按项目「项目A」过滤：跨周命中叶子节点，且每个结果都带正确 root_title。
         let by_group = query_tasks(
             &conn,
             &QueryFilter {
@@ -827,7 +874,7 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(by_group.len(), 4);
+        assert_eq!(by_group.len(), 2);
         assert!(by_group.iter().all(|row| row.root_title == "项目A"));
         assert!(
             !by_group.iter().any(|row| row.task.title == "项目B"),
@@ -844,7 +891,7 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(by_group_and_week.len(), 2);
+        assert_eq!(by_group_and_week.len(), 1);
         assert!(by_group_and_week
             .iter()
             .all(|row| row.week_id == "20260810-20260816"));

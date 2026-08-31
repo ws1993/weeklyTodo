@@ -38,6 +38,7 @@ pub struct QueryFilter {
     pub keyword: Option<String>,
     pub status: Option<String>,
     pub carried_over_only: Option<bool>,
+    pub leaf_only: Option<bool>,
     pub start_week_id: Option<String>,
     pub end_week_id: Option<String>,
     pub owner_id: Option<i64>,

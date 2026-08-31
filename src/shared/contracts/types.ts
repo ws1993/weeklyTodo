@@ -70,6 +70,7 @@ export interface QueryFilter {
   keyword?: string;
   status?: string;
   carriedOverOnly?: boolean;
+  leafOnly?: boolean;
   startWeekId?: string;
   endWeekId?: string;
   ownerId?: number;

@@ -15,6 +15,7 @@ import { subtreeSize } from '../utils/tree';
 import { EmptyState } from './EmptyState';
 import {
   CalendarIcon,
+  CheckIcon,
   ClockIcon,
   CrossIcon,
   RenameIcon,
@@ -71,6 +72,7 @@ export function QueryView({ open, onClose }: QueryViewProps) {
   const [renameDraft, setRenameDraft] = useState('');
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null);
   const [deleteCount, setDeleteCount] = useState(0);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
   // 按周缓存整棵任务树，供删除确认数量与详情上下文复用。
   const weekTreesCache = useRef(new Map<string, Task[]>());
 
@@ -92,6 +94,7 @@ export function QueryView({ open, onClose }: QueryViewProps) {
         groupFilter: groupFilter || undefined,
         status: status || undefined,
         carriedOverOnly: carriedOnly || undefined,
+        leafOnly: true,
         ownerId,
         assignerId,
         tagId,
@@ -202,6 +205,19 @@ export function QueryView({ open, onClose }: QueryViewProps) {
     }
     await refreshMetadata();
     await loadGroupOptions(weekId);
+  };
+
+  const handleCopyTitle = async (event: React.MouseEvent, title: string, id: number) => {
+    event.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(title);
+      setCopiedId(id);
+      window.setTimeout(() => {
+        setCopiedId((cur) => (cur === id ? null : cur));
+      }, 1500);
+    } catch (error) {
+      console.error('复制任务标题失败:', error);
+    }
   };
 
   const progressByWeek = useMemo(() => {
@@ -372,7 +388,7 @@ export function QueryView({ open, onClose }: QueryViewProps) {
 
           <div className="query-results-head">
             <span>
-              找到 <b>{results.length}</b> 条分支
+              找到 <b>{results.length}</b> 条任务
               {activeWeek && <span className="query-results-scope"> · {activeWeek.id}</span>}
             </span>
             <span className="query-results-meta">
@@ -399,7 +415,7 @@ export function QueryView({ open, onClose }: QueryViewProps) {
             {!loading && results.length === 0 && (
               <EmptyState
                 icon={<SearchIcon size={24} />}
-                title="没有找到匹配的分支"
+                title="没有找到匹配的任务"
                 sub="试试调整筛选条件，或清空关键词"
               />
             )}
@@ -442,9 +458,17 @@ export function QueryView({ open, onClose }: QueryViewProps) {
                         />
                       ) : (
                         <span
-                          className={`query-row-title${row.task.status === 'closed' ? ' closed' : ''}`}
+                          className={`query-row-title${row.task.status === 'closed' ? ' closed' : ''}${copiedId === row.task.id ? ' copied' : ''}`}
+                          title="点击复制任务标题，双击查看任务详情"
+                          onClick={(event) => handleCopyTitle(event, row.task.title, row.task.id)}
                         >
-                          {row.task.title}
+                          <span className="title-text">{row.task.title}</span>
+                          {copiedId === row.task.id && (
+                            <span className="query-row-copy-badge">
+                              <CheckIcon size={10} />
+                              已复制
+                            </span>
+                          )}
                         </span>
                       )}
                     </span>
