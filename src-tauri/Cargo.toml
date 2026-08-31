@@ -1,6 +1,6 @@
 [package]
 name = "weekly-todo"
-version = "1.0.17"
+version = "1.0.18"
 description = "Local-first weekly task tree desktop application"
 edition = "2021"
 rust-version = "1.81"
