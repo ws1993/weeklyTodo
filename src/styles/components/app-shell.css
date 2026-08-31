@@ -1,11 +1,25 @@
 /* ---------- App shell ---------- */
-.app-shell{
-  display:grid;
-  grid-template-columns:300px minmax(0,1fr) auto;
-  grid-template-rows:58px minmax(0,1fr);
+.app-shell {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) 320px;
+  grid-template-rows: 56px minmax(0, 1fr);
   grid-template-areas:
     "topbar topbar topbar"
     "rail main panel";
-  height:100vh;
-  width:100vw;
+  height: 100vh;
+  width: 100vw;
+  transition: grid-template-columns 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.app-shell.sidebar-collapsed {
+  grid-template-columns: 0px minmax(0, 1fr) 320px;
+}
+
+.app-shell.panel-collapsed {
+  grid-template-columns: 280px minmax(0, 1fr) 52px;
+}
+
+.app-shell.both-collapsed {
+  grid-template-columns: 0px minmax(0, 1fr) 52px;
 }

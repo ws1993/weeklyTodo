@@ -21,6 +21,7 @@ import {
   TrashIcon,
 } from './ForestIcons';
 import { TaskDetailPanel } from './TaskDetailPanel';
+import { fireConfetti } from '../utils/confetti';
 
 interface TaskTreeProps {
   tasks: Task[];
@@ -511,6 +512,10 @@ function TaskNode({
             title={closed ? '重新打开' : '标记完成'}
             onClick={(event) => {
               event.stopPropagation();
+              if (!closed) {
+                const rect = event.currentTarget.getBoundingClientRect();
+                fireConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+              }
               void toggleTask(task.id);
             }}
           >

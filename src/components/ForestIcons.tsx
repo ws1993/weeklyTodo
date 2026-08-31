@@ -150,6 +150,64 @@ export function BoltIcon({ size = 14 }: { size?: number }) {
   );
 }
 
+export function ZapIcon({ size = 15 }: { size?: number }) {
+  return <BoltIcon size={size} />;
+}
+
+export function ChevronLeftIcon({ size = 15 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <path d="m15 18-6-6 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function SunMoonIcon({ size = 15 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function PanelLeftIcon({ size = 15 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M9 3v18" stroke="currentColor" strokeWidth="1.7" />
+    </Svg>
+  );
+}
+
+export function PanelRightIcon({ size = 15 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M15 3v18" stroke="currentColor" strokeWidth="1.7" />
+    </Svg>
+  );
+}
+
+export function KanbanIcon({ size = 15 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <path d="M6 5v11M12 5v6M18 5v14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function NetworkIcon({ size = 15 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <rect x="16" y="16" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.6" />
+      <rect x="2" y="16" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.6" />
+      <rect x="9" y="2" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3M12 12V8" stroke="currentColor" strokeWidth="1.6" />
+    </Svg>
+  );
+}
+
 /** 定位：十字准星，用于在任务树中定位某任务。 */
 export function LocateIcon({ size = 14 }: { size?: number }) {
   return (

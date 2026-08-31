@@ -24,6 +24,8 @@ const priorityOptions = [
   { value: 3, label: 'P3 低' },
 ];
 
+const EMPTY_TASKS: Task[] = [];
+
 export function TaskDetailPanel({ task, onClose, tasks, weekId, onMutated }: TaskDetailPanelProps) {
   const editTask = useAppStore((state) => state.editTask);
   const toggleTask = useAppStore((state) => state.toggleTask);
@@ -33,7 +35,8 @@ export function TaskDetailPanel({ task, onClose, tasks, weekId, onMutated }: Tas
   const assigners = useAppStore((state) => state.assigners);
   const tags = useAppStore((state) => state.tags);
   const activeWeekId = useAppStore((state) => state.activeWeekId);
-  const storeTreeTasks = useAppStore((state) => state.tree?.tasks ?? []);
+  const tree = useAppStore((state) => state.tree);
+  const storeTreeTasks = tree?.tasks ?? EMPTY_TASKS;
   const treeTasks = tasks ?? storeTreeTasks;
   const targetWeekId = weekId ?? activeWeekId;
 

@@ -22,6 +22,9 @@ import './styles/components/query-view.css';
 import './styles/components/statistics.css';
 import './styles/components/share-card.css';
 import './styles/components/states.css';
+import './styles/components/kanban-view.css';
+import './styles/components/focus-banner.css';
+import './styles/components/command-palette.css';
 import { App } from './App';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

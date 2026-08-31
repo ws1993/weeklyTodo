@@ -1,14 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Task } from '../shared/contracts/types';
 import { activeLeaves, useAppStore } from '../store/appStore';
 import { EmptyState } from './EmptyState';
-import { BoltIcon, ChevronRightIcon, LocateIcon } from './ForestIcons';
+import { BoltIcon, CheckIcon, ChevronRightIcon, LocateIcon } from './ForestIcons';
 import { GROUP_COLOR_PENDING, groupColorMap } from '../utils/groupColors';
 
 interface CurrentActionsProps {
   tasks: Task[];
   /** 点击某行动时，在左侧任务树中定位并高亮。 */
   onLocate: (taskId: number) => void;
+  /** 点击专注按钮时触发进入 Pomodoro 倒计时专注。 */
+  onStartFocus?: (task: Task) => void;
 }
 
 interface LeafEntry {
@@ -39,7 +41,7 @@ function buildLeafEntries(tasks: Task[]): LeafEntry[] {
   });
 }
 
-export function CurrentActions({ tasks, onLocate }: CurrentActionsProps) {
+export function CurrentActions({ tasks, onLocate, onStartFocus }: CurrentActionsProps) {
   const toggleTask = useAppStore((state) => state.toggleTask);
   const groupColors = useAppStore((state) => state.groupColors);
   const ensureGroupColor = useAppStore((state) => state.ensureGroupColor);
@@ -75,13 +77,18 @@ export function CurrentActions({ tasks, onLocate }: CurrentActionsProps) {
     }
   }, [groups, activeGroup]);
 
+  const requestedMissingRef = useRef<Set<string>>(new Set());
+
   // 为尚未分配颜色的分组自动取色（后端取第一个未用色）。
   useEffect(() => {
     const missing = groups
-      .filter((group) => !colorMap.has(group.title))
+      .filter((group) => !colorMap.has(group.title) && !requestedMissingRef.current.has(group.title))
       .map((group) => group.title);
     if (missing.length === 0) {
       return;
+    }
+    for (const title of missing) {
+      requestedMissingRef.current.add(title);
     }
     let cancelled = false;
     void (async () => {
@@ -92,7 +99,7 @@ export function CurrentActions({ tasks, onLocate }: CurrentActionsProps) {
         try {
           await ensureGroupColor(title);
         } catch {
-          // 单次失败忽略，下次渲染会重试。
+          requestedMissingRef.current.delete(title);
         }
       }
     })();
@@ -170,45 +177,68 @@ export function CurrentActions({ tasks, onLocate }: CurrentActionsProps) {
               onClick={() => onLocate(entry.task.id)}
               title={fullPath.join(' › ')}
             >
-              <span className="leaf-dot" style={{ background: color }} />
-              <span className="leaf-body">
-                <span className="leaf-title-row">
-                  <span className="leaf-title">{entry.task.title}</span>
-                  <span className={`tag tag-priority tag-priority-sm p${entry.task.priority}`}>
-                    P{entry.task.priority}
-                  </span>
+              {/* Row 1: Project Dot + Full Task Title + Priority Tag */}
+              <div className="leaf-header-row">
+                <span className="leaf-dot" style={{ background: color }} />
+                <span className="leaf-title">{entry.task.title}</span>
+                <span className={`tag tag-priority tag-priority-sm p${entry.task.priority}`}>
+                  P{entry.task.priority}
                 </span>
-                {entry.parentTitles.length > 0 && (
-                  <span className="leaf-path">
-                    {entry.parentTitles.map((title, index) => (
+              </div>
+
+              {/* Row 2: Breadcrumb Path + Action Buttons */}
+              <div className="leaf-footer-row">
+                <span className="leaf-path">
+                  {entry.parentTitles.length > 0 ? (
+                    entry.parentTitles.map((title, index) => (
                       <span key={`${title}-${index}`} className="path-seg">
                         {title}
                         <span className="path-sep">›</span>
                       </span>
-                    ))}
-                  </span>
-                )}
-              </span>
-              <button
-                className="locate-btn"
-                title="在任务树中定位"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onLocate(entry.task.id);
-                }}
-              >
-                <LocateIcon size={14} />
-              </button>
-              <button
-                className="pick-btn"
-                title="标记完成"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  void toggleTask(entry.task.id);
-                }}
-              >
-                完成
-              </button>
+                    ))
+                  ) : (
+                    <span className="path-root-hint">{entry.rootTitle}</span>
+                  )}
+                </span>
+
+                <div className="leaf-actions" onClick={(event) => event.stopPropagation()}>
+                  {onStartFocus && (
+                    <button
+                      type="button"
+                      className="leaf-action-btn action-focus"
+                      title="开启专注模式 (25分钟番茄倒计时)"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onStartFocus(entry.task);
+                      }}
+                    >
+                      <BoltIcon size={13} />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="leaf-action-btn action-locate"
+                    title="在任务树中定位"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onLocate(entry.task.id);
+                    }}
+                  >
+                    <LocateIcon size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    className="leaf-action-btn action-complete"
+                    title="标记为已完成"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void toggleTask(entry.task.id);
+                    }}
+                  >
+                    <CheckIcon size={13} />
+                  </button>
+                </div>
+              </div>
             </div>
           );
         })}

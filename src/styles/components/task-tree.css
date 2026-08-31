@@ -1,137 +1,536 @@
-/* ---------- Task tree ---------- */
-.tree-card{
-  background:var(--surface);border:1px solid var(--border);border-radius:4px;
-  flex:1;min-height:0;display:flex;flex-direction:column;
-  box-shadow:0 1px 2px rgba(23,32,51,.03);
+/* ---------- Modern Task Tree Styles ---------- */
+
+.tree-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
 }
-.tree-toolbar{
-  display:flex;align-items:center;gap:10px;padding:9px 14px;
-  border-bottom:1px solid var(--border);background:var(--surface-2);
-  border-radius:4px 4px 0 0;flex:none;
+
+.tree-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  flex: none;
 }
-.tree-title{font-size:13px;font-weight:600;white-space:nowrap}
-.tree-hint{font-size:11px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tree-toolbar .btn{margin-left:auto}
-.tree{flex:1;overflow:auto;min-height:0;padding:0 0 40px}
-.tree-node{position:relative}
-.tree-row{
-  display:flex;align-items:center;gap:10px;min-height:42px;padding:4px 14px;
-  border-bottom:1px solid var(--border);position:relative;cursor:pointer;
-  transition:background .12s;
-  -webkit-user-select:none;user-select:none;
+
+.tree-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-1);
+  white-space: nowrap;
 }
-.tree-row:last-child{border-bottom:none}
-.tree-row:hover{background:var(--surface-2)}
-.tree-row:not(.collapsible){cursor:default}
-.tree-row.top{background:rgba(21,87,208,.018)}
-.tree-row.top:hover{background:var(--brand-soft)}
-.tree-row.closed .node-title{color:var(--text-3);text-decoration:line-through;text-decoration-color:#C4CDDC;font-weight:400}
-.tree-children{position:relative}
-.tree-children .tree-row{padding-left:52px}
-.tree-children .tree-row::before{
-  content:"";position:absolute;left:26px;top:0;bottom:0;width:1px;background:var(--border);
+
+.tree-hint {
+  font-size: 11.5px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.tree-children .tree-row::after{
-  content:"";position:absolute;left:26px;top:50%;width:16px;height:1px;background:var(--border);
+
+.tree-toolbar .btn {
+  margin-left: auto;
 }
-/* Nested levels: deeper rows indent further and their connector lines follow. */
-.tree-row.depth-1{padding-left:52px}
-.tree-row.depth-2{padding-left:88px}
-.tree-row.depth-3{padding-left:124px}
-.tree-row.depth-4{padding-left:160px}
-.tree-row.depth-5{padding-left:196px}
-.tree-row.depth-1::before,.tree-row.depth-1::after{left:26px}
-.tree-row.depth-2::before,.tree-row.depth-2::after{left:62px}
-.tree-row.depth-3::before,.tree-row.depth-3::after{left:98px}
-.tree-row.depth-4::before,.tree-row.depth-4::after{left:134px}
-.tree-row.depth-5::before,.tree-row.depth-5::after{left:170px}
-.add-inline.depth-1{padding-left:52px}
-.add-inline.depth-2{padding-left:88px}
-.add-inline.depth-3{padding-left:124px}
-.add-inline.depth-4{padding-left:160px}
-.add-inline.depth-5{padding-left:196px}
-.tree-row.dragging{opacity:.5}
-.tree-row.drop-before{box-shadow:inset 0 2px 0 0 var(--brand);background:var(--surface)}
-.tree-row.drop-after{box-shadow:inset 0 -2px 0 0 var(--brand);background:var(--surface)}
-.tree-row.drop-inside{background:var(--brand-soft);box-shadow:inset 0 0 0 1.5px var(--brand)}
-.task-toggle{
-  width:16px;height:16px;display:grid;place-items:center;color:var(--text-3);
-  background:none;border:none;padding:0;cursor:pointer;flex:none;border-radius:3px;
+
+.tree {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+  padding: 4px 0 40px;
 }
-.task-toggle:hover{color:var(--brand)}
-.task-toggle svg{width:15px;height:15px;transition:transform .15s ease}
-.task-toggle.open svg{transform:rotate(90deg)}
-.task-toggle.leaf{visibility:hidden;pointer-events:none}
-.task-check{
-  width:18px;height:18px;border-radius:3px;border:1.5px solid #B9C4D8;
-  background:var(--surface);display:grid;place-items:center;cursor:pointer;
-  flex:none;color:#fff;padding:0;
-  transition:border-color .12s,background .12s,color .12s;
+
+.tree-node {
+  position: relative;
 }
-.task-check:hover{border-color:var(--brand)}
-.task-check svg{width:12px;height:12px;opacity:0;transition:opacity .1s}
-.task-check.done{background:var(--success);border-color:var(--success)}
-.task-check.done svg{opacity:1}
-/* 分享多选模式：行首选择复选框（选中态用品牌色填充）。 */
-.task-select{
-  width:18px;height:18px;border-radius:3px;border:1.5px solid #B9C4D8;
-  background:var(--surface);display:grid;place-items:center;cursor:pointer;
-  flex:none;color:#fff;padding:0;
-  transition:border-color .12s,background .12s,color .12s;
+
+/* Individual Row */
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 5px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-user-select: none;
+  user-select: none;
 }
-.task-select:hover{border-color:var(--brand)}
-.task-select svg{width:12px;height:12px;opacity:0;transition:opacity .1s}
-.task-select.checked{background:var(--brand);border-color:var(--brand)}
-.task-select.checked svg{opacity:1}
-.tree-row.selected{background:var(--brand-soft)}
-.tree-row.selected:hover{background:var(--brand-soft)}
-.node-glyph{display:none}
-.node-title-wrap{flex:1;min-width:0;display:flex;align-items:center;gap:6px}
-.node-title{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;line-height:1.5}
-.tree-row.top .node-title{font-size:13px;font-weight:600}
-.task-title-input{
-  flex:1;min-width:0;height:26px;border:1px solid var(--brand);border-radius:3px;
-  padding:0 8px;font-family:inherit;font-size:13px;outline:none;color:var(--text-1);
-  box-shadow:0 0 0 3px rgba(21,87,208,.12);background:var(--surface);
+
+.tree-row:last-child {
+  border-bottom: none;
 }
-.tag{
-  display:inline-flex;align-items:center;gap:4px;font-size:11px;line-height:18px;
-  padding:0 8px;border-radius:999px;white-space:nowrap;flex:none;
+
+.tree-row:hover {
+  background: var(--surface-2);
 }
-.tag-carry{color:var(--warning);background:var(--warning-soft);border:1px solid var(--warning-border)}
-.tag-closed{color:var(--success);background:var(--success-soft);border:1px solid var(--success-border)}
-.tag-priority{
-  font-family:var(--mono);color:var(--text-3);border:1px solid var(--border);
-  background:transparent;letter-spacing:.5px;font-size:10.5px;
+
+.tree-row:not(.collapsible) {
+  cursor: default;
 }
-.tag-priority.p0{color:var(--danger);border-color:var(--danger-border);background:var(--danger-soft)}
-.tag-priority.p1{color:var(--warning);border-color:var(--warning-border);background:var(--warning-soft)}
-.tag-priority.p2{color:var(--brand);border-color:var(--brand-border);background:var(--brand-soft)}
-.tag-priority.p3{color:var(--text-3);border-color:var(--border);background:transparent}
-.tag-self{color:var(--text-2);border:1px solid var(--border);background:var(--surface-2);letter-spacing:.3px}
-/* 跟进 / 分派 合并徽章：一个整体胶囊承载「语义词·人名」，两类用不同色相区分。 */
-.tag-follow-combo{color:var(--warning);border-color:var(--warning-border);background:var(--warning-soft);letter-spacing:.3px;font-weight:600}
-.tag-assign-combo{color:var(--assigner);border-color:var(--assigner-border);background:var(--assigner-soft);letter-spacing:.3px;font-weight:600}
-.tag-label{color:var(--text-2);border:1px solid var(--border);background:var(--surface-2);letter-spacing:.3px}
-.tag-extra{color:var(--text-3);border:1px solid var(--border);background:transparent;letter-spacing:.3px}
-/* 优先级/标签徽章区的双击热区：悬停给出可点提示，负外边距抵消内边距、不改变原有布局。
-   左侧 200px 为标题预留显示空间（194px = 200px − 6px 原有的负外边距）。 */
-.node-meta{
-  display:inline-flex;align-items:center;gap:10px;flex:none;cursor:pointer;
-  padding:2px 6px;margin:-2px -6px -2px 194px;border-radius:999px;transition:background .12s;
+
+.tree-row.top {
+  background: color-mix(in srgb, var(--brand, #2563eb) 2.5%, transparent);
 }
-.node-meta:hover{background:var(--brand-soft)}
-/* 固定间隙即可：标题占满剩余宽度，操作按钮仍贴右缘。 */
-.row-spacer{flex:0 0 24px}
-.task-actions{display:inline-flex;align-items:center;gap:4px;opacity:0;transition:opacity .12s}
-.tree-row:hover .task-actions{opacity:1}
-.add-btn,.edit-btn{
-  display:inline-flex;align-items:center;justify-content:center;
-  width:26px;height:26px;border-radius:3px;border:1px solid transparent;
-  background:transparent;color:var(--text-3);cursor:pointer;
+
+.tree-row.top:hover {
+  background: var(--brand-soft);
 }
-.add-btn:hover,.edit-btn:hover{color:var(--brand);background:var(--brand-soft);border-color:var(--brand-border)}
-.add-btn svg,.edit-btn svg{width:13px;height:13px}
-.edit-btn.danger:hover{color:var(--danger);background:var(--danger-soft);border-color:var(--danger-border)}
-.edit-btn.danger.armed{color:var(--danger);background:var(--danger-soft);border-color:var(--danger-border)}
-.tree-row.closed .add-btn{display:none}
+
+.tree-row.closed .node-title {
+  color: var(--text-4);
+  text-decoration: line-through;
+  text-decoration-color: var(--border-strong);
+  font-weight: 400;
+}
+
+/* Tree Connectors & Guide Rails */
+.tree-children {
+  position: relative;
+}
+
+.tree-children .tree-row {
+  padding-left: 52px;
+}
+
+.tree-children .tree-row::before {
+  content: "";
+  position: absolute;
+  left: 26px;
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background: var(--tree-guide);
+}
+
+.tree-children .tree-row::after {
+  content: "";
+  position: absolute;
+  left: 26px;
+  top: 50%;
+  width: 14px;
+  height: 1.5px;
+  background: var(--tree-guide);
+}
+
+/* Multi-depth Indentation */
+.tree-row.depth-1 { padding-left: 52px; }
+.tree-row.depth-2 { padding-left: 88px; }
+.tree-row.depth-3 { padding-left: 124px; }
+.tree-row.depth-4 { padding-left: 160px; }
+.tree-row.depth-5 { padding-left: 196px; }
+
+.tree-row.depth-1::before, .tree-row.depth-1::after { left: 26px; }
+.tree-row.depth-2::before, .tree-row.depth-2::after { left: 62px; }
+.tree-row.depth-3::before, .tree-row.depth-3::after { left: 98px; }
+.tree-row.depth-4::before, .tree-row.depth-4::after { left: 134px; }
+.tree-row.depth-5::before, .tree-row.depth-5::after { left: 170px; }
+
+.add-inline.depth-1 { padding-left: 52px; }
+.add-inline.depth-2 { padding-left: 88px; }
+.add-inline.depth-3 { padding-left: 124px; }
+.add-inline.depth-4 { padding-left: 160px; }
+.add-inline.depth-5 { padding-left: 196px; }
+
+/* Drag & Drop Feedback */
+.tree-row.dragging {
+  opacity: 0.45;
+}
+.tree-row.drop-before {
+  box-shadow: inset 0 2px 0 0 var(--brand);
+  background: var(--surface);
+}
+.tree-row.drop-after {
+  box-shadow: inset 0 -2px 0 0 var(--brand);
+  background: var(--surface);
+}
+.tree-row.drop-inside {
+  background: var(--brand-soft);
+  box-shadow: inset 0 0 0 1.5px var(--brand);
+}
+
+/* Node Expand / Collapse Button */
+.task-toggle {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  color: var(--text-3);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  flex: none;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s;
+}
+
+.task-toggle:hover {
+  color: var(--brand);
+  background: var(--surface-2);
+}
+
+.task-toggle svg {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.15s ease;
+}
+
+.task-toggle.open svg {
+  transform: rotate(90deg);
+}
+
+.task-toggle.leaf {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Status Checkbox */
+.task-check {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  border: 1.6px solid var(--border-strong);
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex: none;
+  color: #FFFFFF;
+  padding: 0;
+  transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.task-check:hover {
+  border-color: var(--brand);
+  transform: scale(1.05);
+}
+
+.task-check svg {
+  width: 12px;
+  height: 12px;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.task-check.done {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+.task-check.done svg {
+  opacity: 1;
+  stroke-width: 3;
+}
+
+/* Multi-Share Selection Box */
+.task-select {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  border: 1.6px solid var(--border-strong);
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex: none;
+  color: #FFFFFF;
+  padding: 0;
+  transition: all 0.12s;
+}
+
+.task-select:hover {
+  border-color: var(--brand);
+}
+
+.task-select svg {
+  width: 12px;
+  height: 12px;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.task-select.checked {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+
+.task-select.checked svg {
+  opacity: 1;
+}
+
+.tree-row.selected {
+  background: var(--brand-soft);
+}
+
+/* Node Title & Inputs */
+.node-glyph {
+  display: none;
+}
+
+.node-title-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.node-title {
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  line-height: 1.5;
+  color: var(--text-1);
+}
+
+.tree-row.top .node-title {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.task-title-input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-sm);
+  padding: 0 8px;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  color: var(--text-1);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+  background: var(--surface);
+}
+
+/* Tags & Meta Badges */
+.node-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  margin-left: auto;
+  border-radius: var(--radius-full);
+  transition: background 0.12s;
+}
+
+.node-meta:hover {
+  background: var(--surface-2);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 7px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+  flex: none;
+  border: 1px solid transparent;
+}
+
+.tag-carry {
+  color: var(--warning);
+  background: var(--warning-soft);
+  border-color: var(--warning-border);
+}
+
+.tag-closed {
+  color: var(--success);
+  background: var(--success-soft);
+  border-color: var(--success-border);
+}
+
+.tag-priority {
+  font-family: var(--mono);
+  color: var(--text-3);
+  border: 1px solid var(--border);
+  background: transparent;
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+.tag-priority.p0 {
+  color: var(--danger);
+  border-color: var(--danger-border);
+  background: var(--danger-soft);
+  font-weight: 600;
+}
+
+.tag-priority.p1 {
+  color: var(--warning);
+  border-color: var(--warning-border);
+  background: var(--warning-soft);
+  font-weight: 600;
+}
+
+.tag-priority.p2 {
+  color: var(--brand);
+  border-color: var(--brand-border);
+  background: var(--brand-soft);
+}
+
+.tag-priority.p3 {
+  color: var(--text-3);
+  border-color: var(--border);
+  background: transparent;
+}
+
+.tag-self {
+  color: var(--text-2);
+  border-color: var(--border);
+  background: var(--surface-2);
+}
+
+.tag-follow-combo {
+  color: var(--warning);
+  border-color: var(--warning-border);
+  background: var(--warning-soft);
+  font-weight: 500;
+}
+
+.tag-assign-combo {
+  color: var(--assigner);
+  border-color: var(--assigner-border);
+  background: var(--assigner-soft);
+  font-weight: 500;
+}
+
+.tag-label {
+  color: var(--text-2);
+  border-color: var(--border);
+  background: var(--surface-2);
+}
+
+.tag-extra {
+  color: var(--text-3);
+  border-color: var(--border);
+  background: transparent;
+}
+
+/* Row Action Buttons (Hover Toolbar) */
+.row-spacer {
+  flex: 0 0 12px;
+}
+
+.task-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  flex: none;
+}
+
+.tree-row:hover .task-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.add-btn,
+.edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.12s ease;
+}
+
+.add-btn:hover,
+.edit-btn:hover {
+  color: var(--brand);
+  background: var(--brand-soft);
+  border-color: var(--brand-border);
+}
+
+.add-btn svg,
+.edit-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.edit-btn.danger:hover {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-color: var(--danger-border);
+}
+
+.edit-btn.danger.armed {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-color: var(--danger-border);
+}
+
+.tree-row.closed .add-btn {
+  display: none;
+}
+
+/* Inline Add Input Container */
+.add-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.add-inline .task-title-input {
+  flex: 1;
+}
+
+.add-inline .ok-btn,
+.add-inline .no-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  transition: all 0.12s;
+}
+
+.add-inline .ok-btn:hover {
+  color: #FFFFFF;
+  background: var(--brand);
+  border-color: var(--brand);
+}
+
+.add-inline .no-btn:hover {
+  color: var(--text-1);
+  background: var(--surface-3);
+}
+
+.add-inline svg {
+  width: 13px;
+  height: 13px;
+}

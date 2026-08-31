@@ -1,104 +1,357 @@
-/* ---------- Right lane : current actions ---------- */
-.actions-pane{
-  grid-area:panel;
-  width:300px;background:var(--surface);border-left:1px solid var(--border);
-  display:flex;flex-direction:column;min-height:0;
-  transition:width .18s ease;
-}
-.actions-pane.collapsed{width:46px}
-.actions-pane.collapsed .lane-head{flex-direction:column;padding:11px 10px;gap:4px}
-.actions-pane.collapsed .panel-collapse{margin-left:0}
-.actions-pane.collapsed .panel-collapse svg{transform:rotate(180deg)}
-.lane-head{
-  display:flex;align-items:center;gap:8px;padding:11px 12px 11px 14px;
-  border-bottom:1px solid var(--border);flex:none;
-}
-.lane-glyph{display:flex;align-items:center;color:var(--brand);flex:none}
-.lane-glyph svg{width:15px;height:15px}
-.actions-pane-title{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--text-1);white-space:nowrap}
-.lane-sub{font-size:11px;color:var(--text-3);margin-left:6px}
-.lane-count{
-  font-size:11px;color:var(--brand);background:var(--brand-soft);
-  border:1px solid var(--brand-border);border-radius:999px;padding:0 7px;
-  line-height:18px;white-space:nowrap;
-}
-.panel-collapse{
-  margin-left:auto;width:26px;height:26px;border-radius:3px;border:1px solid transparent;
-  background:transparent;color:var(--text-3);cursor:pointer;display:grid;place-items:center;
-}
-.panel-collapse:hover{color:var(--brand);background:var(--brand-soft);border-color:var(--brand-border)}
-.panel-collapse svg{width:15px;height:15px}
-.action-list{flex:1;overflow-y:auto;min-height:0;display:flex;flex-direction:column}
-.pick-btn{
-  flex:none;font-size:11px;color:var(--brand);background:var(--brand-soft);
-  border:1px solid var(--brand-border);border-radius:3px;padding:3px 9px;cursor:pointer;
-  transition:background .12s,color .12s;
-}
-.pick-btn:hover{background:var(--brand);color:#fff}
-/* 「当前行动」空状态在弹性面板中垂直居中。 */
-.action-list .empty-state{flex:1;justify-content:center}
-.panel-foot{
-  padding:9px 14px;border-top:1px solid var(--border);font-size:11px;
-  color:var(--text-3);flex:none;background:var(--surface-2);
+/* ---------- Right lane : Current Actions ---------- */
+
+.actions-pane {
+  grid-area: panel;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  transition: width 0.24s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* 分组色码 chips 行 */
-.group-chips{
-  display:flex;gap:5px;padding:9px 12px;border-bottom:1px solid var(--border);
-  flex-wrap:wrap;flex:none;
+.actions-pane.collapsed {
+  width: 52px;
 }
-.g-chip{
-  display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 9px;
-  border-radius:999px;font-size:11px;color:var(--text-2);
-  border:1px solid var(--border);background:var(--surface);cursor:pointer;
-  transition:all .12s;max-width:150px;white-space:nowrap;
-}
-.g-chip:hover{border-color:var(--border-strong)}
-.g-chip.active{
-  color:var(--text-1);border-color:var(--border-strong);
-  background:var(--surface-2);font-weight:600;
-}
-/* 标签文字单行显示，超出最大宽度时省略隐藏。 */
-.g-chip-text{
-  min-width:0;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.g-chip-dot{width:7px;height:7px;border-radius:50%;flex:none}
-.g-chip.active .g-chip-dot{box-shadow:0 0 0 2px rgba(23,32,51,.06)}
 
-/* 行动卡片：色点 + 标题 + 祖先路径 */
-.leaf-card{
-  display:flex;align-items:center;gap:10px;padding:9px 14px;
-  border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;
+.actions-pane.collapsed .lane-head {
+  flex-direction: column;
+  padding: 12px 6px;
+  gap: 8px;
 }
-.leaf-card:hover{background:var(--brand-soft)}
-.leaf-dot{
-  width:8px;height:8px;border-radius:50%;flex:none;
-  box-shadow:0 0 0 3px rgba(23,32,51,.05);
-}
-.leaf-body{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
-.leaf-title{font-size:12.5px;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-/* 标题行：标题占满剩余宽度可省略，右侧常驻优先级徽章。 */
-.leaf-title-row{display:flex;align-items:center;gap:6px;min-width:0}
-.leaf-title-row .leaf-title{flex:1;min-width:0}
-/* 复用任务树 tag-priority 色系，仅缩小尺寸适配卡片。 */
-.tag.tag-priority-sm{font-size:9px;line-height:15px;padding:0 5px;letter-spacing:.4px}
-.leaf-path{
-  display:flex;align-items:center;gap:4px;min-width:0;
-  font-size:10.5px;color:var(--text-4);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.path-seg{display:inline-flex;align-items:center;gap:4px;color:var(--text-3)}
-.path-sep{opacity:.55}
-.locate-btn{
-  flex:none;width:24px;height:24px;border-radius:3px;border:1px solid transparent;
-  background:transparent;color:var(--text-4);display:grid;place-items:center;
-  opacity:.65;cursor:pointer;transition:all .12s;
-}
-.locate-btn:hover{color:var(--brand);background:var(--brand-soft);border-color:var(--brand-border);opacity:1}
 
-/* 任务树定位高亮 */
-.tree-row.locate-flash{
-  background:var(--warning-soft);
-  outline:1px solid var(--warning-border);
+.actions-pane.collapsed .panel-collapse {
+  margin-left: 0;
+}
+
+.actions-pane.collapsed .panel-collapse svg {
+  transform: rotate(180deg);
+}
+
+.lane-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+
+.lane-glyph {
+  display: flex;
+  align-items: center;
+  color: var(--brand);
+  flex: none;
+}
+
+.lane-glyph svg {
+  width: 16px;
+  height: 16px;
+}
+
+.actions-pane-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-1);
+  white-space: nowrap;
+}
+
+.lane-count {
+  font-size: 11px;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-border);
+  border-radius: var(--radius-full);
+  padding: 1px 7px;
+  line-height: 16px;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.panel-collapse {
+  margin-left: auto;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: all 0.15s;
+  padding: 0;
+}
+
+.panel-collapse:hover {
+  color: var(--brand);
+  background: var(--brand-soft);
+  border-color: var(--brand-border);
+}
+
+.panel-collapse svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Category group chips (Wrapped & spread out with no horizontal scrollbar) */
+.group-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-2);
+  flex: none;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.g-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  white-space: nowrap;
+}
+
+.g-chip:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+
+.g-chip.active {
+  color: var(--brand);
+  border-color: var(--brand-border);
+  background: var(--brand-soft);
+  font-weight: 600;
+}
+
+.g-chip-text {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.g-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+}
+
+/* Action List */
+.action-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  gap: 6px;
+}
+
+/* Action Leaf Card - Modern 2-Row Layout */
+.leaf-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.leaf-card:hover {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-xs);
+}
+
+.leaf-card.active-focus {
+  background: var(--brand-soft);
+  border-color: var(--brand-border);
+}
+
+/* Row 1: Header (Category Dot + Full Task Title + Priority Badge) */
+.leaf-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.leaf-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.leaf-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-1);
+}
+
+.tag-priority-sm {
+  font-size: 10.5px;
+  font-family: var(--mono);
+  padding: 0 6px;
+  line-height: 17px;
+  border-radius: var(--radius-sm);
+  flex: none;
+}
+
+/* Row 2: Footer (Breadcrumb Path on Left, Action Buttons on Right) */
+.leaf-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.leaf-path {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+  font-size: 11.5px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.leaf-path .path-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.leaf-path .path-sep {
+  color: var(--text-4);
+  font-size: 10px;
+}
+
+.path-root-hint {
+  color: var(--text-3);
+}
+
+.leaf-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+}
+
+.leaf-action-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  border: 1px solid transparent;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.leaf-action-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* 1. 专注模式 - 活力琥珀橙 (Amber/Energy) */
+.leaf-action-btn.action-focus {
+  color: #D97706;
+  background: #FEF3C7;
+  border-color: #FDE68A;
+}
+
+.leaf-action-btn.action-focus:hover {
+  background: #F59E0B;
+  border-color: #F59E0B;
+  color: #FFFFFF;
+  transform: scale(1.08);
+  box-shadow: 0 2px 5px rgba(245, 158, 11, 0.3);
+}
+
+/* 2. 定位模式 - 品牌聚焦蓝 (Brand Indigo/Blue) */
+.leaf-action-btn.action-locate {
+  color: var(--brand);
+  background: var(--brand-soft);
+  border-color: var(--brand-border);
+}
+
+.leaf-action-btn.action-locate:hover {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #FFFFFF;
+  transform: scale(1.08);
+  box-shadow: 0 2px 5px var(--brand-glow);
+}
+
+/* 3. 标记完成 - 清新成功绿 (Emerald Green) */
+.leaf-action-btn.action-complete {
+  color: #059669;
+  background: #D1FAE5;
+  border-color: #A7F3D0;
+}
+
+.leaf-action-btn.action-complete:hover {
+  background: #10B981;
+  border-color: #10B981;
+  color: #FFFFFF;
+  transform: scale(1.08);
+  box-shadow: 0 2px 5px rgba(16, 185, 129, 0.3);
+}
+
+.panel-foot {
+  padding: 8px 14px;
+  font-size: 11.5px;
+  color: var(--text-3);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-2);
+  text-align: right;
+  flex: none;
+}
+
+/* Locate Flash Effect */
+.tree-row.locate-flash {
+  animation: locateFlashAnim 1.6s ease-out;
+}
+
+@keyframes locateFlashAnim {
+  0% { background: var(--brand-soft); box-shadow: 0 0 0 3px var(--brand-border); }
+  50% { background: var(--brand-soft); box-shadow: 0 0 0 2px var(--brand-border); }
+  100% { background: transparent; box-shadow: none; }
 }

@@ -1,0 +1,2550 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>周计划 WeeklyTodo · V2.0 体验重构原型</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Lucide Icons -->
+<script src="https://unpkg.com/lucide@latest"></script>
+<!-- Canvas Confetti -->
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+<style>
+/* =========================================================
+   DESIGN TOKENS & THEMING (CSS CUSTOM PROPERTIES)
+   ========================================================= */
+:root {
+  /* Theme: Clean Modern Light (Default) */
+  --bg-app: #F8FAFC;
+  --bg-sidebar: #FFFFFF;
+  --bg-surface: #FFFFFF;
+  --bg-surface-elevated: #FFFFFF;
+  --bg-subtle: #F1F5F9;
+  --bg-hover: #F8FAFC;
+  --bg-active: #EEF2F6;
+  
+  --border-subtle: rgba(226, 232, 240, 0.8);
+  --border-default: #E2E8F0;
+  --border-strong: #CBD5E1;
+  --border-focus: #3B82F6;
+
+  --text-main: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
+  --text-faint: #94A3B8;
+
+  /* Brand Accents */
+  --brand: #2563EB;
+  --brand-hover: #1D4ED8;
+  --brand-light: #EFF6FF;
+  --brand-border: #BFDBFE;
+  --brand-glow: rgba(37, 99, 235, 0.15);
+
+  /* Status Colors */
+  --success: #10B981;
+  --success-light: #ECFDF5;
+  --success-border: #A7F3D0;
+  --warning: #F59E0B;
+  --warning-light: #FFFBEB;
+  --warning-border: #FDE68A;
+  --danger: #EF4444;
+  --danger-light: #FEF2F2;
+  --danger-border: #FECACA;
+  --purple: #8B5CF6;
+  --purple-light: #F5F3FF;
+  --purple-border: #DDD6FE;
+
+  /* Priority Palette */
+  --p0-color: #EF4444;
+  --p0-bg: #FEF2F2;
+  --p0-border: #FECACA;
+  --p1-color: #F97316;
+  --p1-bg: #FFF7ED;
+  --p1-border: #FFEDD5;
+  --p2-color: #2563EB;
+  --p2-bg: #EFF6FF;
+  --p2-border: #DBEAFE;
+  --p3-color: #64748B;
+  --p3-bg: #F8FAFC;
+  --p3-border: #E2E8F0;
+
+  /* Elevation Shadows */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 2px 4px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 4px 12px -2px rgba(15, 23, 42, 0.07), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 12px 28px -4px rgba(15, 23, 42, 0.1), 0 4px 10px -2px rgba(15, 23, 42, 0.04);
+  --shadow-xl: 0 20px 40px -8px rgba(15, 23, 42, 0.16);
+
+  /* Geometry & Typography */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: 'JetBrains Mono', "Cascadia Code", Consolas, monospace;
+
+  --tree-guide: #E2E8F0;
+  --tree-guide-active: #93C5FD;
+}
+
+/* Dark Obsidian Theme */
+[data-theme="dark"] {
+  --bg-app: #0B0F17;
+  --bg-sidebar: #111722;
+  --bg-surface: #141C2B;
+  --bg-surface-elevated: #1A2438;
+  --bg-subtle: #192233;
+  --bg-hover: #1E293B;
+  --bg-active: #243248;
+
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: #243044;
+  --border-strong: #334155;
+  --border-focus: #60A5FA;
+
+  --text-main: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  --text-faint: #64748B;
+
+  --brand: #3B82F6;
+  --brand-hover: #60A5FA;
+  --brand-light: rgba(59, 130, 246, 0.15);
+  --brand-border: rgba(59, 130, 246, 0.35);
+  --brand-glow: rgba(59, 130, 246, 0.3);
+
+  --p0-bg: rgba(239, 68, 68, 0.15);
+  --p0-border: rgba(239, 68, 68, 0.3);
+  --p1-bg: rgba(249, 115, 22, 0.15);
+  --p1-border: rgba(249, 115, 22, 0.3);
+  --p2-bg: rgba(59, 130, 246, 0.15);
+  --p2-border: rgba(59, 130, 246, 0.3);
+  --p3-bg: rgba(148, 163, 184, 0.12);
+  --p3-border: rgba(148, 163, 184, 0.25);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 16px 36px rgba(0, 0, 0, 0.55);
+
+  --tree-guide: #243044;
+  --tree-guide-active: #3B82F6;
+}
+
+/* Forest Zen Theme */
+[data-theme="forest"] {
+  --bg-app: #0F1715;
+  --bg-sidebar: #131E1B;
+  --bg-surface: #172421;
+  --bg-surface-elevated: #1E2E2A;
+  --bg-subtle: #1C2B27;
+  --bg-hover: #223530;
+  --bg-active: #2A403A;
+
+  --border-subtle: rgba(237, 234, 226, 0.07);
+  --border-default: #253833;
+  --border-strong: #364F48;
+  --border-focus: #10B981;
+
+  --text-main: #F1F5F3;
+  --text-secondary: #CBD8D3;
+  --text-muted: #8EA89F;
+  --text-faint: #5C756D;
+
+  --brand: #10B981;
+  --brand-hover: #34D399;
+  --brand-light: rgba(16, 185, 129, 0.14);
+  --brand-border: rgba(16, 185, 129, 0.3);
+  --brand-glow: rgba(16, 185, 129, 0.25);
+
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.4);
+  --tree-guide: #253833;
+  --tree-guide-active: #10B981;
+}
+
+/* =========================================================
+   BASE RESET & GLOBAL STYLES
+   ========================================================= */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  font-size: 13.5px;
+  line-height: 1.5;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+  color: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+}
+
+/* =========================================================
+   APP SHELL GRID LAYOUT
+   ========================================================= */
+#app-shell {
+  display: grid;
+  grid-template-rows: 56px 1fr;
+  grid-template-columns: 260px minmax(0, 1fr) 340px;
+  grid-template-areas:
+    "topbar topbar topbar"
+    "sidebar main panel";
+  height: 100vh;
+  width: 100vw;
+  transition: grid-template-columns 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#app-shell.sidebar-collapsed {
+  grid-template-columns: 0px minmax(0, 1fr) 340px;
+}
+
+#app-shell.panel-collapsed {
+  grid-template-columns: 260px minmax(0, 1fr) 56px;
+}
+
+#app-shell.both-collapsed {
+  grid-template-columns: 0px minmax(0, 1fr) 56px;
+}
+
+/* =========================================================
+   TOPBAR HEADER
+   ========================================================= */
+.topbar {
+  grid-area: topbar;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  z-index: 30;
+  backdrop-filter: blur(12px);
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--brand) 0%, #4F46E5 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 2px 8px var(--brand-glow);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.logo-badge:hover {
+  transform: scale(1.05);
+}
+
+.app-title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.app-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--text-main);
+}
+
+.app-version-pill {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--brand);
+  background: var(--brand-light);
+  border: 1px solid var(--brand-border);
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+}
+
+.topbar-center {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Quick Week Stepper */
+.week-stepper {
+  display: flex;
+  align-items: center;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 2px 4px;
+}
+
+.stepper-btn {
+  border: none;
+  background: transparent;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.stepper-btn:hover {
+  background: var(--bg-surface);
+  color: var(--text-main);
+  box-shadow: var(--shadow-xs);
+}
+
+.stepper-label {
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stepper-today-badge {
+  font-size: 10px;
+  color: var(--success);
+  background: var(--success-light);
+  border: 1px solid var(--success-border);
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+}
+
+/* Search Box Prompt */
+.global-search-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 5px 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  width: 210px;
+}
+.global-search-trigger:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+.search-kbd {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--text-faint);
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* View Mode Switcher Pills */
+.view-tabs {
+  display: flex;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-default);
+  padding: 2px;
+  border-radius: var(--radius-md);
+}
+
+.view-tab-btn {
+  border: none;
+  background: transparent;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s;
+}
+.view-tab-btn:hover {
+  color: var(--text-main);
+}
+.view-tab-btn.active {
+  background: var(--bg-surface);
+  color: var(--brand);
+  font-weight: 600;
+  box-shadow: var(--shadow-xs);
+}
+
+.btn-icon {
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-icon:hover {
+  background: var(--bg-subtle);
+  color: var(--text-main);
+  border-color: var(--border-strong);
+}
+
+/* =========================================================
+   LEFT SIDEBAR: WEEK RAIL
+   ========================================================= */
+.sidebar {
+  grid-area: sidebar;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-default);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.sidebar-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.sidebar-weeks-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.week-nav-card {
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  transition: all 0.15s;
+  text-align: left;
+}
+.week-nav-card:hover {
+  background: var(--bg-subtle);
+}
+.week-nav-card.active {
+  background: var(--brand-light);
+  border-color: var(--brand-border);
+}
+
+.week-nav-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.week-nav-id {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+.week-nav-card.active .week-nav-id {
+  color: var(--brand);
+}
+
+.week-nav-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+}
+.badge-current {
+  background: var(--brand);
+  color: white;
+}
+.badge-done {
+  background: var(--success-light);
+  color: var(--success);
+  border: 1px solid var(--success-border);
+}
+
+.week-nav-range {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.week-nav-meter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+.nav-progress-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--border-default);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.nav-progress-fill {
+  height: 100%;
+  background: var(--success);
+  border-radius: 999px;
+  transition: width 0.3s;
+}
+.nav-progress-text {
+  font-size: 10.5px;
+  font-family: var(--font-mono);
+  color: var(--text-faint);
+}
+
+.sidebar-footer {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.btn-create-week {
+  border: 1px dashed var(--border-strong);
+  background: var(--bg-subtle);
+  color: var(--text-secondary);
+  padding: 8px;
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-create-week:hover {
+  background: var(--brand-light);
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+/* =========================================================
+   MAIN WORKSPACE AREA
+   ========================================================= */
+.main-workspace {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 24px;
+  gap: 16px;
+}
+
+/* Week Banner Card */
+.week-dashboard-banner {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: 18px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+.week-dashboard-banner::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--brand) 0%, #8B5CF6 100%);
+}
+
+.banner-title-area {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.banner-headline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.banner-week-name {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: var(--text-main);
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+.status-chip.in-progress {
+  background: var(--brand-light);
+  color: var(--brand);
+  border: 1px solid var(--brand-border);
+}
+
+.banner-submeta {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.banner-submeta .meta-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.banner-right-stats {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.stat-metric-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.stat-metric-value {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-main);
+}
+.stat-metric-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Circular Progress Dial */
+.progress-dial-wrap {
+  position: relative;
+  width: 52px;
+  height: 52px;
+}
+.progress-dial-svg {
+  transform: rotate(-90deg);
+}
+.progress-dial-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-main);
+}
+
+.btn-banner-action {
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  color: var(--text-main);
+  padding: 7px 14px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  box-shadow: var(--shadow-xs);
+  transition: all 0.15s;
+}
+.btn-banner-action:hover {
+  background: var(--bg-subtle);
+  border-color: var(--border-strong);
+}
+.btn-banner-action.primary {
+  background: var(--brand);
+  color: white;
+  border-color: var(--brand);
+  box-shadow: 0 2px 8px var(--brand-glow);
+}
+.btn-banner-action.primary:hover {
+  background: var(--brand-hover);
+}
+
+/* =========================================================
+   TASK TREE CONTAINER & TOOLBAR
+   ========================================================= */
+.tree-container-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 480px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.tree-toolbar {
+  padding: 12px 18px;
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tree-view-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tree-quick-tips {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Quick Filter Pills */
+.filter-toggle-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.filter-toggle-pill.active {
+  background: var(--brand-light);
+  border-color: var(--brand-border);
+  color: var(--brand);
+  font-weight: 600;
+}
+
+/* Task Tree List */
+.task-tree-viewport {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px 60px;
+}
+
+/* Tree Node Row */
+.task-node-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 4px 10px;
+  border-radius: var(--radius-md);
+  margin-bottom: 3px;
+  transition: background-color 0.12s, box-shadow 0.12s;
+  cursor: pointer;
+}
+.task-node-row:hover {
+  background: var(--bg-hover);
+}
+.task-node-row.selected-active {
+  background: var(--brand-light);
+  box-shadow: inset 0 0 0 1px var(--brand-border);
+}
+.task-node-row.is-completed .task-title-text {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+
+/* Depth Connectors & Tree Indentation */
+.tree-branch-indent {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+
+.branch-segment {
+  width: 24px;
+  height: 40px;
+  position: relative;
+  flex: none;
+}
+.branch-segment.line-through::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background: var(--tree-guide);
+}
+.branch-segment.line-corner::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 0;
+  height: 20px;
+  width: 1.5px;
+  background: var(--tree-guide);
+}
+.branch-segment.line-corner::after {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 20px;
+  width: 13px;
+  height: 1.5px;
+  background: var(--tree-guide);
+}
+
+/* Expand Collapse Chevron */
+.node-expander {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: all 0.15s;
+  flex: none;
+  margin-right: 4px;
+}
+.node-expander:hover {
+  color: var(--text-main);
+  background: var(--bg-subtle);
+}
+.node-expander.collapsed svg {
+  transform: rotate(-90deg);
+}
+
+/* Custom Status Checkbox */
+.custom-checkbox {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  border: 1.8px solid var(--border-strong);
+  background: var(--bg-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  cursor: pointer;
+  flex: none;
+  margin-right: 10px;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.custom-checkbox:hover {
+  border-color: var(--brand);
+  transform: scale(1.08);
+}
+.custom-checkbox.checked {
+  background: var(--success);
+  border-color: var(--success);
+}
+.custom-checkbox.checked svg {
+  stroke-width: 3;
+}
+
+/* Root Task Left Accent Ribbon */
+.root-group-indicator {
+  width: 3px;
+  height: 18px;
+  border-radius: 999px;
+  margin-right: 8px;
+  flex: none;
+}
+
+/* Task Title & Content */
+.task-content-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.task-title-text {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+}
+.task-node-row.is-root .task-title-text {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* Priority & Attribute Badges */
+.badge-p {
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  line-height: 14px;
+  flex: none;
+}
+.badge-p0 {
+  background: var(--p0-bg);
+  color: var(--p0-color);
+  border: 1px solid var(--p0-border);
+}
+.badge-p1 {
+  background: var(--p1-bg);
+  color: var(--p1-color);
+  border: 1px solid var(--p1-border);
+}
+.badge-p2 {
+  background: var(--p2-bg);
+  color: var(--p2-color);
+  border: 1px solid var(--p2-border);
+}
+.badge-p3 {
+  background: var(--p3-bg);
+  color: var(--p3-color);
+  border: 1px solid var(--p3-border);
+}
+
+.tag-pill {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-default);
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+}
+
+.carried-pill {
+  font-size: 10.5px;
+  color: var(--purple);
+  background: var(--purple-light);
+  border: 1px solid var(--purple-border);
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+}
+
+.assignee-avatar-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-default);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  flex: none;
+}
+.avatar-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366F1 0%, #A855F7 100%);
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Hover Quick Actions Bar */
+.node-hover-actions {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  background: var(--bg-surface-elevated);
+  padding: 2px 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-sm);
+  z-index: 10;
+}
+.task-node-row:hover .node-hover-actions {
+  display: flex;
+}
+
+.action-tool-btn {
+  border: none;
+  background: transparent;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.action-tool-btn:hover {
+  background: var(--bg-subtle);
+  color: var(--brand);
+}
+.action-tool-btn.danger:hover {
+  background: var(--danger-light);
+  color: var(--danger);
+}
+
+/* Inline Quick Create Input Row */
+.inline-create-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 0 3px var(--brand-light);
+  margin: 6px 0;
+}
+.inline-input-field {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13.5px;
+  color: var(--text-main);
+}
+
+/* =========================================================
+   RIGHT PANEL: CURRENT ACTIONS & FOCUS LANE
+   ========================================================= */
+.right-panel {
+  grid-area: panel;
+  background: var(--bg-sidebar);
+  border-left: 1px solid var(--border-default);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  transition: width 0.2s;
+}
+
+.panel-head {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.panel-title-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.action-count-pill {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--brand);
+  background: var(--brand-light);
+  border: 1px solid var(--brand-border);
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+}
+
+/* Right Filter Chips */
+.group-filter-scroll {
+  display: flex;
+  gap: 6px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  overflow-x: auto;
+  flex-wrap: nowrap;
+}
+.group-filter-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-default);
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.group-filter-chip:hover {
+  border-color: var(--border-strong);
+}
+.group-filter-chip.active {
+  background: var(--text-main);
+  color: var(--bg-surface);
+  font-weight: 600;
+  border-color: var(--text-main);
+}
+.chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+/* Action Items List */
+.action-card-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.action-leaf-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: var(--shadow-xs);
+}
+.action-leaf-card:hover {
+  border-color: var(--brand-border);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+.action-leaf-card.active-focus {
+  border-color: var(--brand);
+  background: var(--brand-light);
+}
+
+.action-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.action-card-header .custom-checkbox {
+  margin-top: 1px;
+  margin-right: 0;
+}
+.action-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+  flex: 1;
+  line-height: 1.4;
+}
+
+.action-card-path {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 28px;
+}
+
+.action-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 28px;
+  margin-top: 2px;
+}
+
+.btn-focus-now {
+  font-size: 11px;
+  color: var(--brand);
+  background: transparent;
+  border: 1px solid var(--brand-border);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.12s;
+}
+.btn-focus-now:hover {
+  background: var(--brand);
+  color: white;
+}
+
+/* =========================================================
+   KANBAN VIEW & MATRIX VIEW
+   ========================================================= */
+.kanban-board-container {
+  display: none;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  flex: 1;
+  overflow-x: auto;
+  padding: 6px 0;
+}
+
+.kanban-col {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  min-width: 250px;
+  box-shadow: var(--shadow-sm);
+}
+
+.kanban-col-head {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.kanban-col-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.kanban-cards-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* =========================================================
+   SLIDE-OVER TASK DETAIL DRAWER
+   ========================================================= */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.drawer-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.task-detail-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 460px;
+  background: var(--bg-surface-elevated);
+  border-left: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-xl);
+  z-index: 51;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.task-detail-drawer.open {
+  transform: translateX(0);
+}
+
+.drawer-head {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.drawer-head-title {
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.form-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.form-input, .form-textarea, .form-select {
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  font-size: 13.5px;
+  color: var(--text-main);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.form-input:focus, .form-textarea:focus, .form-select:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-light);
+}
+
+.priority-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.priority-choice-btn {
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  padding: 7px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+}
+.priority-choice-btn.selected {
+  border-color: var(--brand);
+  background: var(--brand-light);
+  color: var(--brand);
+}
+
+.drawer-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-subtle);
+}
+
+/* =========================================================
+   COMMAND PALETTE MODAL (CTRL+K)
+   ========================================================= */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(6px);
+  z-index: 60;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.modal-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.command-modal {
+  width: 580px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+  transform: scale(0.96);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.modal-overlay.open .command-modal {
+  transform: scale(1);
+}
+
+.cmd-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-default);
+}
+.cmd-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 16px;
+  color: var(--text-main);
+}
+
+.cmd-results-list {
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cmd-item {
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.cmd-item:hover, .cmd-item.active {
+  background: var(--brand-light);
+  color: var(--brand);
+}
+.cmd-item-title {
+  font-weight: 500;
+  font-size: 13.5px;
+  flex: 1;
+}
+
+/* =========================================================
+   POMODORO / FOCUS CARD OVERLAY
+   ========================================================= */
+.focus-timer-banner {
+  display: none;
+  background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+  color: white;
+  border-radius: var(--radius-lg);
+  padding: 14px 20px;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--shadow-md);
+  margin-bottom: 12px;
+}
+.focus-timer-banner.active {
+  display: flex;
+}
+.timer-digits {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #38BDF8;
+}
+
+/* Prototype Feature Switcher Toast */
+.demo-controller-floating {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--shadow-lg);
+  z-index: 40;
+}
+.demo-pill {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+</style>
+</head>
+<body>
+
+<div id="app-shell">
+  <!-- ==================== TOPBAR ==================== -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="logo-badge" title="周计划 WeeklyTodo">
+        <i data-lucide="check-check" style="width: 18px; height: 18px;"></i>
+      </div>
+      <div class="app-title-group">
+        <span class="app-title">周计划</span>
+        <span class="app-version-pill">v2.0 概念原型</span>
+      </div>
+      <button class="btn-icon" id="toggle-sidebar-btn" title="折叠/展开左侧周栏">
+        <i data-lucide="panel-left" style="width: 16px; height: 16px;"></i>
+      </button>
+    </div>
+
+    <div class="topbar-center">
+      <!-- Quick Week Stepper -->
+      <div class="week-stepper">
+        <button class="stepper-btn" id="btn-prev-week" title="上一周 (Alt+[)">
+          <i data-lucide="chevron-left" style="width: 15px; height: 15px;"></i>
+        </button>
+        <div class="stepper-label">
+          <i data-lucide="calendar" style="width: 13px; height: 13px; color: var(--brand);"></i>
+          <span id="top-week-label">20260831-20260906</span>
+          <span class="stepper-today-badge">本周</span>
+        </div>
+        <button class="stepper-btn" id="btn-next-week" title="下一周 (Alt+])">
+          <i data-lucide="chevron-right" style="width: 15px; height: 15px;"></i>
+        </button>
+      </div>
+
+      <!-- Global Search / Command Bar Trigger -->
+      <div class="global-search-trigger" id="search-trigger-btn" title="快捷搜索全部历史与任务 (Ctrl+K)">
+        <i data-lucide="search" style="width: 14px; height: 14px;"></i>
+        <span>搜索任务或按周筛选...</span>
+        <span class="search-kbd">Ctrl K</span>
+      </div>
+    </div>
+
+    <div class="topbar-right">
+      <!-- View Switcher -->
+      <div class="view-tabs">
+        <button class="view-tab-btn active" data-view="tree">
+          <i data-lucide="git-fork" style="width: 13px; height: 13px;"></i>
+          任务树
+        </button>
+        <button class="view-tab-btn" data-view="kanban">
+          <i data-lucide="kanban" style="width: 13px; height: 13px;"></i>
+          看板
+        </button>
+      </div>
+
+      <!-- Theme Switcher -->
+      <button class="btn-icon" id="theme-toggle-btn" title="切换主题风格 (浅色/深色/森林)">
+        <i data-lucide="sun-moon" style="width: 16px; height: 16px;"></i>
+      </button>
+
+      <!-- Stats Modal Trigger -->
+      <button class="btn-icon" id="stats-btn" title="周复盘与统计分析">
+        <i data-lucide="bar-chart-2" style="width: 16px; height: 16px;"></i>
+      </button>
+
+      <!-- Settings -->
+      <button class="btn-icon" id="settings-btn" title="偏好设置 & WebDAV 同步">
+        <i data-lucide="settings" style="width: 16px; height: 16px;"></i>
+      </button>
+
+      <button class="btn-icon" id="toggle-panel-btn" title="折叠/展开右侧行动栏">
+        <i data-lucide="panel-right" style="width: 16px; height: 16px;"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- ==================== LEFT SIDEBAR ==================== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-title">周周期列表</span>
+      <span style="font-size: 11px; color: var(--text-faint);">最近 4 周</span>
+    </div>
+
+    <div class="sidebar-weeks-list">
+      <!-- Week 1 (Active) -->
+      <div class="week-nav-card active">
+        <div class="week-nav-top">
+          <span class="week-nav-id">20260831-20260906</span>
+          <span class="week-nav-badge badge-current">本周</span>
+        </div>
+        <span class="week-nav-range">08/31 ~ 09/06 · 进行中</span>
+        <div class="week-nav-meter">
+          <div class="nav-progress-bar">
+            <div class="nav-progress-fill" style="width: 64%;"></div>
+          </div>
+          <span class="nav-progress-text">64%</span>
+        </div>
+      </div>
+
+      <!-- Week 2 -->
+      <div class="week-nav-card">
+        <div class="week-nav-top">
+          <span class="week-nav-id">20260824-20260830</span>
+          <span class="week-nav-badge badge-done">已归档</span>
+        </div>
+        <span class="week-nav-range">08/24 ~ 08/30 · 历史周</span>
+        <div class="week-nav-meter">
+          <div class="nav-progress-bar">
+            <div class="nav-progress-fill" style="width: 100%;"></div>
+          </div>
+          <span class="nav-progress-text">100%</span>
+        </div>
+      </div>
+
+      <!-- Week 3 -->
+      <div class="week-nav-card">
+        <div class="week-nav-top">
+          <span class="week-nav-id">20260817-20260823</span>
+          <span class="week-nav-badge badge-done">已归档</span>
+        </div>
+        <span class="week-nav-range">08/17 ~ 08/23 · 历史周</span>
+        <div class="week-nav-meter">
+          <div class="nav-progress-bar">
+            <div class="nav-progress-fill" style="width: 88%;"></div>
+          </div>
+          <span class="nav-progress-text">88%</span>
+        </div>
+      </div>
+
+      <!-- Week 4 -->
+      <div class="week-nav-card">
+        <div class="week-nav-top">
+          <span class="week-nav-id">20260810-20260816</span>
+          <span class="week-nav-badge badge-done">已归档</span>
+        </div>
+        <span class="week-nav-range">08/10 ~ 08/16 · 历史周</span>
+        <div class="week-nav-meter">
+          <div class="nav-progress-bar">
+            <div class="nav-progress-fill" style="width: 92%;"></div>
+          </div>
+          <span class="nav-progress-text">92%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="btn-create-week" id="btn-create-week-modal">
+        <i data-lucide="plus" style="width: 15px; height: 15px;"></i>
+        新建自定义周
+      </button>
+    </div>
+  </aside>
+
+  <!-- ==================== MAIN WORKSPACE ==================== -->
+  <main class="main-workspace">
+    <!-- Active Focus Timer Banner (Optional) -->
+    <div class="focus-timer-banner" id="focus-banner">
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <i data-lucide="zap" style="color: #38BDF8; width: 22px; height: 22px;"></i>
+        <div>
+          <div style="font-size: 11px; color: #94A3B8; text-transform: uppercase; font-weight: 700;">当前专注行动</div>
+          <div style="font-size: 14px; font-weight: 600;" id="focus-task-title">前端组件重构与无障碍适配</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <span class="timer-digits" id="timer-display">24:45</span>
+        <button class="btn-banner-action primary" id="btn-finish-focus">
+          <i data-lucide="check" style="width: 14px; height: 14px;"></i> 完成专注
+        </button>
+        <button class="btn-icon" style="background: rgba(255,255,255,0.1); border: none; color: white;" id="btn-close-focus">
+          <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Week Dashboard Header Banner -->
+    <section class="week-dashboard-banner">
+      <div class="banner-title-area">
+        <div class="banner-headline">
+          <h1 class="banner-week-name">20260831-20260906</h1>
+          <span class="status-chip in-progress">
+            <i data-lucide="clock" style="width: 12px; height: 12px;"></i>
+            本周进行中
+          </span>
+        </div>
+        <div class="banner-submeta">
+          <span class="meta-item">
+            <i data-lucide="calendar" style="width: 13px; height: 13px;"></i>
+            2026年8月31日 - 9月6日
+          </span>
+          <span>·</span>
+          <span class="meta-item" style="color: var(--purple);">
+            <i data-lucide="corner-down-right" style="width: 13px; height: 13px;"></i>
+            自 20260824 自动承接未完成分支
+          </span>
+        </div>
+      </div>
+
+      <div class="banner-right-stats">
+        <div class="stat-metric-group">
+          <span class="stat-metric-value" id="stats-count-text">9 / 14</span>
+          <span class="stat-metric-label">已完成 / 总任务数</span>
+        </div>
+
+        <!-- Radial Progress Indicator -->
+        <div class="progress-dial-wrap">
+          <svg class="progress-dial-svg" width="52" height="52" viewBox="0 0 52 52">
+            <circle cx="26" cy="26" r="22" stroke="var(--border-default)" stroke-width="4" fill="none" />
+            <circle id="progress-circle" cx="26" cy="26" r="22" stroke="var(--success)" stroke-width="4" stroke-linecap="round" fill="none" stroke-dasharray="138.23" stroke-dashoffset="49.7" />
+          </svg>
+          <div class="progress-dial-text" id="progress-percent">64%</div>
+        </div>
+
+        <button class="btn-banner-action" id="btn-share-modal">
+          <i data-lucide="share-2" style="width: 14px; height: 14px;"></i>
+          生成周报分享图
+        </button>
+      </div>
+    </section>
+
+    <!-- Task Tree View Container -->
+    <section class="tree-container-card" id="tree-view-wrapper">
+      <div class="tree-toolbar">
+        <div class="toolbar-left">
+          <span class="tree-view-title">
+            <i data-lucide="network" style="width: 16px; height: 16px; color: var(--brand);"></i>
+            无限层级任务树
+          </span>
+          <span class="tree-quick-tips">
+            <i data-lucide="info" style="width: 12px; height: 12px;"></i>
+            支持直接回车建同级 · Tab 缩进子任务 · 拖拽调整顺序
+          </span>
+        </div>
+
+        <div class="toolbar-right">
+          <div class="filter-toggle-pill" id="filter-incomplete-toggle">
+            <i data-lucide="filter" style="width: 13px; height: 13px;"></i>
+            <span>仅看未完成</span>
+          </div>
+
+          <button class="btn-banner-action primary" id="btn-add-root-task">
+            <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
+            新建主任务
+          </button>
+        </div>
+      </div>
+
+      <!-- Task Tree Nodes List -->
+      <div class="task-tree-viewport" id="tree-viewport">
+        <!-- Root Task 1: 客户端 2.0 架构升级 -->
+        <div class="task-node-row is-root" data-task-id="1">
+          <div class="root-group-indicator" style="background: #3B82F6;"></div>
+          <div class="node-expander"><i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i></div>
+          <div class="custom-checkbox" data-task-id="1"><i data-lucide="check" style="width: 13px; height: 13px;"></i></div>
+          <div class="task-content-block">
+            <span class="task-title-text">周计划桌面端 2.0 架构重构与性能优化</span>
+            <span class="badge-p badge-p0">P0 紧急</span>
+            <span class="tag-pill"><i data-lucide="tag" style="width: 10px; height: 10px;"></i>核心版本</span>
+            <div class="assignee-avatar-chip">
+              <span class="avatar-dot">王</span>
+              <span>王工</span>
+            </div>
+          </div>
+          <div class="node-hover-actions">
+            <button class="action-tool-btn" title="添加子任务" onclick="triggerAddSubtask(1)"><i data-lucide="plus" style="width: 14px; height: 14px;"></i></button>
+            <button class="action-tool-btn" title="编辑详情" onclick="openDetailDrawer(1)"><i data-lucide="sliders-horizontal" style="width: 14px; height: 14px;"></i></button>
+            <button class="action-tool-btn danger" title="删除任务"><i data-lucide="trash-2" style="width: 14px; height: 14px;"></i></button>
+          </div>
+        </div>
+
+        <!-- Child 1.1 -->
+        <div class="task-node-row is-completed" data-task-id="2" data-parent="1">
+          <div class="tree-branch-indent">
+            <div class="branch-segment line-through"></div>
+            <div class="branch-segment line-corner"></div>
+          </div>
+          <div class="custom-checkbox checked" data-task-id="2"><i data-lucide="check" style="width: 13px; height: 13px;"></i></div>
+          <div class="task-content-block">
+            <span class="task-title-text">Tauri 2.0 原生桥接层与 SQLite 升级</span>
+            <span class="badge-p badge-p1">P1 高</span>
+            <span class="carried-pill"><i data-lucide="corner-down-right" style="width: 10px; height: 10px;"></i>带入</span>
+          </div>
+          <div class="node-hover-actions">
+            <button class="action-tool-btn" title="编辑详情" onclick="openDetailDrawer(2)"><i data-lucide="sliders-horizontal" style="width: 14px; height: 14px;"></i></button>
+            <button class="action-tool-btn danger" title="删除任务"><i data-lucide="trash-2" style="width: 14px; height: 14px;"></i></button>
+          </div>
+        </div>
+
+        <!-- Child 1.2 -->
+        <div class="task-node-row" data-task-id="3" data-parent="1">
+          <div class="tree-branch-indent">
+            <div class="branch-segment line-through"></div>
+            <div class="branch-segment line-corner"></div>
+          </div>
+          <div class="custom-checkbox" data-task-id="3"><i data-lucide="check" style="width: 13px; height: 13px;"></i></div>
+          <div class="task-content-block">
+            <span class="task-title-text">UI 现代设计系统构建与深浅主题切换</span>
+            <span class="badge-p badge-p0">P0 紧急</span>
+            <span class="tag-pill"><i data-lucide="sparkles" style="width: 10px; height: 10px;"></i>UI重构</span>
+            <div class="assignee-avatar-chip">
+              <span class="avatar-dot" style="background:#10B981;">李</span>
+              <span>李设计</span>
+            </div>
+          </div>
+          <div class="node-hover-actions">
+            <button class="action-tool-btn" title="添加子任务" onclick="triggerAddSubtask(3)"><i data-lucide="plus" style="width: 14px; height: 14px;"></i></button>
+            <button class="action-tool-btn" title="编辑详情" onclick="openDetailDrawer(3)"><i data-lucide="sliders-horizontal" style="width: 14px; height: 14px;"></i></button>
+            <button class="action-tool-btn danger" title="删除任务"><i data-lucide="trash-2" style="width: 14px; height: 14px;"></i></button>
+          </div>
+        </div>
+
+        <!-- Sub-child 1.2.1 -->
+        <div class="task-node-row" data-task-id="4" data-parent="3">
+          <div class="tree-branch-indent">
+            <div class="branch-segment line-through"></div>
+            <div class="branch-segment line-through"></div>
+            <div class="branch-segment line-corner"></div>
+          </div>
+          <div class="custom-checkbox" data-task-id="4"><i data-lucide="check" style="width: 13px; height: 13px;"></i></div>
+          <div class="task-content-block">
+            <span class="task-title-text">设计全新的任务树连接导轨与层级高亮线</span>
+            <span class="badge-p badge-p2">P2 普通</span>
+          </div>
+          <div class="node-hover-actions">
+            <button class="action-tool-btn" title="编辑详情" onclick="openDetailDrawer(4)"><i data-lucide="sliders-horizontal" style="width: 14px; height: 14px;"></i></button>
+            <button class="action-tool-btn danger" title="删除任务"><i data-lucide="trash-2" style="width: 14px; height: 14px;"></i></button>
+          </div>
+        </div>
+
+        <!-- Sub-child 1.2.2 -->
+        <div class="task-node-row" data-task-id="5" data-parent="3">
+          <div class="tree-branch-indent">
+            <div class="branch-segment line-through"></div>
+            <div class="branch-segment line-through"></div>
+            <div class="branch-segment line-corner"></div>
+          </div>
+          <div class="custom-checkbox" data-task-id="5"><i data-lucide="check" style="width: 13px; height: 13px;"></i></div>
+          <div class="task-content-block">
+            <span class="task-title-text">右侧行动面板加入沉浸式专注倒计时 (Focus Mode)</span>
+            <span class="badge-p badge-p1">P1 高</span>
+          </div>
+          <div class="node-hover-actions">
+            <button class="action-tool-btn" title="编辑详情" onclick="openDetailDrawer(5)"><i data-lucide="sliders-horizontal" style="width: 14px; height: 14px;"></i></button>
+            <button class="action-tool-btn danger" title="删除任务"><i data-lucide="trash-2" style="width: 14px; height: 14px;"></i></button>
+          </div>
+        </div>
+
+        <!-- Root Task 2: WebDAV 与数据同步可靠性 -->
+        <div class="task-node-row is-root" data-task-id="6" style="margin-top: 10px;">
+          <div class="root-group-indicator" style="background: #10B981;"></div>
+          <div class="node-expander"><i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i></div>
+          <div class="custom-checkbox checked" data-task-id="6"><i data-lucide="check" style="width: 13px; height: 13px;"></i></div>
+          <div class="task-content-block">
+            <span class="task-title-text">WebDAV 多设备数据同步与增量快照策略</span>
+            <span class="badge-p badge-p1">P1 高</span>
+            <span class="tag-pill"><i data-lucide="cloud" style="width: 10px; height: 10px;"></i>同步存储</span>
+          </div>
+          <div class="node-hover-actions">
+            <button class="action-tool-btn" title="添加子任务" onclick="triggerAddSubtask(6)"><i data-lucide="plus" style="width: 14px; height: 14px;"></i></button>
+            <button class="action-tool-btn" title="编辑详情" onclick="openDetailDrawer(6)"><i data-lucide="sliders-horizontal" style="width: 14px; height: 14px;"></i></button>
+          </div>
+        </div>
+
+        <!-- Child 2.1 -->
+        <div class="task-node-row is-completed" data-task-id="7" data-parent="6">
+          <div class="tree-branch-indent">
+            <div class="branch-segment line-corner"></div>
+          </div>
+          <div class="custom-checkbox checked" data-task-id="7"><i data-lucide="check" style="width: 13px; height: 13px;"></i></div>
+          <div class="task-content-block">
+            <span class="task-title-text">本地 SQLite 数据库与远端 baseline 时间戳冲突判定算法</span>
+            <span class="badge-p badge-p1">P1 高</span>
+          </div>
+          <div class="node-hover-actions">
+            <button class="action-tool-btn" title="编辑详情" onclick="openDetailDrawer(7)"><i data-lucide="sliders-horizontal" style="width: 14px; height: 14px;"></i></button>
+          </div>
+        </div>
+
+        <!-- Root Task 3: 用户交互与周复盘模块 -->
+        <div class="task-node-row is-root" data-task-id="8" style="margin-top: 10px;">
+          <div class="root-group-indicator" style="background: #F59E0B;"></div>
+          <div class="node-expander"><i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i></div>
+          <div class="custom-checkbox" data-task-id="8"><i data-lucide="check" style="width: 13px; height: 13px;"></i></div>
+          <div class="task-content-block">
+            <span class="task-title-text">周报统计复盘与精美卡片分享功能</span>
+            <span class="badge-p badge-p2">P2 普通</span>
+            <span class="tag-pill"><i data-lucide="image" style="width: 10px; height: 10px;"></i>分享导出</span>
+          </div>
+          <div class="node-hover-actions">
+            <button class="action-tool-btn" title="添加子任务" onclick="triggerAddSubtask(8)"><i data-lucide="plus" style="width: 14px; height: 14px;"></i></button>
+            <button class="action-tool-btn" title="编辑详情" onclick="openDetailDrawer(8)"><i data-lucide="sliders-horizontal" style="width: 14px; height: 14px;"></i></button>
+          </div>
+        </div>
+
+        <!-- Child 3.1 -->
+        <div class="task-node-row" data-task-id="9" data-parent="8">
+          <div class="tree-branch-indent">
+            <div class="branch-segment line-corner"></div>
+          </div>
+          <div class="custom-checkbox" data-task-id="9"><i data-lucide="check" style="width: 13px; height: 13px;"></i></div>
+          <div class="task-content-block">
+            <span class="task-title-text">支持 html-to-image 自动生成深色/浅色高分辨率长图</span>
+            <span class="badge-p badge-p2">P2 普通</span>
+          </div>
+          <div class="node-hover-actions">
+            <button class="action-tool-btn" title="编辑详情" onclick="openDetailDrawer(9)"><i data-lucide="sliders-horizontal" style="width: 14px; height: 14px;"></i></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Alternative Kanban View (Hidden by Default) -->
+    <div class="kanban-board-container" id="kanban-view-wrapper">
+      <!-- Col 1: 待执行 -->
+      <div class="kanban-col">
+        <div class="kanban-col-head">
+          <span class="kanban-col-title" style="color: var(--text-main);">待处理 (To Do)</span>
+          <span class="action-count-pill">3</span>
+        </div>
+        <div class="kanban-cards-area">
+          <div class="action-leaf-card" onclick="openDetailDrawer(4)">
+            <div class="action-card-header">
+              <span class="badge-p badge-p2">P2</span>
+              <span class="action-card-title">设计全新的任务树连接导轨与层级高亮线</span>
+            </div>
+            <div class="action-card-path">架构重构 > UI设计系统</div>
+          </div>
+          <div class="action-leaf-card" onclick="openDetailDrawer(9)">
+            <div class="action-card-header">
+              <span class="badge-p badge-p2">P2</span>
+              <span class="action-card-title">支持 html-to-image 生成深色高分辨率长图</span>
+            </div>
+            <div class="action-card-path">周报统计复盘</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Col 2: 进行中 (In Progress) -->
+      <div class="kanban-col">
+        <div class="kanban-col-head">
+          <span class="kanban-col-title" style="color: var(--brand);">进行中 (In Progress)</span>
+          <span class="action-count-pill">2</span>
+        </div>
+        <div class="kanban-cards-area">
+          <div class="action-leaf-card active-focus" onclick="openDetailDrawer(3)">
+            <div class="action-card-header">
+              <span class="badge-p badge-p0">P0</span>
+              <span class="action-card-title">UI 现代设计系统构建与深浅主题切换</span>
+            </div>
+            <div class="action-card-path">架构重构</div>
+          </div>
+          <div class="action-leaf-card" onclick="openDetailDrawer(5)">
+            <div class="action-card-header">
+              <span class="badge-p badge-p1">P1</span>
+              <span class="action-card-title">右侧行动面板加入沉浸式专注倒计时</span>
+            </div>
+            <div class="action-card-path">架构重构 > UI设计系统</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Col 3: 需跟进 (Following) -->
+      <div class="kanban-col">
+        <div class="kanban-col-head">
+          <span class="kanban-col-title" style="color: var(--purple);">跟进协作 (Following)</span>
+          <span class="action-count-pill">1</span>
+        </div>
+        <div class="kanban-cards-area">
+          <div class="action-leaf-card">
+            <div class="action-card-header">
+              <span class="badge-p badge-p1">P1</span>
+              <span class="action-card-title">跨端同步 SQLite Baseline 测试用例覆盖</span>
+            </div>
+            <div class="action-card-path">WebDAV 多设备同步</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Col 4: 已完成 (Done) -->
+      <div class="kanban-col">
+        <div class="kanban-col-head">
+          <span class="kanban-col-title" style="color: var(--success);">已完成 (Closed)</span>
+          <span class="action-count-pill" style="background: var(--success-light); color: var(--success); border-color: var(--success-border);">2</span>
+        </div>
+        <div class="kanban-cards-area">
+          <div class="action-leaf-card" style="opacity: 0.75;">
+            <div class="action-card-header">
+              <span class="badge-p badge-p1">P1</span>
+              <span class="action-card-title" style="text-decoration: line-through;">Tauri 2.0 原生桥接层与 SQLite 升级</span>
+            </div>
+            <div class="action-card-path">架构重构</div>
+          </div>
+          <div class="action-leaf-card" style="opacity: 0.75;">
+            <div class="action-card-header">
+              <span class="badge-p badge-p1">P1</span>
+              <span class="action-card-title" style="text-decoration: line-through;">SQLite baseline 时间戳冲突判定算法</span>
+            </div>
+            <div class="action-card-path">WebDAV 多设备同步</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ==================== RIGHT PANEL: CURRENT ACTIONS ==================== -->
+  <aside class="right-panel" id="actions-panel">
+    <div class="panel-head">
+      <div class="panel-title-group">
+        <i data-lucide="zap" style="width: 16px; height: 16px; color: var(--brand);"></i>
+        <span class="panel-title-text">当前可执行行动</span>
+        <span class="action-count-pill" id="active-leaf-count">4</span>
+      </div>
+      <button class="btn-icon" style="width: 26px; height: 26px; border: none;" title="按优先级/分组排列">
+        <i data-lucide="arrow-down-up" style="width: 14px; height: 14px;"></i>
+      </button>
+    </div>
+
+    <!-- Category Group Filter Chips -->
+    <div class="group-filter-scroll">
+      <div class="group-filter-chip active" data-group="all">全部行动</div>
+      <div class="group-filter-chip" data-group="arch">
+        <span class="chip-dot" style="background: #3B82F6;"></span>
+        架构重构 (3)
+      </div>
+      <div class="group-filter-chip" data-group="sync">
+        <span class="chip-dot" style="background: #10B981;"></span>
+        数据同步 (0)
+      </div>
+      <div class="group-filter-chip" data-group="review">
+        <span class="chip-dot" style="background: #F59E0B;"></span>
+        复盘分享 (1)
+      </div>
+    </div>
+
+    <!-- Actions List -->
+    <div class="action-card-list">
+      <!-- Leaf 1 -->
+      <div class="action-leaf-card" data-leaf-id="4">
+        <div class="action-card-header">
+          <div class="custom-checkbox" data-task-id="4"><i data-lucide="check" style="width: 13px; height: 13px;"></i></div>
+          <span class="action-card-title">设计全新的任务树连接导轨与层级高亮线</span>
+        </div>
+        <div class="action-card-path">
+          <span class="chip-dot" style="background: #3B82F6;"></span>
+          <span>周计划 2.0 架构 > UI 现代设计系统</span>
+        </div>
+        <div class="action-card-footer">
+          <span class="badge-p badge-p2">P2 普通</span>
+          <button class="btn-focus-now" onclick="startFocusSession('设计全新的任务树连接导轨与层级高亮线')">
+            <i data-lucide="play" style="width: 10px; height: 10px;"></i> 专注
+          </button>
+        </div>
+      </div>
+
+      <!-- Leaf 2 -->
+      <div class="action-leaf-card" data-leaf-id="5">
+        <div class="action-card-header">
+          <div class="custom-checkbox" data-task-id="5"><i data-lucide="check" style="width: 13px; height: 13px;"></i></div>
+          <span class="action-card-title">右侧行动面板加入沉浸式专注倒计时 (Focus Mode)</span>
+        </div>
+        <div class="action-card-path">
+          <span class="chip-dot" style="background: #3B82F6;"></span>
+          <span>周计划 2.0 架构 > UI 现代设计系统</span>
+        </div>
+        <div class="action-card-footer">
+          <span class="badge-p badge-p1">P1 高</span>
+          <button class="btn-focus-now" onclick="startFocusSession('右侧行动面板加入沉浸式专注倒计时')">
+            <i data-lucide="play" style="width: 10px; height: 10px;"></i> 专注
+          </button>
+        </div>
+      </div>
+
+      <!-- Leaf 3 -->
+      <div class="action-leaf-card" data-leaf-id="9">
+        <div class="action-card-header">
+          <div class="custom-checkbox" data-task-id="9"><i data-lucide="check" style="width: 13px; height: 13px;"></i></div>
+          <span class="action-card-title">支持 html-to-image 自动生成深色/浅色高分辨率长图</span>
+        </div>
+        <div class="action-card-path">
+          <span class="chip-dot" style="background: #F59E0B;"></span>
+          <span>周报统计复盘与精美卡片分享</span>
+        </div>
+        <div class="action-card-footer">
+          <span class="badge-p badge-p2">P2 普通</span>
+          <button class="btn-focus-now" onclick="startFocusSession('支持 html-to-image 自动生成长图')">
+            <i data-lucide="play" style="width: 10px; height: 10px;"></i> 专注
+          </button>
+        </div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- ==================== TASK DETAIL DRAWER ==================== -->
+<div class="drawer-backdrop" id="detail-backdrop" onclick="closeDetailDrawer()"></div>
+<div class="task-detail-drawer" id="task-detail-drawer">
+  <div class="drawer-head">
+    <div class="drawer-head-title">
+      <i data-lucide="file-edit" style="width: 16px; height: 16px; color: var(--brand);"></i>
+      <span>任务详情与属性配置</span>
+    </div>
+    <button class="btn-icon" onclick="closeDetailDrawer()">
+      <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+    </button>
+  </div>
+
+  <div class="drawer-body">
+    <div class="form-group">
+      <label class="form-label">任务名称</label>
+      <input type="text" class="form-input" id="drawer-title-input" value="UI 现代设计系统构建与深浅主题切换" />
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">优先级</label>
+      <div class="priority-selector-grid">
+        <div class="priority-choice-btn selected" style="color: var(--p0-color); background: var(--p0-bg); border-color: var(--p0-border);">P0 紧急</div>
+        <div class="priority-choice-btn">P1 高</div>
+        <div class="priority-choice-btn">P2 普通</div>
+        <div class="priority-choice-btn">P3 低</div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">执行模式与归属</label>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        <select class="form-select">
+          <option value="self">自己执行 (Self)</option>
+          <option value="follow">跟进督办 (Follow)</option>
+        </select>
+        <select class="form-select">
+          <option value="wang">负责人: 王工</option>
+          <option value="li" selected>负责人: 李设计</option>
+          <option value="zhang">负责人: 张架构</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">标签 (Tags)</label>
+      <input type="text" class="form-input" value="UI重构, 核心版本, v2.0" placeholder="多个标签以逗号隔开" />
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">上级归属节点</label>
+      <select class="form-select">
+        <option value="1">周计划桌面端 2.0 架构重构与性能优化</option>
+        <option value="root">（设为顶层主任务）</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">详细描述与备忘 (Markdown)</label>
+      <textarea class="form-textarea" rows="6" placeholder="输入任务的详细验收标准或跟进记录...">
+- [x] 确定新版色彩系统 (Light / Dark / Forest)
+- [ ] 优化无限层级树状导轨连接线算法
+- [ ] 增加右侧当前行动番茄专注模式
+- [ ] 导出周报图卡片模板视觉升级
+      </textarea>
+    </div>
+  </div>
+
+  <div class="drawer-footer">
+    <button class="btn-banner-action" style="color: var(--danger);" onclick="deleteCurrentDrawerTask()">
+      <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> 删除
+    </button>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn-banner-action" onclick="closeDetailDrawer()">取消</button>
+      <button class="btn-banner-action primary" onclick="saveDetailDrawer()">
+        <i data-lucide="check" style="width: 14px; height: 14px;"></i> 保存修改
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== COMMAND PALETTE MODAL ==================== -->
+<div class="modal-overlay" id="command-modal-overlay" onclick="closeCommandPalette(event)">
+  <div class="command-modal" onclick="event.stopPropagation()">
+    <div class="cmd-input-wrap">
+      <i data-lucide="search" style="width: 18px; height: 18px; color: var(--brand);"></i>
+      <input type="text" class="cmd-search-input" id="cmd-input" placeholder="输入任务名、周日期或命令 (如: 新建、统计、导出)..." autofocus />
+      <span class="search-kbd">ESC 退出</span>
+    </div>
+
+    <div class="cmd-results-list">
+      <div class="cmd-item active" onclick="alert('跳转到任务: UI 现代设计系统构建'); closeCommandPalette();">
+        <i data-lucide="git-commit" style="width: 16px; height: 16px; color: var(--brand);"></i>
+        <span class="cmd-item-title">UI 现代设计系统构建与深浅主题切换</span>
+        <span class="badge-p badge-p0">本周 P0</span>
+      </div>
+
+      <div class="cmd-item" onclick="alert('跳转到任务: SQLite 升级'); closeCommandPalette();">
+        <i data-lucide="git-commit" style="width: 16px; height: 16px; color: var(--success);"></i>
+        <span class="cmd-item-title">Tauri 2.0 原生桥接层与 SQLite 升级</span>
+        <span class="badge-p badge-p1">已完成</span>
+      </div>
+
+      <div class="cmd-item" onclick="document.getElementById('stats-btn').click(); closeCommandPalette();">
+        <i data-lucide="bar-chart-2" style="width: 16px; height: 16px; color: var(--warning);"></i>
+        <span class="cmd-item-title">打开全周期统计复盘面板</span>
+        <span style="font-size: 11px; color: var(--text-faint);">快捷指令</span>
+      </div>
+
+      <div class="cmd-item" onclick="document.getElementById('theme-toggle-btn').click(); closeCommandPalette();">
+        <i data-lucide="sun-moon" style="width: 16px; height: 16px; color: var(--purple);"></i>
+        <span class="cmd-item-title">快速切换主题风格 (Light / Dark / Forest)</span>
+        <span style="font-size: 11px; color: var(--text-faint);">系统外观</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== PROTOTYPE CONTROLLER BAR ==================== -->
+<div class="demo-controller-floating">
+  <span class="demo-pill">✨ 原型交互演示控制台:</span>
+  <button class="btn-banner-action" onclick="cycleTheme()" title="切换演示主题">
+    <i data-lucide="palette" style="width: 13px; height: 13px;"></i> 主题: <span id="current-theme-name">Light</span>
+  </button>
+  <button class="btn-banner-action" onclick="triggerBatchCelebration()" title="测试完成打勾庆祝动画">
+    <i data-lucide="sparkles" style="width: 13px; height: 13px; color: var(--warning);"></i> 庆祝动效
+  </button>
+</div>
+
+<!-- =========================================================
+   INTERACTION LOGIC & JAVASCRIPT
+   ========================================================= -->
+<script>
+// Initialize Lucide Icons
+lucide.createIcons();
+
+// State management
+let currentThemeIndex = 0;
+const themes = ['light', 'dark', 'forest'];
+const themeNames = ['极简浅色 (Light)', '曜石深色 (Dark)', '自然森林 (Forest)'];
+
+// Theme Toggle
+function cycleTheme() {
+  currentThemeIndex = (currentThemeIndex + 1) % themes.length;
+  const theme = themes[currentThemeIndex];
+  if (theme === 'light') {
+    document.documentElement.removeAttribute('data-theme');
+  } else {
+    document.documentElement.setAttribute('data-theme', theme);
+  }
+  document.getElementById('current-theme-name').innerText = themeNames[currentThemeIndex];
+}
+document.getElementById('theme-toggle-btn').addEventListener('click', cycleTheme);
+
+// Sidebar Collapse
+const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn');
+const appShell = document.getElementById('app-shell');
+toggleSidebarBtn.addEventListener('click', () => {
+  appShell.classList.toggle('sidebar-collapsed');
+});
+
+// Panel Collapse
+const togglePanelBtn = document.getElementById('toggle-panel-btn');
+togglePanelBtn.addEventListener('click', () => {
+  appShell.classList.toggle('panel-collapsed');
+});
+
+// View Switcher (Tree vs Kanban)
+const viewTabButtons = document.querySelectorAll('.view-tab-btn');
+const treeViewWrapper = document.getElementById('tree-view-wrapper');
+const kanbanViewWrapper = document.getElementById('kanban-view-wrapper');
+
+viewTabButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    viewTabButtons.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const mode = btn.getAttribute('data-view');
+    if (mode === 'kanban') {
+      treeViewWrapper.style.display = 'none';
+      kanbanViewWrapper.style.display = 'grid';
+    } else {
+      treeViewWrapper.style.display = 'flex';
+      kanbanViewWrapper.style.display = 'none';
+    }
+  });
+});
+
+// Checkbox Interaction & Celebration
+document.querySelectorAll('.custom-checkbox').forEach(box => {
+  box.addEventListener('click', (e) => {
+    e.stopPropagation();
+    box.classList.toggle('checked');
+    const row = box.closest('.task-node-row') || box.closest('.action-leaf-card');
+    if (row) {
+      if (box.classList.contains('checked')) {
+        row.classList.add('is-completed');
+        // Confetti micro-interaction
+        const rect = box.getBoundingClientRect();
+        confetti({
+          particleCount: 28,
+          spread: 45,
+          origin: {
+            x: (rect.left + rect.width / 2) / window.innerWidth,
+            y: (rect.top + rect.height / 2) / window.innerHeight
+          },
+          colors: ['#10B981', '#3B82F6', '#F59E0B']
+        });
+      } else {
+        row.classList.remove('is-completed');
+      }
+    }
+    updateProgressStats();
+  });
+});
+
+function updateProgressStats() {
+  const total = document.querySelectorAll('.task-tree-viewport .custom-checkbox').length;
+  const checked = document.querySelectorAll('.task-tree-viewport .custom-checkbox.checked').length;
+  const percent = total > 0 ? Math.round((checked / total) * 100) : 0;
+  
+  document.getElementById('stats-count-text').innerText = `${checked} / ${total}`;
+  document.getElementById('progress-percent').innerText = `${percent}%`;
+  
+  // 2 * PI * r = 2 * 3.14159 * 22 = 138.23
+  const dashoffset = 138.23 * (1 - percent / 100);
+  document.getElementById('progress-circle').style.strokeDashoffset = dashoffset;
+}
+
+function triggerBatchCelebration() {
+  confetti({
+    particleCount: 80,
+    spread: 70,
+    origin: { y: 0.6 }
+  });
+}
+
+// Expand / Collapse Subtree
+document.querySelectorAll('.node-expander').forEach(expander => {
+  expander.addEventListener('click', (e) => {
+    e.stopPropagation();
+    expander.classList.toggle('collapsed');
+    const parentRow = expander.closest('.task-node-row');
+    const parentId = parentRow.getAttribute('data-task-id');
+    const children = document.querySelectorAll(`.task-node-row[data-parent="${parentId}"]`);
+    children.forEach(child => {
+      child.style.display = expander.classList.contains('collapsed') ? 'none' : 'flex';
+    });
+  });
+});
+
+// Task Detail Drawer
+const detailBackdrop = document.getElementById('detail-backdrop');
+const detailDrawer = document.getElementById('task-detail-drawer');
+
+function openDetailDrawer(taskId) {
+  detailBackdrop.classList.add('open');
+  detailDrawer.classList.add('open');
+}
+function closeDetailDrawer() {
+  detailBackdrop.classList.remove('open');
+  detailDrawer.classList.remove('open');
+}
+function saveDetailDrawer() {
+  closeDetailDrawer();
+  confetti({ particleCount: 20, spread: 30, origin: { x: 0.85, y: 0.5 } });
+}
+function deleteCurrentDrawerTask() {
+  if (confirm('确定要删除此任务及所有子任务吗？')) {
+    closeDetailDrawer();
+  }
+}
+
+// Command Palette (Ctrl+K)
+const cmdOverlay = document.getElementById('command-modal-overlay');
+const searchTrigger = document.getElementById('search-trigger-btn');
+
+function openCommandPalette() {
+  cmdOverlay.classList.add('open');
+  setTimeout(() => document.getElementById('cmd-input').focus(), 50);
+}
+function closeCommandPalette(e) {
+  cmdOverlay.classList.remove('open');
+}
+
+searchTrigger.addEventListener('click', openCommandPalette);
+
+window.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    openCommandPalette();
+  }
+  if (e.key === 'Escape') {
+    closeCommandPalette();
+    closeDetailDrawer();
+  }
+});
+
+// Focus Timer Mock
+let timerInterval = null;
+let secondsRemaining = 25 * 60;
+
+function startFocusSession(taskTitle) {
+  document.getElementById('focus-task-title').innerText = taskTitle;
+  document.getElementById('focus-banner').classList.add('active');
+  secondsRemaining = 25 * 60;
+  
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    if (secondsRemaining > 0) {
+      secondsRemaining--;
+      const mins = String(Math.floor(secondsRemaining / 60)).padStart(2, '0');
+      const secs = String(secondsRemaining % 60).padStart(2, '0');
+      document.getElementById('timer-display').innerText = `${mins}:${secs}`;
+    }
+  }, 1000);
+}
+
+document.getElementById('btn-close-focus').addEventListener('click', () => {
+  document.getElementById('focus-banner').classList.remove('active');
+  if (timerInterval) clearInterval(timerInterval);
+});
+
+document.getElementById('btn-finish-focus').addEventListener('click', () => {
+  document.getElementById('focus-banner').classList.remove('active');
+  if (timerInterval) clearInterval(timerInterval);
+  confetti({ particleCount: 50, spread: 60 });
+});
+
+// Inline Add Subtask Mock
+function triggerAddSubtask(parentId) {
+  const parentRow = document.querySelector(`.task-node-row[data-task-id="${parentId}"]`);
+  if (!parentRow) return;
+  
+  const existingBox = document.getElementById('inline-create-box');
+  if (existingBox) existingBox.remove();
+  
+  const inputRow = document.createElement('div');
+  inputRow.id = 'inline-create-box';
+  inputRow.className = 'inline-create-box';
+  inputRow.style.marginLeft = '44px';
+  inputRow.innerHTML = `
+    <i data-lucide="plus-circle" style="width: 16px; height: 16px; color: var(--brand);"></i>
+    <input type="text" class="inline-input-field" placeholder="输入新子任务标题，按 Enter 确认，ESC 取消..." autofocus />
+  `;
+  
+  parentRow.after(inputRow);
+  lucide.createIcons();
+  
+  const input = inputRow.querySelector('input');
+  input.focus();
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && input.value.trim()) {
+      alert(`已新建子任务: "${input.value.trim()}" (归属于任务 #${parentId})`);
+      inputRow.remove();
+    } else if (e.key === 'Escape') {
+      inputRow.remove();
+    }
+  });
+}
+
+// Add Root Task
+document.getElementById('btn-add-root-task').addEventListener('click', () => {
+  const title = prompt('请输入顶层主任务名称:');
+  if (title && title.trim()) {
+    alert(`已创建顶层主任务: "${title.trim()}"`);
+  }
+});
+
+// Share Modal Trigger Mock
+document.getElementById('btn-share-modal').addEventListener('click', () => {
+  alert('🎨 正在拉起精美周报分享海报生成器 (支持切换 3 款精美主题长图与一键复制到剪贴板)...');
+});
+
+// Filter Incomplete
+const filterToggle = document.getElementById('filter-incomplete-toggle');
+filterToggle.addEventListener('click', () => {
+  filterToggle.classList.toggle('active');
+  const isOnlyIncomplete = filterToggle.classList.contains('active');
+  document.querySelectorAll('.task-tree-viewport .task-node-row').forEach(row => {
+    if (row.classList.contains('is-completed')) {
+      row.style.display = isOnlyIncomplete ? 'none' : 'flex';
+    }
+  });
+});
+</script>
+</body>
+</html>

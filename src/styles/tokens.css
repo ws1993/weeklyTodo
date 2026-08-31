@@ -1,30 +1,161 @@
-:root{
-  --bg:#F2F6FA;
-  --surface:#FFFFFF;
-  --surface-2:#F7F9FC;
-  --text-1:#172033;
-  --text-2:#647086;
-  --text-3:#8B95A7;
-  --text-4:#A8B2C1;
-  --brand:#1557D0;
-  --brand-hover:#0B43AC;
-  --brand-soft:#EAF1FF;
-  --brand-border:#C9DBF7;
-  --success:#167354;
-  --success-soft:#E8F4EF;
-  --success-border:#C9E3D6;
-  --warning:#9B5D00;
-  --warning-soft:#FFF6E0;
-  --warning-border:#F0DFB8;
-  --assigner:#5A4B9E;
-  --assigner-soft:#F0EDF9;
-  --assigner-border:#D6CEEA;
-  --danger:#B42333;
-  --danger-soft:#FDEBEC;
-  --danger-border:#F3C9CD;
-  --border:#E1E7F0;
-  --border-strong:#CDD7E6;
-  --radius:3px;
-  --font:"Segoe UI Variable","Microsoft YaHei UI",-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC","Hiragino Sans GB",sans-serif;
-  --mono:"Cascadia Mono","Cascadia Code",Consolas,"JetBrains Mono",monospace;
+/* =========================================================
+   DESIGN TOKENS & THEMING (CSS CUSTOM PROPERTIES)
+   ========================================================= */
+
+:root {
+  /* Theme: Clean Modern Light (Default) */
+  --bg: #F8FAFC;
+  --bg-sidebar: #FFFFFF;
+  --surface: #FFFFFF;
+  --surface-2: #F1F5F9;
+  --surface-elevated: #FFFFFF;
+  --bg-subtle: #F1F5F9;
+  --bg-hover: #F8FAFC;
+  --bg-active: #EEF2F6;
+
+  --border-subtle: rgba(226, 232, 240, 0.8);
+  --border: #E2E8F0;
+  --border-strong: #CBD5E1;
+  --border-focus: #3B82F6;
+
+  --text-1: #0F172A;
+  --text-2: #475569;
+  --text-3: #64748B;
+  --text-4: #94A3B8;
+
+  /* Brand Accents */
+  --brand: #2563EB;
+  --brand-hover: #1D4ED8;
+  --brand-soft: #EFF6FF;
+  --brand-border: #BFDBFE;
+  --brand-glow: rgba(37, 99, 235, 0.15);
+
+  /* Status Colors */
+  --success: #10B981;
+  --success-soft: #ECFDF5;
+  --success-border: #A7F3D0;
+  --warning: #F59E0B;
+  --warning-soft: #FFFBEB;
+  --warning-border: #FDE68A;
+  --assigner: #6366F1;
+  --assigner-soft: #EEF2FF;
+  --assigner-border: #C7D2FE;
+  --danger: #EF4444;
+  --danger-soft: #FEF2F2;
+  --danger-border: #FECACA;
+  --purple: #8B5CF6;
+  --purple-soft: #F5F3FF;
+  --purple-border: #DDD6FE;
+
+  /* Priority Palette */
+  --p0-color: #EF4444;
+  --p0-bg: #FEF2F2;
+  --p0-border: #FECACA;
+  --p1-color: #F97316;
+  --p1-bg: #FFF7ED;
+  --p1-border: #FFEDD5;
+  --p2-color: #2563EB;
+  --p2-bg: #EFF6FF;
+  --p2-border: #DBEAFE;
+  --p3-color: #64748B;
+  --p3-bg: #F8FAFC;
+  --p3-border: #E2E8F0;
+
+  /* Elevation Shadows */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 2px 4px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 4px 12px -2px rgba(15, 23, 42, 0.07), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 12px 28px -4px rgba(15, 23, 42, 0.1), 0 4px 10px -2px rgba(15, 23, 42, 0.04);
+  --shadow-xl: 0 20px 40px -8px rgba(15, 23, 42, 0.16);
+
+  /* Geometry & Typography */
+  --radius: 6px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 18px;
+  --radius-full: 9999px;
+
+  --font: "Plus Jakarta Sans", "Segoe UI Variable", "Microsoft YaHei UI", -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif;
+  --mono: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+
+  --tree-guide: #E2E8F0;
+  --tree-guide-active: #93C5FD;
+}
+
+/* Theme: Dark Obsidian */
+[data-theme="dark"] {
+  --bg: #0B0F17;
+  --bg-sidebar: #111722;
+  --surface: #141C2B;
+  --surface-2: #192233;
+  --surface-elevated: #1A2438;
+  --bg-subtle: #192233;
+  --bg-hover: #1E293B;
+  --bg-active: #243248;
+
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border: #243044;
+  --border-strong: #334155;
+  --border-focus: #60A5FA;
+
+  --text-1: #F8FAFC;
+  --text-2: #CBD5E1;
+  --text-3: #94A3B8;
+  --text-4: #64748B;
+
+  --brand: #3B82F6;
+  --brand-hover: #60A5FA;
+  --brand-soft: rgba(59, 130, 246, 0.15);
+  --brand-border: rgba(59, 130, 246, 0.35);
+  --brand-glow: rgba(59, 130, 246, 0.3);
+
+  --p0-bg: rgba(239, 68, 68, 0.15);
+  --p0-border: rgba(239, 68, 68, 0.35);
+  --p1-bg: rgba(249, 115, 22, 0.15);
+  --p1-border: rgba(249, 115, 22, 0.35);
+  --p2-bg: rgba(59, 130, 246, 0.15);
+  --p2-border: rgba(59, 130, 246, 0.35);
+  --p3-bg: rgba(148, 163, 184, 0.12);
+  --p3-border: rgba(148, 163, 184, 0.25);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 16px 36px rgba(0, 0, 0, 0.55);
+
+  --tree-guide: #243044;
+  --tree-guide-active: #3B82F6;
+}
+
+/* Theme: Forest Zen */
+[data-theme="forest"] {
+  --bg: #0F1715;
+  --bg-sidebar: #131E1B;
+  --surface: #172421;
+  --surface-2: #1C2B27;
+  --surface-elevated: #1E2E2A;
+  --bg-subtle: #1C2B27;
+  --bg-hover: #223530;
+  --bg-active: #2A403A;
+
+  --border-subtle: rgba(237, 234, 226, 0.07);
+  --border: #253833;
+  --border-strong: #364F48;
+  --border-focus: #10B981;
+
+  --text-1: #F1F5F3;
+  --text-2: #CBD8D3;
+  --text-3: #8EA89F;
+  --text-4: #5C756D;
+
+  --brand: #10B981;
+  --brand-hover: #34D399;
+  --brand-soft: rgba(16, 185, 129, 0.14);
+  --brand-border: rgba(16, 185, 129, 0.3);
+  --brand-glow: rgba(16, 185, 129, 0.25);
+
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.4);
+  --tree-guide: #253833;
+  --tree-guide-active: #10B981;
 }
