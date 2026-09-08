@@ -60,6 +60,17 @@ export async function createWeek(mondayDate: string): Promise<Week> {
   return invokeCommand<Week>('create_week', { mondayDate });
 }
 
+/**
+ * 跨周轮询入口：若本周（周一~周日）尚未创建则创建并带入未完成任务。
+ * 仅当实际新建了周时返回该周，否则返回 null。
+ */
+export async function ensureCurrentWeek(): Promise<Week | null> {
+  if (!isTauriRuntime()) {
+    return null;
+  }
+  return invokeCommand<Week | null>('ensure_current_week');
+}
+
 export async function createTask(input: {
   weekId: string;
   title: string;

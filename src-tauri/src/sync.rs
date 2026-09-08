@@ -183,6 +183,7 @@ pub async fn sync_now_with_password(
 }
 
 /// Core synchronization implementation with an explicit scheduling mode.
+#[allow(clippy::too_many_arguments)]
 pub async fn sync_now_with_mode_and_password(
     data_dir: &str,
     url: &str,

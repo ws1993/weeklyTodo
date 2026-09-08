@@ -64,7 +64,7 @@ export function CreateWeekModal({ open, onClose }: CreateWeekModalProps) {
           <CrossIcon size={14} />
         </button>
         <h2 className="modal-title">种下新的一周</h2>
-        <p className="modal-sub">选择一周中的任意一天，将以周一为起点，种下一棵新的树干。</p>
+        <p className="modal-sub">选择一周中的任意一天，将以周一为起点，种下一棵新的树干；未完成的任务会自动从最近的一周带入。</p>
         <div className="modal-body">
           <div className="field">
             <label htmlFor="createDate">日期（YYYYMMDD）</label>

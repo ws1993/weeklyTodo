@@ -9,6 +9,7 @@ import type {
   Week,
   WeekTreePayload,
 } from '../shared/contracts/types';
+import { currentWeekId as computeCurrentWeekId } from '../utils/weekFormat';
 import * as bridge from '../api/nativeBridge';
 
 /** 防止 React StrictMode 双 effect 或 WebDAV 恢复流程并发触发多次初始化。 */
@@ -65,6 +66,12 @@ interface AppState {
   moveTask: (taskId: number, newParentId: number | null, newIndex: number, weekId?: string) => Promise<void>;
   deleteTask: (taskId: number, weekId?: string) => Promise<void>;
   createWeek: (mondayDate: string) => Promise<Week>;
+  /**
+   * 跨周轮询：应用持续运行过周一 0 点（未重启）时，检测到新的当前周后
+   * 调用后端 ensure_current_week 完成建周 + 带入，并刷新周列表。
+   * 仅当实际新建了周时返回该周。
+   */
+  rolloverToNewWeekIfDue: () => Promise<Week | null>;
   ensureGroupColor: (name: string) => Promise<void>;
   setGroupColor: (name: string, color: string) => Promise<void>;
   resetGroupColor: (name: string) => Promise<void>;
@@ -241,6 +248,23 @@ export const useAppStore = create<AppState>((set, get) => ({
     const week = await bridge.createWeek(mondayDate);
     await get().refreshWeeks();
     return week;
+  },
+
+  rolloverToNewWeekIfDue: async () => {
+    const { currentWeekId, activeWeekId } = get();
+    const todayWeekId = computeCurrentWeekId();
+    if (!currentWeekId || todayWeekId === currentWeekId) {
+      return null;
+    }
+    const created = await bridge.ensureCurrentWeek();
+    set({ currentWeekId: todayWeekId });
+    await get().refreshWeeks();
+    // 用户若正停留在旧的当前周则自动跳到新周；正在回看其它周时不打断。
+    // 新周可能已由手动建周提前创建（created 为 null），同样需要跳转。
+    if (activeWeekId === currentWeekId) {
+      await get().selectWeek(todayWeekId);
+    }
+    return created;
   },
 }));
 

@@ -40,6 +40,7 @@ pub fn run() {
             commands::get_week_tree,
             commands::get_current_week_tree,
             commands::create_week,
+            commands::ensure_current_week,
             commands::create_task,
             commands::update_task,
             commands::list_assigners,

@@ -129,8 +129,8 @@ db.rs（schema 与迁移唯一 owner）→ SQLite（WAL）
 ### 周模型
 
 - 周 id = `YYYYMMDD-YYYYMMDD`（周一至周日），本地时区；`monday_of()` 计算周一。
-- `ensure_current_week`：启动时调用，幂等；缺失则创建并从「最近一个 start_date ≤ 今天的周」带入。
-- 手动建周只接受周一日期，重复周报错。
+- `ensure_current_week`：启动时调用，幂等；缺失则创建并从「最近一个 start_date ≤ 今天的周」带入。另有跨周定时任务：前端 60s 轮询当前周 id，变化时调用 `ensure_current_week` 命令（仅实际新建时返回周），窗口 focus / visibilitychange 补查一次，防止隐藏时定时器被 WebView 节流；用户正停留在旧当前周时自动跳到新周，回看其它周时不打断。
+- 手动建周只接受周一日期，重复周报错；同样从「最近一个 start_date < 本周周一的周」带入未完成任务（与启动建周行为一致），记 `carried_from_week_id`。
 
 ### 带入（carry_over）
 

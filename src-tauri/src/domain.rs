@@ -1474,14 +1474,42 @@ fn carry_over_branch(
     Ok(())
 }
 
+/// The most recent stored week that starts strictly before `monday`.
+fn latest_week_starting_before(
+    conn: &Connection,
+    monday: NaiveDate,
+) -> Result<Option<Week>, String> {
+    // start_date keys are `YYYYMMDD`, so "on or before the previous day" is
+    // equivalent to "strictly before monday".
+    latest_week_starting_on_or_before(conn, monday - Duration::days(1))
+}
+
 /// Create a week manually for a Monday start date. Duplicates are rejected.
-pub fn create_week_for_monday(conn: &Connection, monday: NaiveDate) -> Result<Week, String> {
-    let week = week_from_monday(monday, None);
-    if has_week(conn, &week.id)? {
-        return Err(format!("周已存在：{}", week.id));
+/// Unfinished tasks are carried over from the newest stored week that starts
+/// before this one, mirroring the startup behavior of `ensure_current_week`.
+pub fn create_week_for_monday(conn: &mut Connection, monday: NaiveDate) -> Result<Week, String> {
+    let week_id = week_range_key(monday);
+
+    // IMMEDIATE transaction so the existence check and the week + carry-over
+    // inserts commit atomically, same as `ensure_current_week`.
+    let tx = conn
+        .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+        .map_err(|error| format!("开启建周事务失败：{error}"))?;
+    if has_week(&tx, &week_id)? {
+        return Err(format!("周已存在：{week_id}"));
     }
-    insert_week(conn, &week)?;
-    record_event(conn, &week.id, None, "create", Some("manual"))?;
+    let carried_from = latest_week_starting_before(&tx, monday)?;
+    let week = week_from_monday(
+        monday,
+        carried_from.as_ref().map(|source| source.id.clone()),
+    );
+    insert_week(&tx, &week)?;
+    record_event(&tx, &week.id, None, "create", Some("manual"))?;
+    if let Some(source) = &carried_from {
+        carry_over_week(&tx, &week.id, &source.id)?;
+    }
+    tx.commit()
+        .map_err(|error| format!("提交建周事务失败：{error}"))?;
     Ok(week)
 }
 
@@ -1822,10 +1850,67 @@ mod tests {
 
     #[test]
     fn manual_duplicate_week_rejected() {
-        let conn = db::open_in_memory();
+        let mut conn = db::open_in_memory();
         let monday = NaiveDate::from_ymd_opt(2026, 8, 17).unwrap();
-        create_week_for_monday(&conn, monday).unwrap();
-        assert!(create_week_for_monday(&conn, monday).is_err());
+        create_week_for_monday(&mut conn, monday).unwrap();
+        assert!(create_week_for_monday(&mut conn, monday).is_err());
+    }
+
+    #[test]
+    fn manual_week_creation_carries_over_open_tasks() {
+        let mut conn = db::open_in_memory();
+        seed_week(&conn, "20260727-20260802");
+        let root = create_plain_task(&conn, "20260727-20260802", "项目A", None);
+        create_plain_task(&conn, "20260727-20260802", "子任务1", Some(root.id));
+        let done_root = create_plain_task(&conn, "20260727-20260802", "已完成项目", None);
+        close_task(&mut conn, "20260727-20260802", done_root.id).unwrap();
+
+        // A manually created later week inherits unfinished work from the
+        // newest earlier week, just like the startup path.
+        let monday = NaiveDate::from_ymd_opt(2026, 8, 17).unwrap();
+        let week = create_week_for_monday(&mut conn, monday).unwrap();
+        assert_eq!(
+            week.carried_from_week_id.as_deref(),
+            Some("20260727-20260802")
+        );
+        let carried_tasks = list_tasks(&conn, &week.id).unwrap();
+        let titles: Vec<&str> = carried_tasks
+            .iter()
+            .map(|task| task.title.as_str())
+            .collect();
+        assert_eq!(titles, vec!["项目A", "子任务1"]);
+    }
+
+    #[test]
+    fn manual_week_creation_carries_from_nearest_previous_week() {
+        let mut conn = db::open_in_memory();
+        // Two earlier weeks; the newer one is the carry source.
+        seed_week(&conn, "20260727-20260802");
+        seed_week(&conn, "20260803-20260809");
+        create_plain_task(&conn, "20260727-20260802", "旧周任务", None);
+        create_plain_task(&conn, "20260803-20260809", "近周任务", None);
+
+        let monday = NaiveDate::from_ymd_opt(2026, 8, 17).unwrap();
+        let week = create_week_for_monday(&mut conn, monday).unwrap();
+        assert_eq!(
+            week.carried_from_week_id.as_deref(),
+            Some("20260803-20260809")
+        );
+        let carried_tasks = list_tasks(&conn, &week.id).unwrap();
+        let titles: Vec<&str> = carried_tasks
+            .iter()
+            .map(|task| task.title.as_str())
+            .collect();
+        assert_eq!(titles, vec!["近周任务"]);
+    }
+
+    #[test]
+    fn manual_week_creation_without_previous_week_has_no_carry() {
+        let mut conn = db::open_in_memory();
+        let monday = NaiveDate::from_ymd_opt(2026, 8, 17).unwrap();
+        let week = create_week_for_monday(&mut conn, monday).unwrap();
+        assert_eq!(week.carried_from_week_id, None);
+        assert!(list_tasks(&conn, &week.id).unwrap().is_empty());
     }
 
     #[test]

@@ -1,6 +1,100 @@
-import { describe, expect, it } from 'vitest';
-import type { Task } from '../shared/contracts/types';
-import { activeLeaves, flattenTasks, taskDepth } from './appStore';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Task, Week, WeekTreePayload } from '../shared/contracts/types';
+import { activeLeaves, flattenTasks, taskDepth, useAppStore } from './appStore';
+
+const mockedBridge = vi.hoisted(() => ({
+  ensureCurrentWeek: vi.fn(),
+  recentWeeks: vi.fn(),
+  listWeeks: vi.fn(),
+  getWeekTree: vi.fn(),
+}));
+
+const mockedCurrentWeekId = vi.hoisted(() => vi.fn<() => string>());
+
+vi.mock('../api/nativeBridge', () => mockedBridge);
+vi.mock('../utils/weekFormat', () => ({ currentWeekId: mockedCurrentWeekId }));
+
+function makeWeek(id: string): Week {
+  return { id, startDate: id.slice(0, 8), endDate: id.slice(9), createdAt: '' };
+}
+
+describe('rolloverToNewWeekIfDue', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedBridge.recentWeeks.mockResolvedValue([]);
+    mockedBridge.listWeeks.mockResolvedValue([]);
+    mockedBridge.getWeekTree.mockImplementation(
+      async (weekId: string): Promise<WeekTreePayload> => ({
+        week: makeWeek(weekId),
+        tasks: [],
+      }),
+    );
+  });
+
+  it('does nothing before the week rolls over', async () => {
+    useAppStore.setState({
+      currentWeekId: '20260803-20260809',
+      activeWeekId: '20260803-20260809',
+    });
+    mockedCurrentWeekId.mockReturnValue('20260803-20260809');
+
+    const created = await useAppStore.getState().rolloverToNewWeekIfDue();
+
+    expect(created).toBeNull();
+    expect(mockedBridge.ensureCurrentWeek).not.toHaveBeenCalled();
+  });
+
+  it('creates the new week and jumps when the user was on the old current week', async () => {
+    useAppStore.setState({
+      currentWeekId: '20260803-20260809',
+      activeWeekId: '20260803-20260809',
+    });
+    mockedCurrentWeekId.mockReturnValue('20260810-20260816');
+    const newWeek = makeWeek('20260810-20260816');
+    newWeek.carriedFromWeekId = '20260803-20260809';
+    mockedBridge.ensureCurrentWeek.mockResolvedValue(newWeek);
+
+    const created = await useAppStore.getState().rolloverToNewWeekIfDue();
+
+    expect(created).toEqual(newWeek);
+    expect(useAppStore.getState().currentWeekId).toBe('20260810-20260816');
+    expect(useAppStore.getState().activeWeekId).toBe('20260810-20260816');
+    expect(mockedBridge.getWeekTree).toHaveBeenCalledWith('20260810-20260816');
+    expect(mockedBridge.listWeeks).toHaveBeenCalled();
+  });
+
+  it('refreshes weeks without interrupting when the user is viewing an older week', async () => {
+    useAppStore.setState({
+      currentWeekId: '20260803-20260809',
+      activeWeekId: '20260727-20260802',
+    });
+    mockedCurrentWeekId.mockReturnValue('20260810-20260816');
+    mockedBridge.ensureCurrentWeek.mockResolvedValue(makeWeek('20260810-20260816'));
+
+    const created = await useAppStore.getState().rolloverToNewWeekIfDue();
+
+    expect(created).not.toBeNull();
+    expect(useAppStore.getState().currentWeekId).toBe('20260810-20260816');
+    expect(useAppStore.getState().activeWeekId).toBe('20260727-20260802');
+    expect(mockedBridge.getWeekTree).not.toHaveBeenCalled();
+    expect(mockedBridge.listWeeks).toHaveBeenCalled();
+  });
+
+  it('still switches to the new week when it was created earlier manually', async () => {
+    useAppStore.setState({
+      currentWeekId: '20260803-20260809',
+      activeWeekId: '20260803-20260809',
+    });
+    mockedCurrentWeekId.mockReturnValue('20260810-20260816');
+    // ensure_current_week 发现周已存在（如手动提前建周）时返回 null。
+    mockedBridge.ensureCurrentWeek.mockResolvedValue(null);
+
+    const created = await useAppStore.getState().rolloverToNewWeekIfDue();
+
+    expect(created).toBeNull();
+    expect(useAppStore.getState().activeWeekId).toBe('20260810-20260816');
+  });
+});
 
 function makeTask(partial: Partial<Task> & { id: number; title: string }): Task {
   return {

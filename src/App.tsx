@@ -70,6 +70,7 @@ export function App() {
   const activeWeekId = useAppStore((state) => state.activeWeekId);
   const currentWeekId = useAppStore((state) => state.currentWeekId);
   const selectWeek = useAppStore((state) => state.selectWeek);
+  const rolloverToNewWeekIfDue = useAppStore((state) => state.rolloverToNewWeekIfDue);
 
   // 视图模式：任务树 (tree) / 看板 (kanban)
   const [viewMode, setViewMode] = useState<'tree' | 'kanban'>('tree');
@@ -181,6 +182,33 @@ export function App() {
     }, 60_000);
     return () => window.clearInterval(tick);
   }, [loading]);
+
+  // 跨周定时任务：程序持续运行跨过周一 0 点（未重启）时，轮询检测到新的
+  // 当前周后自动建周并带入未完成任务。窗口从托盘恢复/重新聚焦时补查一次，
+  // 防止隐藏期间定时器被 WebView 节流导致新周延迟创建。
+  useEffect(() => {
+    if (loading) {
+      return;
+    }
+    const rollover = () => {
+      void rolloverToNewWeekIfDue().catch(() => {
+        // 静默失败：下个 tick 或下次窗口聚焦会重试。
+      });
+    };
+    const tick = window.setInterval(rollover, 60_000);
+    const handleVisible = () => {
+      if (document.visibilityState === 'visible') {
+        rollover();
+      }
+    };
+    window.addEventListener('focus', rollover);
+    document.addEventListener('visibilitychange', handleVisible);
+    return () => {
+      window.clearInterval(tick);
+      window.removeEventListener('focus', rollover);
+      document.removeEventListener('visibilitychange', handleVisible);
+    };
+  }, [loading, rolloverToNewWeekIfDue]);
 
   const runWebDavSync = async (settings: WebDavSettings) => {
     if (webdavSyncInFlight || !settings.url || !settings.username) {

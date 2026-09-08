@@ -86,10 +86,21 @@ pub async fn get_current_week_tree() -> Result<WeekTreePayload, String> {
 #[tauri::command]
 pub async fn create_week(monday_date: String) -> Result<domain::Week, String> {
     let config = resolve_storage()?;
-    let conn = open_conn(&config)?;
+    let mut conn = open_conn(&config)?;
     let monday = chrono::NaiveDate::parse_from_str(&monday_date, "%Y%m%d")
         .map_err(|_| "日期格式应为 YYYYMMDD".to_string())?;
-    domain::create_week_for_monday(&conn, monday)
+    domain::create_week_for_monday(&mut conn, monday)
+}
+
+/// Scheduler entry for week rollover while the app stays open across Monday
+/// midnight: ensures the current week exists (creating it with carry-over when
+/// missing). Returns the newly created week, or `null` when nothing changed.
+#[tauri::command]
+pub async fn ensure_current_week() -> Result<Option<domain::Week>, String> {
+    let config = resolve_storage()?;
+    let mut conn = open_conn(&config)?;
+    let (week, created) = domain::ensure_current_week(&mut conn)?;
+    Ok(created.then_some(week))
 }
 
 #[tauri::command]
