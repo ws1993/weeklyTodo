@@ -1301,6 +1301,13 @@ pub fn ensure_current_week(conn: &mut Connection) -> Result<(Week, bool), String
 
     // Fast path: the current week already exists.
     if let Some(week) = get_week(conn, &week_id)? {
+        // Older builds created a manually chosen week empty (no carry-over).
+        // If such a week is still empty with no carry source while the newest
+        // earlier week still holds unfinished tasks, backfill once so that
+        // work is not stranded in the previous week.
+        if let Some(repaired) = repair_empty_week_carry_over(conn, &week, monday)? {
+            return Ok((repaired, false));
+        }
         return Ok((week, false));
     }
 
@@ -1332,16 +1339,76 @@ pub fn ensure_current_week(conn: &mut Connection) -> Result<(Week, bool), String
     Ok((new_week, true))
 }
 
+/// Backfill unfinished tasks into an existing-but-empty current week that an
+/// older build created without carry-over. Returns the updated week when a
+/// repair happened, or `None` when no action was needed.
+///
+/// Trigger (all must hold) so it only fires on the stranded-week bug and never
+/// disturbs normal weeks:
+/// - the week has no recorded carry source (`carried_from_week_id` is NULL);
+/// - the week contains zero tasks;
+/// - the newest earlier week exists and has unfinished tasks to copy.
+fn repair_empty_week_carry_over(
+    conn: &mut Connection,
+    week: &Week,
+    monday: NaiveDate,
+) -> Result<Option<Week>, String> {
+    if week.carried_from_week_id.is_some() {
+        return Ok(None);
+    }
+    if !list_tasks(conn, &week.id)?.is_empty() {
+        return Ok(None);
+    }
+    let Some(source) = latest_week_starting_before(conn, monday)? else {
+        return Ok(None);
+    };
+
+    let tx = conn
+        .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+        .map_err(|error| format!("开启补带入事务失败：{error}"))?;
+    // Re-check under the write lock: another caller may have repaired or added
+    // tasks while we waited for it.
+    let still_stranded = match get_week(&tx, &week.id)? {
+        Some(current) => {
+            current.carried_from_week_id.is_none() && list_tasks(&tx, &week.id)?.is_empty()
+        }
+        None => false,
+    };
+    if !still_stranded {
+        tx.rollback()
+            .map_err(|error| format!("回滚补带入事务失败：{error}"))?;
+        return Ok(None);
+    }
+    let copied = carry_over_week(&tx, &week.id, &source.id)?;
+    if copied == 0 {
+        tx.rollback()
+            .map_err(|error| format!("回滚补带入事务失败：{error}"))?;
+        return Ok(None);
+    }
+    tx.execute(
+        "UPDATE weeks SET carried_from_week_id = ?1 WHERE id = ?2",
+        params![source.id, week.id],
+    )
+    .map_err(|error| format!("更新周带入来源失败：{error}"))?;
+    tx.commit()
+        .map_err(|error| format!("提交补带入事务失败：{error}"))?;
+
+    let mut repaired = week.clone();
+    repaired.carried_from_week_id = Some(source.id);
+    Ok(Some(repaired))
+}
+
 /// Clone unfinished tasks of `source_week_id` into `target_week_id`.
 /// Only open tasks are copied; closed tasks always stay in their source week.
+/// Returns the number of tasks copied.
 fn carry_over_week(
     conn: &Connection,
     target_week_id: &str,
     source_week_id: &str,
-) -> Result<(), String> {
+) -> Result<usize, String> {
     let source_tasks = list_tasks(conn, source_week_id)?;
     if source_tasks.is_empty() {
-        return Ok(());
+        return Ok(0);
     }
 
     // Map source task id -> target task id for copied tasks.
@@ -1378,7 +1445,7 @@ fn carry_over_week(
             Some(&payload.to_string()),
         )?;
     }
-    Ok(())
+    Ok(id_map.len())
 }
 
 /// Recursively carry one branch. `target_parent_id` is the carried parent task in the target week.
@@ -1911,6 +1978,59 @@ mod tests {
         let week = create_week_for_monday(&mut conn, monday).unwrap();
         assert_eq!(week.carried_from_week_id, None);
         assert!(list_tasks(&conn, &week.id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn ensure_current_week_repairs_empty_manual_week() {
+        let mut conn = db::open_in_memory();
+        let today = Local::now().date_naive();
+        let previous_monday = monday_of(today) - Duration::days(7);
+        let previous_id = week_range_key(previous_monday);
+        let current_id = current_week_id();
+        seed_week(&conn, &previous_id);
+        // Simulate an older build's manual creation: exists, empty, no source.
+        seed_week(&conn, &current_id);
+        let root = create_plain_task(&conn, &previous_id, "遗留项目", None);
+        create_plain_task(&conn, &previous_id, "遗留子任务", Some(root.id));
+        let done = create_plain_task(&conn, &previous_id, "已完成项目", None);
+        close_task(&mut conn, &previous_id, done.id).unwrap();
+
+        let (week, created) = ensure_current_week(&mut conn).unwrap();
+
+        assert!(!created);
+        assert_eq!(
+            week.carried_from_week_id.as_deref(),
+            Some(previous_id.as_str())
+        );
+        let carried = list_tasks(&conn, &current_id).unwrap();
+        let titles: Vec<&str> = carried.iter().map(|t| t.title.as_str()).collect();
+        assert_eq!(titles, vec!["遗留项目", "遗留子任务"]);
+        assert!(carried.iter().all(|t| t.carried_from_task_id.is_some()));
+
+        // Idempotent: a second run must not duplicate anything.
+        ensure_current_week(&mut conn).unwrap();
+        assert_eq!(list_tasks(&conn, &current_id).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn ensure_current_week_repair_skips_weeks_with_existing_tasks() {
+        let mut conn = db::open_in_memory();
+        let today = Local::now().date_naive();
+        let previous_id = week_range_key(monday_of(today) - Duration::days(7));
+        let current_id = current_week_id();
+        seed_week(&conn, &previous_id);
+        seed_week(&conn, &current_id);
+        create_plain_task(&conn, &previous_id, "上一周任务", None);
+        // The user already started the new week manually: leave it alone.
+        create_plain_task(&conn, &current_id, "本周已有任务", None);
+
+        ensure_current_week(&mut conn).unwrap();
+
+        let current_tasks = list_tasks(&conn, &current_id).unwrap();
+        let titles: Vec<&str> = current_tasks.iter().map(|t| t.title.as_str()).collect();
+        assert_eq!(titles, vec!["本周已有任务"]);
+        let week = get_week(&conn, &current_id).unwrap().unwrap();
+        assert_eq!(week.carried_from_week_id, None);
     }
 
     #[test]

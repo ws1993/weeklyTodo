@@ -131,6 +131,7 @@ db.rs（schema 与迁移唯一 owner）→ SQLite（WAL）
 - 周 id = `YYYYMMDD-YYYYMMDD`（周一至周日），本地时区；`monday_of()` 计算周一。
 - `ensure_current_week`：启动时调用，幂等；缺失则创建并从「最近一个 start_date ≤ 今天的周」带入。另有跨周定时任务：前端 60s 轮询当前周 id，变化时调用 `ensure_current_week` 命令（仅实际新建时返回周），窗口 focus / visibilitychange 补查一次，防止隐藏时定时器被 WebView 节流；用户正停留在旧当前周时自动跳到新周，回看其它周时不打断。
 - 手动建周只接受周一日期，重复周报错；同样从「最近一个 start_date < 本周周一的周」带入未完成任务（与启动建周行为一致），记 `carried_from_week_id`。
+- 空周补偿修复：旧版在用户「新建周」时建的是不带入的空周。为兜底，`ensure_current_week` 的快路径检测到「当前周已存在、0 任务、`carried_from_week_id` 为空、且最近一个更早周有未完成任务」时，在一个 IMMEDIATE 事务内从该周补做一次 `carry_over_week` 并回填 `carried_from_week_id`；补过即幂等，已含任何任务的周绝不改动。`src-tauri/examples/repair_current_week.rs` 提供一次性命令行入口（`cargo run --example repair_current_week -- "<data-dir>"`）对离线库执行同样的修复。
 
 ### 带入（carry_over）
 
