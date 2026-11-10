@@ -21,9 +21,10 @@ import {
   RenameIcon,
   SearchIcon,
   SettingsIcon,
+  ShareIcon,
   TrashIcon,
 } from './ForestIcons';
-import { DropdownSelect, SearchField, SegmentedControl, ToggleSwitch } from './QueryControls';
+import { ChipMultiSelect, DropdownSelect, SearchField, SegmentedControl, ToggleSwitch } from './QueryControls';
 import { TaskDetailPanel } from './TaskDetailPanel';
 
 type StatusFilter = '' | 'in_progress' | 'closed';
@@ -56,7 +57,7 @@ export function QueryView({ open, onClose }: QueryViewProps) {
   const [keyword, setKeyword] = useState('');
   const [debouncedKeyword, setDebouncedKeyword] = useState('');
   const [weekId, setWeekId] = useState('');
-  const [groupFilter, setGroupFilter] = useState('');
+  const [groupFilters, setGroupFilters] = useState<string[]>([]);
   const [groupOptions, setGroupOptions] = useState<string[]>([]);
   const [status, setStatus] = useState<StatusFilter>('');
   const [carriedOnly, setCarriedOnly] = useState(false);
@@ -73,6 +74,10 @@ export function QueryView({ open, onClose }: QueryViewProps) {
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null);
   const [deleteCount, setDeleteCount] = useState(0);
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  // 批量勾选：key（`${weekId}-${taskId}`）-> 行数据，供多选复制按当前列表顺序取用。
+  const [selectedRows, setSelectedRows] = useState<Map<string, QueryTaskRow>>(() => new Map());
+  const [batchNumbered, setBatchNumbered] = useState(false);
+  const [batchCopied, setBatchCopied] = useState(false);
   // 按周缓存整棵任务树，供删除确认数量与详情上下文复用。
   const weekTreesCache = useRef(new Map<string, Task[]>());
 
@@ -91,7 +96,6 @@ export function QueryView({ open, onClose }: QueryViewProps) {
       const rows = await queryAllTasks({
         keyword: debouncedKeyword || undefined,
         weekId: weekId || undefined,
-        groupFilter: groupFilter || undefined,
         status: status || undefined,
         carriedOverOnly: carriedOnly || undefined,
         leafOnly: true,
@@ -105,7 +109,7 @@ export function QueryView({ open, onClose }: QueryViewProps) {
     } finally {
       setLoading(false);
     }
-  }, [open, debouncedKeyword, weekId, groupFilter, status, carriedOnly, ownerId, assignerId, tagId]);
+  }, [open, debouncedKeyword, weekId, status, carriedOnly, ownerId, assignerId, tagId]);
 
   useEffect(() => {
     void runQuery();
@@ -115,12 +119,13 @@ export function QueryView({ open, onClose }: QueryViewProps) {
     async (targetWeekId: string) => {
       const options = await queryGroupOptions(targetWeekId || undefined);
       setGroupOptions(options);
-      if (groupFilter && !options.includes(groupFilter)) {
-        // 切到某个周后，所选项目不存在于该周时自动清空，避免出现「筛选出空结果」的困惑。
-        setGroupFilter('');
-      }
+      // 切到某个周后，只保留该周仍存在的项目选择，避免出现「筛选出空结果」的困惑。
+      setGroupFilters((prev) => {
+        const kept = prev.filter((name) => options.includes(name));
+        return kept.length === prev.length ? prev : kept;
+      });
     },
-    [groupFilter],
+    [],
   );
 
   useEffect(() => {
@@ -220,6 +225,112 @@ export function QueryView({ open, onClose }: QueryViewProps) {
     }
   };
 
+  /** 各项目的命中数：按其它筛选条件（周 / 状态 / 负责人等）过滤后的完整结果集统计。 */
+  const groupCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of results) {
+      map.set(row.rootTitle, (map.get(row.rootTitle) ?? 0) + 1);
+    }
+    return map;
+  }, [results]);
+
+  /** 项目多选在前端生效：空集合 = 全部项目。 */
+  const groupFilteredResults = useMemo(
+    () =>
+      groupFilters.length === 0
+        ? results
+        : results.filter((row) => groupFilters.includes(row.rootTitle)),
+    [results, groupFilters],
+  );
+
+  /** 当前可见结果里已勾选的数量，供批量条的「全选」判断。 */
+  const selectedVisibleCount = useMemo(() => {
+    let count = 0;
+    for (const row of groupFilteredResults) {
+      if (selectedRows.has(`${row.weekId}-${row.task.id}`)) {
+        count += 1;
+      }
+    }
+    return count;
+  }, [groupFilteredResults, selectedRows]);
+
+  /** 切换单行勾选；key 与列表渲染 key 一致。 */
+  const toggleSelect = useCallback((row: QueryTaskRow) => {
+    const key = `${row.weekId}-${row.task.id}`;
+    setSelectedRows((prev) => {
+      const next = new Map(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.set(key, row);
+      }
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedRows(new Map());
+  }, []);
+
+  /** 批量条上的全选框：可见结果已全选时取消，否则全选当前可见结果。 */
+  const toggleSelectAllVisible = useCallback(() => {
+    setSelectedRows((prev) => {
+      const next = new Map(prev);
+      const allSelected =
+        groupFilteredResults.length > 0 &&
+        groupFilteredResults.every((row) => prev.has(`${row.weekId}-${row.task.id}`));
+      if (allSelected) {
+        for (const row of groupFilteredResults) {
+          next.delete(`${row.weekId}-${row.task.id}`);
+        }
+      } else {
+        for (const row of groupFilteredResults) {
+          next.set(`${row.weekId}-${row.task.id}`, row);
+        }
+      }
+      return next;
+    });
+  }, [groupFilteredResults]);
+
+  /** 项目标签多选切换。 */
+  const toggleGroup = useCallback((name: string) => {
+    setGroupFilters((prev) =>
+      prev.includes(name) ? prev.filter((x) => x !== name) : [...prev, name],
+    );
+  }, []);
+
+  /** 复制选中任务标题：按当前列表顺序分行，可选「1. 」编号前缀。 */
+  const copySelected = useCallback(async () => {
+    const ordered: QueryTaskRow[] = [];
+    const taken = new Set<string>();
+    for (const row of groupFilteredResults) {
+      const key = `${row.weekId}-${row.task.id}`;
+      if (selectedRows.has(key)) {
+        ordered.push(row);
+        taken.add(key);
+      }
+    }
+    // 已被筛选条件隐藏但仍勾选的行按勾选顺序补在后面。
+    for (const [key, row] of selectedRows) {
+      if (!taken.has(key)) {
+        ordered.push(row);
+      }
+    }
+    if (ordered.length === 0) {
+      return;
+    }
+    const text = ordered
+      .map((row, index) => (batchNumbered ? `${index + 1}. ${row.task.title}` : row.task.title))
+      .join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      setBatchCopied(true);
+      window.setTimeout(() => setBatchCopied((cur) => (cur ? false : cur)), 1500);
+    } catch (error) {
+      console.error('批量复制任务失败:', error);
+    }
+  }, [groupFilteredResults, selectedRows, batchNumbered]);
+
   const progressByWeek = useMemo(() => {
     const map = new Map<string, WeekProgress>();
     for (const [id, total, openCount] of summaries) {
@@ -242,7 +353,21 @@ export function QueryView({ open, onClose }: QueryViewProps) {
     return groups;
   }, [allWeeks]);
 
+  /** Chip 全集：项目选项 ∪ 当前结果中出现的根任务；计数来自 groupCounts。 */
+  const chipOptions = useMemo(() => {
+    const names = new Set<string>(groupOptions);
+    for (const row of results) {
+      names.add(row.rootTitle);
+    }
+    return [...names].map((name) => ({
+      value: name,
+      label: name,
+      count: groupCounts.get(name) ?? 0,
+    }));
+  }, [groupOptions, results, groupCounts]);
+
   const ownerOptions = owners.map((owner) => ({ value: String(owner.id), label: owner.name }));
+
   const assignerOptions = assigners.map((assigner) => ({
     value: String(assigner.id),
     label: assigner.name,
@@ -359,13 +484,6 @@ export function QueryView({ open, onClose }: QueryViewProps) {
               />
               <span className="query-toolbar-sep" />
               <DropdownSelect
-                label="项目"
-                options={groupOptions.map((name) => ({ value: name, label: name }))}
-                value={groupFilter}
-                onChange={setGroupFilter}
-              />
-              <span className="query-toolbar-sep" />
-              <DropdownSelect
                 label="负责人"
                 options={ownerOptions}
                 value={ownerId !== undefined ? String(ownerId) : ''}
@@ -384,11 +502,21 @@ export function QueryView({ open, onClose }: QueryViewProps) {
                 onChange={(value) => setTagId(value ? Number(value) : undefined)}
               />
             </div>
+            <div className="query-toolbar-row query-toolbar-row-chips">
+              <ChipMultiSelect
+                label="项目"
+                options={chipOptions}
+                selected={groupFilters}
+                onToggle={toggleGroup}
+                onClear={() => setGroupFilters([])}
+              />
+            </div>
           </div>
 
           <div className="query-results-head">
             <span>
-              找到 <b>{results.length}</b> 条任务
+              找到 <b>{groupFilteredResults.length}</b> 条任务
+
               {activeWeek && <span className="query-results-scope"> · {activeWeek.id}</span>}
             </span>
             <span className="query-results-meta">
@@ -412,7 +540,8 @@ export function QueryView({ open, onClose }: QueryViewProps) {
               </div>
             )}
 
-            {!loading && results.length === 0 && (
+            {!loading && groupFilteredResults.length === 0 && (
+
               <EmptyState
                 icon={<SearchIcon size={24} />}
                 title="没有找到匹配的任务"
@@ -421,7 +550,7 @@ export function QueryView({ open, onClose }: QueryViewProps) {
             )}
 
             {!loading &&
-              results.map((row) => (
+              groupFilteredResults.map((row) => (
                 <div
                   key={`${row.weekId}-${row.task.id}`}
                   className="query-row"
@@ -435,6 +564,20 @@ export function QueryView({ open, onClose }: QueryViewProps) {
                     }
                   }}
                 >
+                  <input
+                    type="checkbox"
+                    className="query-row-check"
+                    aria-label={`选择任务：${row.task.title}`}
+                    checked={selectedRows.has(`${row.weekId}-${row.task.id}`)}
+                    onChange={() => toggleSelect(row)}
+                    onDoubleClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.stopPropagation();
+                      }
+                    }}
+                  />
+
                   <span
                     className={`query-row-dot${row.task.status === 'closed' ? ' closed' : ''}`}
                   />
@@ -573,6 +716,53 @@ export function QueryView({ open, onClose }: QueryViewProps) {
                   </span>
                 </div>
               ))}
+            {selectedRows.size > 0 && (
+              <div className="query-batch-bar">
+                <div className="query-batch-inner">
+                  <input
+                    type="checkbox"
+                    className="query-row-check"
+                    aria-label="全选当前结果"
+                    checked={
+                      groupFilteredResults.length > 0 &&
+                      selectedVisibleCount === groupFilteredResults.length
+                    }
+                    ref={(el) => {
+                      if (el) {
+                        el.indeterminate =
+                          selectedVisibleCount > 0 &&
+                          selectedVisibleCount < groupFilteredResults.length;
+                      }
+                    }}
+                    onChange={toggleSelectAllVisible}
+                  />
+                  <span className="query-batch-count">
+                    已选 <b>{selectedRows.size}</b> 条
+                  </span>
+                  <span className="query-batch-sep" />
+                  <ToggleSwitch label="加编号" checked={batchNumbered} onChange={setBatchNumbered} />
+                  <span className="query-batch-spacer" />
+                  <button
+                    type="button"
+                    className="query-batch-btn"
+                    aria-label="清空选择"
+                    onClick={clearSelection}
+                  >
+                    <CrossIcon size={12} />
+                    清空
+                  </button>
+                  <button
+                    type="button"
+                    className="query-batch-btn primary"
+                    aria-label="复制选中任务"
+                    onClick={() => void copySelected()}
+                  >
+                    {batchCopied ? <CheckIcon size={12} /> : <ShareIcon size={12} />}
+                    {batchCopied ? '已复制' : '复制'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </main>
       </div>

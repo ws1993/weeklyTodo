@@ -239,3 +239,60 @@ export function SearchField({ value, onChange, placeholder }: SearchFieldProps) 
     </div>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* ChipMultiSelect —— 铺开的多选标签组（带计数，0 计数置灰禁用）        */
+/* ------------------------------------------------------------------ */
+
+export interface ChipOption {
+  value: string;
+  label: string;
+  /** 当前其它筛选条件下的任务数量；为 0 时标签置灰且不可点击。 */
+  count: number;
+}
+
+interface ChipMultiSelectProps {
+  label: string;
+  options: ChipOption[];
+  /** 已选中的项目集合；空数组表示「全部」，由调用方负责过滤展示。 */
+  selected: string[];
+  onToggle: (value: string) => void;
+  onClear: () => void;
+}
+
+export function ChipMultiSelect({ label, options, selected, onToggle, onClear }: ChipMultiSelectProps) {
+  return (
+    <div className="chip-multiselect">
+      <span className="control-label">{label}</span>
+      <div className="chip-row" role="group" aria-label={`${label}多选`}>
+        <button
+          type="button"
+          className={`chip-toggle all${selected.length === 0 ? ' active' : ''}`}
+          aria-pressed={selected.length === 0}
+          onClick={onClear}
+        >
+          全部
+        </button>
+        {options.map((option) => {
+          const isSelected = selected.includes(option.value);
+          // 已选中的标签即使计数为 0 也保持可点击，否则无法取消选择。
+          const isEmpty = option.count === 0 && !isSelected;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              className={`chip-toggle${isSelected ? ' active' : ''}${isEmpty ? ' empty' : ''}`}
+              aria-pressed={isSelected}
+              disabled={isEmpty}
+              title={isEmpty ? `${option.label}：当前筛选下没有任务` : option.label}
+              onClick={() => onToggle(option.value)}
+            >
+              <span className="chip-toggle-label">{option.label}</span>
+              <span className="chip-toggle-count">{option.count}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

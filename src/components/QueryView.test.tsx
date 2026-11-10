@@ -2,7 +2,8 @@
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { QueryTaskRow } from '../shared/contracts/types';
+import type { QueryTaskRow, Task } from '../shared/contracts/types';
+
 import { useAppStore } from '../store/appStore';
 import { QueryView } from './QueryView';
 
@@ -69,6 +70,27 @@ function makeRow(partial: Partial<QueryTaskRow>): QueryTaskRow {
     ...partial,
   };
 }
+
+function makeTask(title: string, id: number, overrides?: Partial<Task>): Task {
+  return {
+    id,
+    weekId: '20260803-20260809',
+    parentId: null,
+    title,
+    description: '',
+    status: 'in_progress',
+    priority: 2,
+    sortIndex: 0,
+    createdAt: '2026-08-07T14:30:00.000',
+    updatedAt: '2026-08-07T14:30:00.000',
+    executionMode: 'self',
+    ownerId: null,
+    ownerName: null,
+    tags: [],
+    ...overrides,
+  };
+}
+
 
 describe('QueryView 项目筛选 / 时间显示 / 行交互', () => {
   beforeEach(() => {
@@ -207,5 +229,67 @@ describe('QueryView 项目筛选 / 时间显示 / 行交互', () => {
     await waitFor(() => {
       expect(screen.getByText('已复制')).toBeTruthy();
     });
+  });
+
+  it('项目筛选铺开为多选标签，计数为 0 置灰禁用，多选合并过滤结果', async () => {
+    mockedNativeBridge.queryAllTasks.mockResolvedValue([
+      makeRow({ task: makeTask('准备周报', 1), rootTitle: '项目A' }),
+      makeRow({ task: makeTask('写双周报', 2), rootTitle: '项目A' }),
+      makeRow({ task: makeTask('巡查管线', 3), rootTitle: '项目B' }),
+    ]);
+    mockedNativeBridge.queryGroupOptions.mockResolvedValue(['项目A', '项目B', '项目C']);
+
+    render(<QueryView open onClose={() => undefined} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('巡查管线')).toBeTruthy();
+    });
+
+    // 计数为 0 的项目（项目C）置灰且不可点击。
+    const chipC = screen.getByRole('button', { name: /^项目C/ }) as HTMLButtonElement;
+    expect(chipC.disabled).toBe(true);
+    expect(chipC.className).toContain('empty');
+
+    // 单选项目A：只剩项目A的行。
+    fireEvent.click(screen.getByRole('button', { name: /^项目A/ }));
+    expect(screen.queryByText('巡查管线')).toBeNull();
+    expect(screen.getByText('准备周报')).toBeTruthy();
+
+    // 再加选项目B：多选合并展示。
+    fireEvent.click(screen.getByRole('button', { name: /^项目B/ }));
+    expect(screen.getByText('巡查管线')).toBeTruthy();
+
+    // 点「全部」清空多选，标签恢复未选中态。
+    fireEvent.click(screen.getByRole('button', { name: '全部' }));
+    const chipA = screen.getByRole('button', { name: /^项目A/ }) as HTMLButtonElement;
+    expect(chipA.className).not.toContain('active');
+  });
+
+  it('勾选多行后可一起复制：保留分行，可切换加编号复制', async () => {
+    const writeTextSpy = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText: writeTextSpy } });
+
+    render(<QueryView open onClose={() => undefined} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('准备周报')).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByLabelText('选择任务：准备周报'));
+    fireEvent.click(screen.getByLabelText('选择任务：已完成的备份'));
+    expect(document.querySelector('.query-batch-bar')?.textContent).toContain('已选 2 条');
+
+    // 默认不编号：按列表顺序分行复制。
+    fireEvent.click(screen.getByRole('button', { name: '复制选中任务' }));
+    expect(writeTextSpy).toHaveBeenCalledWith('准备周报\n已完成的备份');
+
+    // 打开「加编号」再复制一次，带 1. 2. 前缀。
+    fireEvent.click(screen.getByText('加编号'));
+    fireEvent.click(screen.getByRole('button', { name: '复制选中任务' }));
+    expect(writeTextSpy).toHaveBeenLastCalledWith('1. 准备周报\n2. 已完成的备份');
+
+    // 清空选择后批量条消失。
+    fireEvent.click(screen.getByRole('button', { name: '清空选择' }));
+    expect(document.querySelector('.query-batch-bar')).toBeNull();
   });
 });
