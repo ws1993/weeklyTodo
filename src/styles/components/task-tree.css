@@ -486,9 +486,8 @@
   border-color: var(--danger-border);
 }
 
-.tree-row.closed .add-btn {
-  display: none;
-}
+/* 已关闭任务同样允许继续添加子任务：挂入时后端会自动重开该节点及其祖先链，
+   因此不再在此处隐藏 .add-btn（曾导致「子任务全部完成后无法再拆分」）。 */
 
 /* Inline Add Input Container */
 .add-inline {

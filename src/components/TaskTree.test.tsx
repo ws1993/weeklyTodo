@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Task } from '../shared/contracts/types';
 import { useAppStore } from '../store/appStore';
@@ -12,6 +12,7 @@ const mockedNativeBridge = vi.hoisted(() => ({
   listWeeks: vi.fn(),
   getWeekTree: vi.fn(),
   listOwners: vi.fn(),
+  listAssigners: vi.fn(),
   listTags: vi.fn(),
   listGroupColors: vi.fn(),
   createTask: vi.fn(),
@@ -180,5 +181,61 @@ describe('TaskTree 合并徽章（跟进 / 分派）', () => {
     const meta = container.querySelectorAll('.node-meta')[0];
     expect(meta.querySelector('.tag-assign-combo')).toBeNull();
     expect(meta.querySelector('.tag-follow-combo')).toBeNull();
+  });
+});
+
+describe('TaskTree 已关闭任务仍可添加子任务', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAppStore.setState({
+      tree: {
+        week: { id: '20260803-20260809', startDate: '', endDate: '', createdAt: '' },
+        tasks: [],
+      },
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('父任务与其全部子任务都已关闭时，父任务行仍显示添加子任务按钮', () => {
+    const parent = makeTask({ id: 1, title: '父任务', status: 'closed' });
+    const child = makeTask({ id: 2, title: '子任务', parentId: 1, status: 'closed' });
+    const { container } = render(<TaskTree tasks={[parent, child]} />);
+
+    const parentRow = container.querySelector('[data-node="1"] .tree-row') as Element;
+    expect(parentRow.classList.contains('closed')).toBe(true);
+    const addBtn = parentRow.querySelector('.task-actions .add-btn');
+    expect(addBtn).not.toBeNull();
+  });
+
+  it('点击已关闭任务的添加按钮后，提交的子任务仍挂在原父任务下', async () => {
+    mockedNativeBridge.createTask.mockResolvedValue(
+      makeTask({ id: 3, title: '新的子任务', parentId: 1 }),
+    );
+    mockedNativeBridge.getWeekTree.mockResolvedValue({
+      week: { id: '20260803-20260809', startDate: '', endDate: '', createdAt: '' },
+      tasks: [],
+    });
+    mockedNativeBridge.listOwners.mockResolvedValue([]);
+    mockedNativeBridge.listTags.mockResolvedValue([]);
+    mockedNativeBridge.listGroupColors.mockResolvedValue([]);
+
+    const parent = makeTask({ id: 1, title: '父任务', status: 'closed' });
+    const { container } = render(<TaskTree tasks={[parent]} />);
+
+    fireEvent.click(container.querySelector('[data-node="1"] .task-actions .add-btn') as Element);
+
+    const input = container.querySelector('[data-node="1"] .add-inline input') as HTMLInputElement;
+    expect(input).not.toBeNull();
+    fireEvent.change(input, { target: { value: '新的子任务' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await waitFor(() => expect(mockedNativeBridge.createTask).toHaveBeenCalledTimes(1));
+    expect(mockedNativeBridge.createTask.mock.calls[0][0]).toMatchObject({
+      title: '新的子任务',
+      parentId: 1,
+    });
   });
 });

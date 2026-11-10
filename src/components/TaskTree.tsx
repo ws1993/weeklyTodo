@@ -606,7 +606,7 @@ function TaskNode({
             <span className="task-actions">
               <button
                 className="add-btn"
-                title="添加子任务"
+                title={closed ? '添加子任务（会自动重新激活此任务及其上级）' : '添加子任务'}
                 onClick={(event) => {
                   event.stopPropagation();
                   setShowInlineAdd(true);
