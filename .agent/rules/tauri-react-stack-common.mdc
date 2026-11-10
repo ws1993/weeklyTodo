@@ -1,0 +1,78 @@
+---
+description: Tauri 2 + React 19 + Rsbuild + SQLite 桌面应用的可复用技术约束（命令契约、数据库迁移、测试、凭据、版本同步、CI 打包）。适用于任何 React 前端 + Tauri/Rust 后端 + SQLite 本地存储的桌面项目。
+alwaysApply: false
+---
+
+# Tauri 2 + React 19 桌面应用技术约束（通用可复用）
+
+> 从 weeklyTodo（E:\Project\AI\weeklyTodo）提炼，适用于「React + TypeScript 前端 + Tauri 2 Rust 后端 + SQLite 本地存储」技术栈的新项目。项目专属约束见 `weeklytodo-project.mdc`；详细设计见 `docs/tech-stack-reference.md`。
+
+## 1. 构建链路：前端与桌面壳分离
+
+- Rsbuild 前端构建输出到 `dist/`，`tauri.conf.json` 的 `frontendDist` 指向该目录。
+- `beforeDevCommand` / `beforeBuildCommand` 分别为 `npm run dev` / `npm run build`，Tauri 侧不要重复构建前端。
+- dev server 固定 `host: 127.0.0.1` + `strictPort: true`，`devUrl` 必须与之精确一致，否则 `tauri dev` 找不到页面。
+- `tauri build` 产出 NSIS 安装器（`installMode: currentUser`），只支持 Windows 时用 `#[cfg(desktop)]` / `#[cfg(windows)]` 隔离平台代码。
+
+## 2. 命令契约模式（前后端类型边界）
+
+- Rust 侧 `contracts.rs` 用 serde 结构体定义命令出入参，统一 `#[serde(rename_all = "camelCase")]`。
+- 前端 `src/shared/contracts/types.ts` 手写镜像类型（camelCase），无代码生成；**两侧类型改动必须同步**。
+- 所有命令返回 `Result<T, String>`，错误信息面向用户可读，不允许静默吞错。
+- 前端通过一层 `nativeBridge.ts` 包装 `invoke`，并给每个函数加 `isTauriRuntime()` 守卫（检测 `window.__TAURI_INTERNALS__`），使纯浏览器 dev/preview 可运行、非桌面环境优雅降级。
+- 命令参数多用 Option 参数或输入结构体；`#[allow(clippy::too_many_arguments)]` 仅作兜底。
+- 事件通道（如下载进度、关闭请求）用 `listen` 订阅，函数返回取消订阅函数，注意异步订阅竞态（disposed 标记）。
+
+## 3. Rust 侧分层
+
+- `commands.rs` 只做薄层：解析参数 → resolve 存储 → 打开连接 → 调用领域函数。
+- 业务逻辑放纯 Rust 函数（接收 `&Connection`），不在命令里内联 SQL，便于内存库单元测试。
+- `db.rs` 是 schema 与迁移的唯一 owner；表结构改动只能通过新版本迁移。
+
+## 4. SQLite 约束
+
+- 打开连接固定启用 `PRAGMA foreign_keys=ON` 与 `journal_mode=WAL`。
+- 迁移用 `PRAGMA user_version` 递增；每个版本一个事务（`transaction()` + `execute_batch` + `pragma_update` + `commit`）。
+- 新功能加列/新表 → 新增迁移版本；**禁止修改已发布的旧版本迁移块**（已升级用户不会重跑）。
+- 树/列表排序用 `sort_index REAL`：插入取 `MAX+1`，拖拽重排用相邻中点 `(a+b)/2`，避免整数重排成本。
+- 子树级联清理用 `ON DELETE CASCADE`（外键）；若改软删除需全链路过滤（查询/带入/统计），回归面大。
+- 多语句业务操作（关闭级联、重开祖先、删子树）必须包事务。
+
+## 5. 测试分层
+
+- Rust：`#[cfg(test)]` 提供 `db::open_in_memory()`（跑全部迁移的内存库）；每个模块独立 `mod tests`；辅助插入函数用 `#[cfg(test)] pub`。
+- 前端：vitest 默认 node 环境（纯函数/store）；组件测试文件头加 `// @vitest-environment jsdom`；store 测试用 `vi.mock('../api/nativeBridge')` + `vi.hoisted` 建 mock。
+- lint 基线 = `tsc --noEmit`（strict），类型即契约。
+
+## 6. 凭据与敏感数据
+
+- 密码等敏感信息不进 localStorage / 配置文件：用系统凭据库（Rust `keyring`，Windows Credential Manager），Rust 侧读写，前端只传用户名。
+- 前端非敏感设置统一走 localStorage，key 用 `appName.sectionName` 前缀；加载用「默认值合并 + 字段校验 + try/catch」，保存失败静默。
+
+## 7. 外部网络请求的防呆
+
+- 下载文件必须校验内容（如 SQLite 魔数 `SQLite format 3\0`），防止服务器返回 HTML 错误页被当数据写入。
+- 落盘用「临时文件 + fsync + rename」原子替换，替换前先备份，替换后清理可能陈旧的侧车文件（`-wal`/`-shm`）。
+- 下载到的文件再跑 `PRAGMA integrity_check` 通过才允许覆盖本地。
+- URL 用标准解析 + 协议白名单校验（http/https/socks）。
+- HTTP 客户端固定 `user_agent`、超时（WebDAV 用 180s）。
+
+## 8. 版本号同步（多文件漂移风险）
+
+- Tauri 应用版本散落在 package.json、Cargo.toml、Cargo.lock、tauri.conf.json 等多个文件，必须有统一 bump 脚本或流程。
+- UI 展示与更新检查若读不同来源（如 `__APP_VERSION__` vs `CARGO_PKG_VERSION`）极易漂移，须保证一致或统一来源。
+- 语义化版本比较建议自行实现（点分数字、缺段补 0），避免引入额外依赖。
+
+## 9. CI 与打包（Windows）
+
+- 依赖安装用 `npm install`，**不要用 `npm ci`**（Windows 上 npm 重写 lockfile 会剪掉跨平台 optional 依赖条目，`npm ci` 严格校验会报 `Missing: ... from lock file`）。详见 `npm-lockfile-ci.mdc`。
+- Node/npm 版本对齐：package.json `engines`/`packageManager`、setup-node `node-version`、（有则）`.nvmrc` 三处一致。
+- Rust 工具链用 `rust-toolchain.toml` 锁定 channel + targets。
+- GitHub Release 由 `v*` tag 推送触发（`softprops/action-gh-release`）。
+
+## 10. 桌面壳交互模式
+
+- 单实例插件：重复启动时唤醒/聚焦主窗口。
+- 关闭按钮拦截：`api.prevent_close()` + emit 事件给前端，由设置决定询问/最小化托盘/退出，避免「点 × 即退出」。
+- 托盘：左键 toggle 主窗口，右键菜单项。
+- 自动更新：应用退出后用独立 shell helper（PowerShell + `ShellExecuteW`）启动安装器，脱离 Tauri 进程树，否则会被连带退出。

@@ -1,0 +1,24 @@
+---
+description: npm lockfile 同步与 CI 安装约束（可复用于任何使用 npm 的前端/Tauri 项目）
+alwaysApply: false
+---
+
+# npm lockfile 同步与 CI 安装约束
+
+## 背景
+
+npm（v11+）在 Windows 上重写 package-lock.json 时会剪掉跨平台 optional 依赖条目（例如 `@rolldown/binding-wasm32-wasi`、`@rspack/binding-wasm32-wasi` 所需的 `@emnapi/core`、`@emnapi/runtime`），因为当前平台不会安装它们。但 `npm ci` 严格校验 lockfile 完整性，任何被引用的包缺失都会报 EUSAGE 错误（`Missing: X from lock file`）。
+
+## 强制约束
+
+1. **修改 package.json 依赖后**，必须用 `npm install` 重新生成 package-lock.json，禁止手动编辑 lockfile 条目。
+2. **CI 安装前端依赖使用 `npm install`，不要用 `npm ci`**。npm install 在 lockfile 缺条目时能自动解析补齐，而缺失的通常只是当前平台不需要的可选依赖，构建结果与 npm ci 一致。这是根治本地 npm 与 CI npm 版本不一致导致死循环的关键。
+3. **本地与 CI 的 Node/npm 版本保持一致**（`.nvmrc`、package.json 的 `engines`/`packageManager`、setup-node 的 `node-version` 三处对齐），避免不同版本 npm 重写 lockfile 造成漂移。
+4. **提交前检查 lockfile 完整性**：用 `rg 'node_modules/@emnapi/(core|runtime)"' package-lock.json` 之类命令确认被引用条目存在；或直接跑 `npm ci --dry-run` 验证。
+
+## 排查流程（遇到 CI 报 `Missing: ... from lock file`）
+
+1. 不要删掉 package-lock.json（`npm ci` 必须有 lockfile，删了直接失败）。
+2. 先确认 CI 实际用的 npm 版本（`gh run view <id> --log` 查看 node/npm 版本）。
+3. 在无 node_modules 的干净临时目录里，用与 CI 相同的 npm 版本复现验证（已有 node_modules 会掩盖 npm ci 的校验错误）。
+4. 修复优先改 CI 为 `npm install`；如需保留 npm ci，则补回缺失条目并统一版本。
