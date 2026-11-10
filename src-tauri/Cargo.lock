@@ -4789,7 +4789,7 @@ dependencies = [
 
 [[package]]
 name = "weekly-todo"
-version = "1.0.19"
+version = "1.0.20"
 dependencies = [
  "base64 0.22.1",
  "chrono",
