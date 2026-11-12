@@ -2,7 +2,9 @@
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  /* 层级：视图浮层（query/settings/stats = 70）之上，命令面板（90）之下。
+     此前为 60，导致「全部周」打开时点关闭弹出的退出/最小化询问框被浮层压住、无法点击。 */
+  z-index: 80;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -32,6 +34,10 @@
 
 /* ---------- Slide-over Task Detail Drawer ---------- */
 .modal-backdrop.task-detail-backdrop {
+  /* 抽屉属于「当前视图的附属面板」，不是阻断式对话框：显式锁回 60，
+     避免跟随 .modal-backdrop 升到 80 后反过来盖住 query/settings 浮层。
+     嵌在浮层内部时（如全部周里的详情），层级只在该浮层的堆叠上下文内比较，仍显示在列表之上。 */
+  z-index: 60;
   justify-content: flex-end;
   align-items: stretch;
   background: rgba(15, 23, 42, 0.14);
