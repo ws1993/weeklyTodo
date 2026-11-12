@@ -238,4 +238,43 @@ describe('TaskTree 已关闭任务仍可添加子任务', () => {
       parentId: 1,
     });
   });
+
+  it('行内新建任务支持快捷语法 (!p0 @负责人 <-分派人 #标签) 自动解析并展示父任务子进度胶囊', async () => {
+    mockedNativeBridge.createTask.mockResolvedValue(
+      makeTask({ id: 4, title: '压测核心网关', parentId: 1, priority: 0 }),
+    );
+    mockedNativeBridge.getWeekTree.mockResolvedValue({
+      week: { id: '20260803-20260809', startDate: '', endDate: '', createdAt: '' },
+      tasks: [],
+    });
+    mockedNativeBridge.listOwners.mockResolvedValue([]);
+    mockedNativeBridge.listAssigners.mockResolvedValue([]);
+    mockedNativeBridge.listTags.mockResolvedValue([]);
+    mockedNativeBridge.listGroupColors.mockResolvedValue([]);
+
+    const parent = makeTask({ id: 1, title: '核心重构' });
+    const childDone = makeTask({ id: 2, title: '已完成子项', parentId: 1, status: 'closed' });
+    const { container } = render(<TaskTree tasks={[parent, childDone]} />);
+
+    // 父任务应渲染 1/1 进度胶囊
+    expect(container.querySelector('.node-sub-progress')?.textContent).toBe('1/1');
+
+    fireEvent.click(container.querySelector('[data-node="1"] .task-actions .add-btn') as Element);
+    const input = container.querySelector('[data-node="1"] .add-inline input') as HTMLInputElement;
+    fireEvent.change(input, {
+      target: { value: '压测核心网关 !p0 @林工 <-王总监 #架构 #高可用' },
+    });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await waitFor(() => expect(mockedNativeBridge.createTask).toHaveBeenCalledTimes(1));
+    expect(mockedNativeBridge.createTask.mock.calls[0][0]).toMatchObject({
+      title: '压测核心网关',
+      parentId: 1,
+      priority: 0,
+      executionMode: 'follow_up',
+      ownerName: '林工',
+      assignerName: '王总监',
+      tagNames: ['架构', '高可用'],
+    });
+  });
 });

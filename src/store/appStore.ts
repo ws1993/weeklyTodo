@@ -38,6 +38,7 @@ interface AppState {
     title: string;
     description?: string;
     parentId?: number | null;
+    priority?: number;
     executionMode?: ExecutionMode;
     ownerName?: string | null;
     assignerName?: string | null;
@@ -179,13 +180,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ tree });
   },
 
-  addTask: async ({ title, description, parentId, executionMode, ownerName, assignerName, tagNames }) => {
+  addTask: async ({ title, description, parentId, priority, executionMode, ownerName, assignerName, tagNames }) => {
     const { activeWeekId } = get();
     const task = await bridge.createTask({
       weekId: activeWeekId,
       title,
       description,
       parentId: parentId ?? null,
+      priority,
       executionMode,
       ownerName,
       assignerName,

@@ -1,22 +1,25 @@
-/* ---------- Focus mode Pomodoro banner ---------- */
+/* ---------- Focus mode Pomodoro banner (Restrained Surface Bar) ---------- */
 .focus-timer-banner {
-  background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
-  color: #FFFFFF;
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--brand) 4%, var(--surface));
+  color: var(--text-1);
+  border: 1px solid var(--brand-border);
   border-radius: var(--radius-lg);
-  padding: 12px 18px;
+  padding: 9px 16px 11px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
   margin-bottom: 2px;
-  animation: slideDownFade 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: slideDownFade 0.22s cubic-bezier(0.22, 1, 0.36, 1);
   flex: none;
 }
 
 @keyframes slideDownFade {
   from {
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateY(-6px);
   }
   to {
     opacity: 1;
@@ -24,82 +27,130 @@
   }
 }
 
+@keyframes focusPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(0.92);
+  }
+}
+
 .focus-banner-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
 }
 
 .focus-glyph {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: rgba(56, 189, 248, 0.18);
-  color: #38BDF8;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-border);
+  color: var(--brand);
   display: grid;
   place-items: center;
   flex: none;
+  animation: focusPulse 2.4s infinite ease-in-out;
 }
 
 .focus-text-block {
   display: flex;
-  flex-direction: column;
-  gap: 1px;
+  align-items: baseline;
+  gap: 8px;
   min-width: 0;
 }
+
 .focus-tagline {
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #94A3B8;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--brand);
+  white-space: nowrap;
 }
+
 .focus-task-title {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: #F8FAFC;
+  color: var(--text-1);
 }
 
 .focus-banner-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   flex: none;
 }
 
 .focus-timer-digits {
   font-family: var(--mono);
-  font-size: 20px;
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: 1px;
-  color: #38BDF8;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.5px;
+  color: var(--text-1);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 2px 9px;
+  border-radius: var(--radius-sm);
 }
 
 .btn-focus-action {
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.1);
-  color: #FFFFFF;
-  padding: 5px 12px;
-  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   display: inline-flex;
   align-items: center;
   gap: 5px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.15s ease;
 }
+
 .btn-focus-action:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+  color: var(--text-1);
 }
+
 .btn-focus-action.finish {
   background: var(--success);
   border-color: var(--success);
+  color: #FFFFFF;
+  font-weight: 600;
 }
+
 .btn-focus-action.finish:hover {
-  filter: brightness(1.1);
+  filter: brightness(1.06);
+  color: #FFFFFF;
+}
+
+.focus-close-btn {
+  padding: 0 6px;
+  color: var(--text-3);
+}
+
+.focus-progress-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2.5px;
+  background: var(--border-subtle);
+}
+
+.focus-progress-fill {
+  height: 100%;
+  background: var(--brand);
+  transition: width 0.4s linear;
 }

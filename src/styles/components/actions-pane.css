@@ -268,8 +268,14 @@
 .leaf-actions {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 3px;
   flex: none;
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+
+.leaf-card:hover .leaf-actions {
+  opacity: 1;
 }
 
 .leaf-action-btn {
@@ -281,8 +287,10 @@
   justify-content: center;
   cursor: pointer;
   padding: 0;
+  color: var(--text-3);
+  background: transparent;
   border: 1px solid transparent;
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.14s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .leaf-action-btn svg {
@@ -290,49 +298,25 @@
   height: 13px;
 }
 
-/* 1. 专注模式 - 活力琥珀橙 (Amber/Energy) */
-.leaf-action-btn.action-focus {
-  color: #D97706;
-  background: #FEF3C7;
-  border-color: #FDE68A;
-}
-
+/* 1. 专注模式 - 常态静默，悬停点亮琥珀色 */
 .leaf-action-btn.action-focus:hover {
-  background: #F59E0B;
-  border-color: #F59E0B;
-  color: #FFFFFF;
-  transform: scale(1.08);
-  box-shadow: 0 2px 5px rgba(245, 158, 11, 0.3);
+  color: var(--warning);
+  background: var(--warning-soft);
+  border-color: var(--warning-border);
 }
 
-/* 2. 定位模式 - 品牌聚焦蓝 (Brand Indigo/Blue) */
-.leaf-action-btn.action-locate {
+/* 2. 定位模式 - 常态静默，悬停点亮品牌蓝 */
+.leaf-action-btn.action-locate:hover {
   color: var(--brand);
   background: var(--brand-soft);
   border-color: var(--brand-border);
 }
 
-.leaf-action-btn.action-locate:hover {
-  background: var(--brand);
-  border-color: var(--brand);
-  color: #FFFFFF;
-  transform: scale(1.08);
-  box-shadow: 0 2px 5px var(--brand-glow);
-}
-
-/* 3. 标记完成 - 清新成功绿 (Emerald Green) */
-.leaf-action-btn.action-complete {
-  color: #059669;
-  background: #D1FAE5;
-  border-color: #A7F3D0;
-}
-
+/* 3. 标记完成 - 常态静默，悬停点亮成功绿 */
 .leaf-action-btn.action-complete:hover {
-  background: #10B981;
-  border-color: #10B981;
-  color: #FFFFFF;
-  transform: scale(1.08);
-  box-shadow: 0 2px 5px rgba(16, 185, 129, 0.3);
+  color: var(--success);
+  background: var(--success-soft);
+  border-color: var(--success-border);
 }
 
 .panel-foot {

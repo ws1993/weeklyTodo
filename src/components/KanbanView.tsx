@@ -92,18 +92,18 @@ export function KanbanView({ tasks, onSelectTask, groupColors = [] }: KanbanView
         </div>
 
         <div className="kanban-card-meta">
-          <span className={`tag tag-priority-${task.priority}`}>P{task.priority}</span>
-          {task.executionMode === 'follow_up' && (
-            <span className="tag tag-mode-follow">跟进</span>
+          <span className={`tag tag-priority p${task.priority}`}>P{task.priority}</span>
+          {task.carriedFromTaskId != null && <span className="tag tag-carry">带入</span>}
+          {task.assignerName && (
+            <span className="tag tag-assign-combo">分派·{task.assignerName}</span>
           )}
-          {task.ownerName && (
-            <span className="tag" style={{ gap: '3px' }}>
-              <PersonIcon size={12} />
-              {task.ownerName}
+          {task.executionMode === 'follow_up' && (
+            <span className="tag tag-follow-combo">
+              {task.ownerName ? `跟进·${task.ownerName}` : '跟进'}
             </span>
           )}
           {task.tags && task.tags.length > 0 && (
-            <span className="tag" style={{ gap: '3px' }}>
+            <span className="tag tag-label" style={{ gap: '3px' }}>
               <TagIcon size={11} />
               {task.tags[0]}
             </span>

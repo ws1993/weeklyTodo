@@ -1,30 +1,51 @@
-/* ---------- 轨道式分组 (Rail-style group roots) ---------- */
-.tree-node.group-root{
-  margin-bottom:12px;
-  border-left:3px solid var(--gcolor,var(--border));
-  border-radius:0 4px 4px 0;
-  background:color-mix(in srgb,var(--gcolor,transparent) 4%,transparent);
-  transition:border-left-color .15s,background .15s;
-}
-/* ---------- 叶子节点强化 (Leaf enhancement) ---------- */
-.leaf-dot{
-  width:7px;height:7px;border-radius:999px;
-  background:var(--gcolor,var(--text-3));
-  flex:none;
-  transition:background .15s,transform .15s;
-}
-.tree-row.leaf-active .node-title{font-weight:600}
-.tree-row.leaf-active:hover{
-  background:color-mix(in srgb,var(--gcolor,var(--brand)) 6%,var(--surface-2));
-}
-.tree-row.closed .leaf-dot{
-  background:var(--text-4);transform:scale(.7);
+/* ---------- 轨道式分组 (Rail-style group roots - 保留分组底色) ---------- */
+.tree-node.group-root {
+  margin-bottom: 10px;
+  border-left: 3px solid var(--gcolor, var(--border));
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: color-mix(in srgb, var(--gcolor, transparent) 4.5%, transparent);
+  transition: border-left-color 0.15s ease, background 0.15s ease;
 }
 
-.add-inline .ok-btn,.add-inline .no-btn{
-  width:26px;height:26px;border-radius:3px;border:1px solid var(--border);
-  background:var(--surface);color:var(--text-2);cursor:pointer;display:grid;place-items:center;
+/* ---------- 叶子节点强化 (Leaf enhancement) ---------- */
+.leaf-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--gcolor, var(--text-3));
+  flex: none;
+  transition: background 0.15s ease, transform 0.15s ease;
 }
-.add-inline .ok-btn:hover{color:#fff;background:var(--brand);border-color:var(--brand)}
-.add-inline .no-btn:hover{color:var(--text-1);background:var(--surface-2)}
-.add-inline svg{width:13px;height:13px}
+
+.tree-row.leaf-active .node-title {
+  font-weight: 500;
+}
+
+.tree-row.leaf-active:hover {
+  background: color-mix(in srgb, var(--gcolor, var(--brand)) 7%, var(--surface-2));
+}
+
+.tree-row.closed .leaf-dot {
+  background: var(--text-4);
+  transform: scale(0.75);
+}
+
+/* ---------- 父节点子任务完成进度胶囊 ---------- */
+.node-sub-progress {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  color: var(--text-3);
+  background: color-mix(in srgb, var(--surface-2) 85%, transparent);
+  border: 1px solid var(--border-subtle);
+  flex: none;
+}
+
+.node-sub-progress.all-done {
+  color: var(--success);
+  background: var(--success-soft);
+  border-color: var(--success-border);
+}

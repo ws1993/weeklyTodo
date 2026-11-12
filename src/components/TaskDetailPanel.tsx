@@ -179,19 +179,31 @@ export function TaskDetailPanel({ task, onClose, tasks, weekId, onMutated }: Tas
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-backdrop task-detail-backdrop" onClick={onClose}>
       <div
         className="modal task-detail"
-        style={{ width: 640 }}
         onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.stopPropagation();
+            onClose();
+          } else if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+            event.preventDefault();
+            void save();
+          }
+        }}
       >
-        <button className="modal-close" title="关闭" onClick={onClose}>
-          <CrossIcon size={14} />
-        </button>
-        <h2 className="modal-title">任务详情</h2>
-        <p className="modal-sub">
-          设置执行方式、负责人、分派人与标签；输入新值会自动保存到选项库，供后续选择。
-        </p>
+        <div className="task-detail-head">
+          <div>
+            <h2 className="modal-title">任务详情</h2>
+            <p className="modal-sub">
+              配置任务属性；输入新负责人、分派人或标签会自动沉淀到选项库（Ctrl+Enter 快速保存）。
+            </p>
+          </div>
+          <button className="modal-close" title="关闭 (Esc)" onClick={onClose}>
+            <CrossIcon size={14} />
+          </button>
+        </div>
 
         <div className="modal-body">
           <div className="task-time">

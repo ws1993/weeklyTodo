@@ -50,10 +50,15 @@ export function WeekRail({ onOpenQuery, onCreateWeek }: WeekRailProps) {
         )}
       </div>
       <div className="rail-footer">
-        <button className="search-entry" type="button" onClick={onOpenQuery}>
+        <button
+          className="search-entry"
+          type="button"
+          title="跨周全历史多维检索 (Ctrl+Shift+F)"
+          onClick={onOpenQuery}
+        >
           <SearchIcon size={15} />
           查询全部
-          <kbd>Ctrl K</kbd>
+          <kbd>Ctrl ⇧ F</kbd>
         </button>
         <button className="btn btn-primary btn-wide" onClick={onCreateWeek}>
           <PlusIcon size={15} />

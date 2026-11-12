@@ -1,111 +1,378 @@
-/* ---------- Modals ---------- */
-.modal-backdrop{
-  position:fixed;inset:0;z-index:60;
-  display:flex;align-items:center;justify-content:center;
-  background:rgba(23,32,51,.38);backdrop-filter:blur(2px);
+/* ---------- Modals & Slide-over Inspector Drawer ---------- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.28);
+  backdrop-filter: blur(2px);
 }
-.modal{
-  width:470px;max-width:94vw;background:var(--surface);
-  border:1px solid var(--border-strong);border-radius:6px;
-  box-shadow:0 18px 50px -12px rgba(23,32,51,.25);
-  position:relative;color:var(--text-1);
+
+.modal {
+  width: 470px;
+  max-width: 94vw;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  position: relative;
+  color: var(--text-1);
 }
-.modal-wide{
-  width:760px;max-width:94vw;height:640px;max-height:92vh;
-  display:flex;flex-direction:column;
+
+.modal-wide {
+  width: 780px;
+  max-width: 94vw;
+  height: 640px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
 }
-.modal.task-detail{
-  max-height:92vh;display:flex;flex-direction:column;
+
+/* ---------- Slide-over Task Detail Drawer ---------- */
+.modal-backdrop.task-detail-backdrop {
+  justify-content: flex-end;
+  align-items: stretch;
+  background: rgba(15, 23, 42, 0.14);
+  backdrop-filter: none;
 }
-.modal.task-detail .modal-body{overflow-y:auto;flex:1;min-height:0}
-.modal-close{
-  position:absolute;top:12px;right:12px;width:28px;height:28px;
-  display:grid;place-items:center;border-radius:3px;border:1px solid transparent;
-  background:transparent;color:var(--text-3);cursor:pointer;
+
+@keyframes drawerSlideIn {
+  from {
+    opacity: 0.6;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
-.modal-close:hover{color:var(--text-1);background:var(--surface-2);border-color:var(--border)}
-.modal-close svg{width:15px;height:15px}
-.modal-title{font-size:15px;font-weight:600;letter-spacing:.3px;padding:16px 44px 0 18px}
-.modal-sub{font-size:12px;color:var(--text-3);margin-top:4px;line-height:1.7;padding:0 44px 0 18px}
-.modal-body{padding:0px 18px 4px 18px;min-height:0}
-.modal-wide .modal-body{display:flex;flex-direction:column;flex:1;overflow:hidden}
-.field{margin-top:12px;display:flex;flex-direction:column;gap:7px}
-.field label{font-size:12px;color:var(--text-2);letter-spacing:.4px}
+
+.modal.task-detail {
+  width: 460px;
+  max-width: 92vw;
+  height: 100vh;
+  max-height: 100vh;
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+  border-left: 1px solid var(--border);
+  box-shadow: -12px 0 32px -8px rgba(15, 23, 42, 0.12);
+  display: flex;
+  flex-direction: column;
+  animation: drawerSlideIn 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.task-detail-head {
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-2) 50%, var(--surface));
+  position: relative;
+  flex: none;
+}
+
+.task-detail-head .modal-title {
+  padding: 0 32px 0 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.task-detail-head .modal-sub {
+  padding: 0 32px 0 0;
+  margin-top: 3px;
+}
+
+.modal.task-detail .modal-body {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding: 4px 20px 16px;
+}
+
+.modal.task-detail .modal-actions {
+  margin-top: auto;
+  padding: 14px 0 4px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.modal-close:hover {
+  color: var(--text-1);
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+.modal-close svg {
+  width: 15px;
+  height: 15px;
+}
+
+.modal-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  padding: 16px 44px 0 18px;
+}
+
+.modal-sub {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 4px;
+  line-height: 1.65;
+  padding: 0 44px 0 18px;
+}
+
+.modal-body {
+  padding: 0 18px 4px 18px;
+  min-height: 0;
+}
+
+.modal-wide .modal-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.field {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+
 .modal input[type="date"]:not([class*="ant-select"]),
 .modal input[type="text"]:not([class*="ant-select"]),
 .modal select,
 .modal-body input:not([class*="ant-select"]),
 .modal-body select,
-.detail-textarea{
-  background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius);
-  padding:7px 10px;color:var(--text-1);font-family:inherit;font-size:13px;
-  outline:none;color-scheme:light;width:100%;
+.detail-textarea {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  color-scheme: light;
+  width: 100%;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
 }
-/* antd Select 内部 input（antd5: ant-select-selection-search-input / antd6: ant-select-input）
-   均含 "ant-select"，用属性子串匹配排除，避免被上面原生 input 规则套上重复边框。
-   注意 .modal input[type="text"] 也必须带 :not()，否则 tags 模式下可见的搜索 input 仍会命中。 */
-.modal input:not([class*="ant-select"]):focus,.modal select:focus,.modal-body input:not([class*="ant-select"]):focus,.modal-body select:focus,.detail-textarea:focus{
-  border-color:var(--brand);box-shadow:0 0 0 3px rgba(21,87,208,.14);
+
+/* antd Select 内部 input 均含 "ant-select"，用属性子串匹配排除，避免重复边框。 */
+.modal input:not([class*="ant-select"]):focus,
+.modal select:focus,
+.modal-body input:not([class*="ant-select"]):focus,
+.modal-body select:focus,
+.detail-textarea:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-soft);
 }
-.week-preview{margin-top:12px;font-size:13px;color:var(--text-2);min-height:21px}
-.week-preview b{font-family:var(--mono);font-weight:500;color:var(--brand);letter-spacing:.5px}
-.week-error{margin-top:8px;font-size:12.5px;color:var(--danger);min-height:18px}
-.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;padding:0 0 16px}
-.modal-wide .modal-actions{padding:12px 18px;border-top:1px solid var(--border);margin-top:0}
-.modal-message{margin-top:10px;font-size:13px;color:var(--success)}
-.modal-error{
-  margin-top:10px;font-size:12.5px;color:var(--danger);background:var(--danger-soft);
-  border:1px solid var(--danger-border);border-radius:var(--radius);padding:9px 11px;
+
+.week-preview {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--text-2);
+  min-height: 21px;
 }
-.modal-hint{font-size:12px;color:var(--text-2);line-height:1.8}
-.modal-hint code{
-  font-family:var(--mono);color:var(--text-2);background:var(--surface-2);
-  border:1px solid var(--border);border-radius:3px;padding:1px 6px;
+
+.week-preview b {
+  font-family: var(--mono);
+  font-weight: 500;
+  color: var(--brand);
+  letter-spacing: 0.5px;
 }
-.task-time{
-  display:flex;align-items:baseline;flex-wrap:nowrap;column-gap:6px;
-  margin-top:12px;
-  font-size:12px;line-height:1.7;color:var(--text-3);
-  user-select:text;
+
+.week-error {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--danger);
+  min-height: 18px;
 }
-.task-time .task-time-label{color:var(--text-4);letter-spacing:.4px;white-space:nowrap}
-.task-time time{
-  font-family:var(--mono);color:var(--text-2);
-  font-variant-numeric:tabular-nums;letter-spacing:.2px;white-space:nowrap;
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 0 0 16px;
 }
-.task-time .task-time-sep{color:var(--text-4)}
-.close-behavior-modal-hint{
-  display:flex;align-items:flex-start;gap:10px;
-  padding:11px 12px;background:var(--surface-2);
-  border:1px solid var(--border);border-radius:var(--radius);
-  font-size:12px;color:var(--text-2);line-height:1.7;
+
+.modal-wide .modal-actions {
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  margin-top: 0;
 }
-.close-behavior-modal-logo{
-  width:32px;height:32px;flex:none;display:grid;place-items:center;border-radius:6px;
+
+.modal-message {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--success);
 }
-.detail-textarea{resize:vertical;min-height:76px}
-.action-spacer{flex:1}
-.task-detail .modal-body{max-height:calc(92vh - 120px);overflow-y:auto}
-.task-detail .ant-select-selector{
-  background:var(--surface) !important;
-  border-color:var(--border-strong) !important;
-  color:var(--text-1) !important;
+
+.modal-error {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--danger);
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius);
+  padding: 9px 11px;
 }
+
+.modal-hint {
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.7;
+}
+
+.modal-hint code {
+  font-family: var(--mono);
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+
+.task-time {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: nowrap;
+  column-gap: 6px;
+  margin-top: 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-3);
+  user-select: text;
+}
+
+.task-time .task-time-label {
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.task-time time {
+  font-family: var(--mono);
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+.task-time .task-time-sep {
+  color: var(--text-4);
+}
+
+.close-behavior-modal-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.7;
+}
+
+.close-behavior-modal-logo {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+}
+
+.detail-textarea {
+  resize: vertical;
+  min-height: 76px;
+}
+
+.action-spacer {
+  flex: 1;
+}
+
+.task-detail .ant-select-selector {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  border-radius: var(--radius) !important;
+  color: var(--text-1) !important;
+}
+
+.task-detail .ant-select-focused .ant-select-selector {
+  border-color: var(--brand) !important;
+  box-shadow: 0 0 0 3px var(--brand-soft) !important;
+}
+
 .task-detail .ant-select-selection-placeholder,
 .task-detail .ant-select-input,
-.task-detail .ant-select-selection-search-input{color:var(--text-3) !important}
-.task-detail .ant-select-selection-item{color:var(--text-1) !important}
-.task-detail .ant-radio-wrapper{color:var(--text-2)}
-.ant-select-dropdown{
-  background:var(--surface) !important;
-  border:1px solid var(--border-strong);
-  border-radius:4px;
-  box-shadow:0 12px 34px -12px rgba(23,32,51,.18);
+.task-detail .ant-select-selection-search-input {
+  color: var(--text-3) !important;
 }
-.ant-select-dropdown .ant-select-item{color:var(--text-2)}
-.ant-select-dropdown .ant-select-item-option-active{background:var(--surface-2)}
-.ant-select-dropdown .ant-select-item-option-selected{
-  color:var(--brand);background:var(--brand-soft);
+
+.task-detail .ant-select-selection-item {
+  color: var(--text-1) !important;
 }
-.ant-select-dropdown .ant-select-item-option-selected .ant-select-item-option-state{color:var(--brand)}
-.ant-select-dropdown .ant-select-item-option-content{color:inherit}
+
+.task-detail .ant-radio-wrapper {
+  color: var(--text-2);
+}
+
+.ant-select-dropdown {
+  background: var(--surface) !important;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+
+.ant-select-dropdown .ant-select-item {
+  color: var(--text-2);
+}
+
+.ant-select-dropdown .ant-select-item-option-active {
+  background: var(--surface-2);
+}
+
+.ant-select-dropdown .ant-select-item-option-selected {
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.ant-select-dropdown .ant-select-item-option-selected .ant-select-item-option-state {
+  color: var(--brand);
+}
+
+.ant-select-dropdown .ant-select-item-option-content {
+  color: inherit;
+}

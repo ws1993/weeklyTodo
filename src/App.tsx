@@ -106,10 +106,15 @@ export function App() {
   const [shareSelectedIds, setShareSelectedIds] = useState<Set<number>>(() => new Set());
   const [shareOpen, setShareOpen] = useState(false);
 
-  // 全局快捷键监听 (Ctrl+K, Alt+[, Alt+])
+  // 全局快捷键监听 (Ctrl+K 唤醒命令面板, Ctrl+Shift+F 打开跨周全库查询)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        setQueryOpen((open) => !open);
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setCommandPaletteOpen((open) => !open);
       }

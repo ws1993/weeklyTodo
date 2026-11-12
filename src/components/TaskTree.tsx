@@ -10,6 +10,7 @@ import {
 } from '../utils/tree';
 import type { DropPosition } from '../utils/tree';
 import { groupColorMap } from '../utils/groupColors';
+import { parseQuickTaskInput } from '../utils/quickTaskSyntax';
 import { EmptyState } from './EmptyState';
 import {
   CheckIcon,
@@ -120,11 +121,14 @@ export function TaskTree({
   }, [newTaskRequest]);
 
   const submitDraft = async () => {
-    const title = draftTitle.trim();
-    if (!title) {
+    const parsed = parseQuickTaskInput(draftTitle);
+    if (!parsed.title) {
       return;
     }
-    await addTask({ title, parentId: addingParentId === 'root' ? null : addingParentId });
+    await addTask({
+      ...parsed,
+      parentId: addingParentId === 'root' ? null : addingParentId,
+    });
     setDraftTitle('');
     setAddingParentId(null);
   };
@@ -238,7 +242,8 @@ export function TaskTree({
         <div className="add-inline" style={{ paddingLeft: 14 }}>
           <input
             autoFocus
-            placeholder="输入任务名称，回车确认…"
+            className="task-title-input"
+            placeholder="输入任务名称（支持 !p0 @负责人 #标签），回车确认…"
             value={draftTitle}
             onChange={(event) => setDraftTitle(event.target.value)}
             onKeyDown={(event) => {
@@ -323,17 +328,24 @@ function TaskNode({
   const [inlineDraft, setInlineDraft] = useState('');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
+  const allDirectChildren = useMemo(
+    () => sortedChildren(allTasks, task.id),
+    [allTasks, task.id],
+  );
   const children = useMemo(() => {
-    const allChildren = sortedChildren(allTasks, task.id);
     return visibleTaskIds
-      ? allChildren.filter((child) => visibleTaskIds.has(child.id))
-      : allChildren;
-  }, [allTasks, task.id, visibleTaskIds]);
+      ? allDirectChildren.filter((child) => visibleTaskIds.has(child.id))
+      : allDirectChildren;
+  }, [allDirectChildren, visibleTaskIds]);
   const hasChildren = children.length > 0;
   const isLeaf = !hasChildren;
   const closed = task.status === 'closed';
   // 「非叶子」以真实子任务判断（不受「仅看未完成」过滤影响），用于隐藏执行方式/负责人。
-  const hasAnyChildren = allTasks.some((item) => item.parentId === task.id);
+  const hasAnyChildren = allDirectChildren.length > 0;
+  const doneChildrenCount = useMemo(
+    () => allDirectChildren.filter((child) => child.status === 'closed').length,
+    [allDirectChildren],
+  );
   const isSelected = selectedIds?.has(task.id) ?? false;
 
   // 定位目标位于本节点子树内时，强制展开以便目标可见。
@@ -355,13 +367,13 @@ function TaskNode({
   const extraTagCount = task.tags.length - visibleTags.length;
 
   const commitInline = async () => {
-    const title = inlineDraft.trim();
-    if (!title) {
+    const parsed = parseQuickTaskInput(inlineDraft);
+    if (!parsed.title) {
       setShowInlineAdd(false);
       setInlineDraft('');
       return;
     }
-    await addTask({ title, parentId: task.id });
+    await addTask({ ...parsed, parentId: task.id });
     setShowInlineAdd(false);
     setInlineDraft('');
   };
@@ -550,12 +562,22 @@ function TaskNode({
               }}
             />
           ) : (
-            <span
-              className="node-title"
-              onDoubleClick={selectionMode ? undefined : () => setEditing(true)}
-            >
-              {task.title}
-            </span>
+            <>
+              <span
+                className="node-title"
+                onDoubleClick={selectionMode ? undefined : () => setEditing(true)}
+              >
+                {task.title}
+              </span>
+              {hasAnyChildren && (
+                <span
+                  className={`node-sub-progress${doneChildrenCount === allDirectChildren.length ? ' all-done' : ''}`}
+                  title={`子任务进度：已完成 ${doneChildrenCount} / 共 ${allDirectChildren.length} 项`}
+                >
+                  {doneChildrenCount}/{allDirectChildren.length}
+                </span>
+              )}
+            </>
           )}
         </span>
 
@@ -578,16 +600,6 @@ function TaskNode({
           }
         >
           {task.carriedFromTaskId != null && <span className="tag tag-carry">带入</span>}
-          {closed && <span className="tag tag-closed">已完成</span>}
-          <span
-            className={`tag tag-priority p${task.priority}`}
-            title={hasChildren ? '优先级由未完成子任务自动联动' : undefined}
-          >
-            P{task.priority}
-          </span>
-          {!hasAnyChildren && task.executionMode === 'self' && (
-            <span className="tag tag-self">自己</span>
-          )}
           {!hasAnyChildren && task.assignerName && (
             <span className="tag tag-assign-combo">分派·{task.assignerName}</span>
           )}
@@ -598,6 +610,12 @@ function TaskNode({
             <span key={tag} className="tag tag-label">{tag}</span>
           ))}
           {extraTagCount > 0 && <span className="tag tag-extra">+{extraTagCount}</span>}
+          <span
+            className={`tag tag-priority p${task.priority}`}
+            title={hasChildren ? '优先级由未完成子任务自动联动' : undefined}
+          >
+            P{task.priority}
+          </span>
         </span>
 
         {!selectionMode && (
@@ -676,6 +694,7 @@ function TaskNode({
               depth={depth + 1}
               drag={drag}
               visibleTaskIds={visibleTaskIds}
+              groupColor={groupColor}
               selectionMode={selectionMode}
               selectedIds={selectedIds}
               onToggleSelect={onToggleSelect}
@@ -688,7 +707,8 @@ function TaskNode({
         <div className={`add-inline ${depthClass}`}>
           <input
             autoFocus
-            placeholder="输入子任务名称，回车确认…"
+            className="task-title-input"
+            placeholder="输入子任务（支持 !p0 @负责人 #标签），回车确认…"
             value={inlineDraft}
             onChange={(event) => setInlineDraft(event.target.value)}
             onKeyDown={(event) => {

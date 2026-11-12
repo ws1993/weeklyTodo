@@ -56,6 +56,10 @@ export function FocusBanner({ task, onClose }: FocusBannerProps) {
   const minutes = Math.floor(secondsRemaining / 60);
   const seconds = secondsRemaining % 60;
   const timeFormatted = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  const elapsedPercent = Math.min(
+    100,
+    Math.max(0, ((DEFAULT_FOCUS_SECONDS - secondsRemaining) / DEFAULT_FOCUS_SECONDS) * 100),
+  );
 
   const handleFinish = async () => {
     fireConfetti();
@@ -102,13 +106,15 @@ export function FocusBanner({ task, onClose }: FocusBannerProps) {
         </button>
         <button
           type="button"
-          className="btn btn-ghost btn-sm"
-          style={{ color: '#94A3B8', padding: '0 6px' }}
+          className="btn btn-ghost btn-sm focus-close-btn"
           onClick={onClose}
           title="退出专注模式"
         >
-          <CrossIcon size={16} />
+          <CrossIcon size={15} />
         </button>
+      </div>
+      <div className="focus-progress-track" aria-hidden="true">
+        <div className="focus-progress-fill" style={{ width: `${elapsedPercent}%` }} />
       </div>
     </div>
   );
