@@ -1,6 +1,9 @@
 /* ---------- Main area (Scheme A: Unified Workspace Console) ---------- */
 .main {
   grid-area: main;
+  /* 容器查询的「容器」：头部所有自适应都按这块区域的真实可用宽度判断 */
+  container-type: inline-size;
+  container-name: workspace;
   padding: 14px 18px;
   display: flex;
   flex-direction: column;
@@ -89,32 +92,14 @@
   color: var(--brand);
 }
 
-.ws-date-range {
-  font-size: 11.5px;
-  color: var(--text-3);
-  font-variant-numeric: tabular-nums;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-}
-
-.ws-carry-hint {
-  font-size: 11px;
-  color: var(--purple);
-  background: var(--purple-soft);
-  border: 1px solid var(--purple-border);
-  padding: 1px 6px;
-  border-radius: var(--radius-full);
-  font-weight: 500;
-}
-
 /* --- Center: View Mode Tabs & Progress Summary --- */
 .ws-head-center {
   display: flex;
   align-items: center;
   gap: 14px;
-  flex: none;
+  flex: 1 1 auto;
+  justify-content: center;
+  min-width: max-content;
 }
 
 .ws-view-tabs {
@@ -149,42 +134,71 @@
   box-shadow: var(--shadow-xs);
 }
 
-.ws-progress-wrap {
+/* 完成度胶囊：环 + 文字说明，避免裸环被误读成「加载中」 */
+.ws-progress {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding-left: 12px;
-  border-left: 1px solid var(--border);
-  font-size: 12px;
-  color: var(--text-2);
-}
-
-.ws-progress-text {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  white-space: nowrap;
-}
-.ws-progress-text b {
-  font-family: var(--mono);
-  color: var(--text-1);
-  font-variant-numeric: tabular-nums;
+  gap: 6px;
+  flex: none;
+  height: 28px;
+  padding: 0 9px 0 5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  cursor: default;
 }
 
 .ws-dial-mini {
-  width: 28px;
-  height: 28px;
+  width: 20px;
+  height: 20px;
   flex: none;
-  transform: rotate(-90deg);
 }
 
-/* --- Right: Filtering & Actions --- */
+.ws-progress-caption {
+  font-size: 11px;
+  color: var(--text-3);
+  line-height: 1;
+}
+
+.ws-progress-value {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* --- Right: 本周状态 → 过滤 → 操作 --- */
 .ws-head-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex: none;
+}
+
+/* 分组分隔线：把「筛选」与「操作」在视觉上切开 */
+.ws-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  flex: none;
+}
+
+.ws-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 头部图标按钮统一 28×28，避免主按钮与次按钮尺寸打架 */
+.ws-icon-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .ws-share-info {
@@ -235,4 +249,36 @@
   border-radius: var(--radius-full);
   line-height: 14px;
   white-space: nowrap;
+}
+
+/* ---------- 头部按「可用宽度」自适应（容器查询，非视口断点） ----------
+   .main 是容器：右侧面板展开/收起、周列表收放都会改变它的真实宽度，而窗口宽度不变。
+   按视口断点判断会漏掉这些变化——这正是"展开面板就溢出/展开异常"的根因。
+   2026-11 头部重排：三段分组固定为「周锚点 / 视图切换 / 状态·过滤·操作」，
+   进度环升级为带文字的胶囊并移到右侧；由于胶囊比裸环宽，下列档位按实测同步上调。
+   档位：隐徽标 → 隐开关文字 → 隐「完成」二字 → 页签只留图标 → 隐分享按钮 → 隐整颗胶囊 → 兜底换行
+   阈值由实测「内容宽度」得出，内容再变窄只会提前触发，不会裁切。 */
+@container workspace (max-width: 940px) {
+  .ws-head-left .badge-now { display: none; }
+}
+@container workspace (max-width: 880px) {
+  .ws-head-right .toggle-label { display: none; }
+}
+@container workspace (max-width: 800px) {
+  .ws-progress-caption { display: none; }
+  .ws-progress { padding-left: 4px; padding-right: 7px; gap: 5px; }
+}
+@container workspace (max-width: 700px) {
+  .ws-view-btn .ws-btn-text { display: none; }
+  .ws-view-btn { padding: 3px 8px; }
+}
+@container workspace (max-width: 600px) {
+  .ws-share-btn { display: none; }
+}
+@container workspace (max-width: 512px) {
+  .ws-progress { display: none; }
+}
+/* 最后兜底：连图标都排不下时才换行 */
+@container workspace (max-width: 430px) {
+  .workspace-header { flex-wrap: wrap; row-gap: 8px; }
 }

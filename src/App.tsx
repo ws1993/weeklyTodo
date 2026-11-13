@@ -50,7 +50,6 @@ import { getAntdThemeConfig } from './utils/theme';
 import type { Task, UpdateCheckResult } from './shared/contracts/types';
 import {
   currentWeekId as currentWeekIdOf,
-  formatCnRange,
   todayLabel,
   weekStatus,
 } from './utils/weekFormat';
@@ -331,7 +330,6 @@ export function App() {
     return <div className="loading-state">正在初始化数据…</div>;
   }
 
-  const carriedCount = tree?.tasks.filter((task) => task.carriedFromTaskId != null).length ?? 0;
   const activeWeekStatus = weekStatus(activeWeekId);
   const currentWeek = currentWeekIdOf();
   const totalTasks = tree?.tasks.length ?? 0;
@@ -457,7 +455,7 @@ export function App() {
 
               {/* Unified Workspace Header (Scheme A) */}
               <section className="workspace-header">
-                {/* 左侧：周步进选择器 + 日期区间 */}
+                {/* 左侧：周步进选择器 */}
                 <div className="ws-head-left">
                   <div className="ws-stepper">
                     <button
@@ -493,19 +491,8 @@ export function App() {
                       <ChevronRightIcon size={14} />
                     </button>
                   </div>
-
-                  <span className="ws-date-range">
-                    {formatCnRange(activeWeekId)}
-                    {tree?.week.carriedFromWeekId && (
-                      <span className="ws-carry-hint">
-                        自 {tree.week.carriedFromWeekId} 带入
-                        {carriedCount > 0 ? ` (${carriedCount}项)` : ''}
-                      </span>
-                    )}
-                  </span>
                 </div>
-
-                {/* 中间：视图模式切换 + 进度概览 */}
+                {/* 中间：视图模式切换（唯一主控件，保持居中） */}
                 <div className="ws-head-center">
                   <div className="ws-view-tabs">
                     <button
@@ -514,7 +501,7 @@ export function App() {
                       onClick={() => setViewMode('tree')}
                     >
                       <NetworkIcon size={13} />
-                      任务树
+                      <span className="ws-btn-text">任务树</span>
                     </button>
                     <button
                       type="button"
@@ -522,43 +509,12 @@ export function App() {
                       onClick={() => setViewMode('kanban')}
                     >
                       <KanbanIcon size={13} />
-                      看板
+                      <span className="ws-btn-text">看板</span>
                     </button>
-                  </div>
-
-                  <div
-                    className="ws-progress-wrap"
-                    title={`共 ${totalTasks} 项任务 · 已完成 ${doneTasks} · 进行中 ${openTasks} · 完成度 ${doneRatio}%`}
-                  >
-                    <span className="ws-progress-text">
-                      <b>{doneTasks}</b> / {totalTasks} 完成
-                    </span>
-                    <svg className="ws-dial-mini" viewBox="0 0 46 46">
-                      <circle
-                        cx="23"
-                        cy="23"
-                        r="18"
-                        stroke="var(--border)"
-                        strokeWidth="3.5"
-                        fill="none"
-                      />
-                      <circle
-                        cx="23"
-                        cy="23"
-                        r="18"
-                        stroke="var(--success)"
-                        strokeWidth="3.5"
-                        strokeLinecap="round"
-                        fill="none"
-                        strokeDasharray={dialCircumference}
-                        strokeDashoffset={dialOffset}
-                        style={{ transition: 'stroke-dashoffset 0.35s ease' }}
-                      />
-                    </svg>
                   </div>
                 </div>
 
-                {/* 右侧：过滤与操作 */}
+                {/* 右侧：本周状态 → 过滤 → 操作（三级分组） */}
                 <div className="ws-head-right">
                   {shareMode ? (
                     <>
@@ -589,6 +545,43 @@ export function App() {
                     </>
                   ) : (
                     <>
+                      <div
+                        className="ws-progress"
+                        title={`共 ${totalTasks} 项任务 · 已完成 ${doneTasks} · 进行中 ${openTasks} · 完成度 ${doneRatio}%`}
+                      >
+                        <svg
+                          className="ws-dial-mini"
+                          viewBox="0 0 46 46"
+                          role="img"
+                          aria-label={`完成度 ${doneRatio}%`}
+                        >
+                          <g transform="rotate(-90 23 23)">
+                            <circle
+                              cx="23"
+                              cy="23"
+                              r="18"
+                              stroke="var(--border)"
+                              strokeWidth="4.5"
+                              fill="none"
+                            />
+                            <circle
+                              cx="23"
+                              cy="23"
+                              r="18"
+                              stroke="var(--success)"
+                              strokeWidth="4.5"
+                              strokeLinecap="round"
+                              fill="none"
+                              strokeDasharray={dialCircumference}
+                              strokeDashoffset={dialOffset}
+                              style={{ transition: 'stroke-dashoffset 0.35s ease' }}
+                            />
+                          </g>
+                        </svg>
+                        <span className="ws-progress-caption">完成</span>
+                        <span className="ws-progress-value">{doneRatio}%</span>
+                      </div>
+
                       {viewMode === 'tree' && (
                         <ToggleSwitch
                           label="仅看未完成"
@@ -596,24 +589,30 @@ export function App() {
                           onChange={setShowIncompleteOnly}
                         />
                       )}
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-sm"
-                        title="新建主任务"
-                        onClick={() => setNewTaskRequest((request) => request + 1)}
-                      >
-                        <PlusIcon size={14} />
-                        新建主任务
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        title="选择多个任务生成分享图"
-                        onClick={startShare}
-                      >
-                        <ShareIcon size={14} />
-                        分享
-                      </button>
+
+                      {/* 过滤与操作之间的分界，避免按钮与筛选混成一片 */}
+                      <span className="ws-sep" aria-hidden="true" />
+
+                      <div className="ws-actions">
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm ws-icon-btn ws-share-btn"
+                          title="选择多个任务生成分享图"
+                          aria-label="选择多个任务生成分享图"
+                          onClick={startShare}
+                        >
+                          <ShareIcon size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm ws-icon-btn"
+                          title="新建主任务"
+                          aria-label="新建主任务"
+                          onClick={() => setNewTaskRequest((request) => request + 1)}
+                        >
+                          <PlusIcon size={14} />
+                        </button>
+                      </div>
                     </>
                   )}
                 </div>
@@ -654,6 +653,8 @@ export function App() {
         {tree && (
           <CurrentActions
             tasks={tree.tasks}
+            collapsed={panelCollapsed}
+            onToggleCollapsed={() => setPanelCollapsed((c) => !c)}
             onLocate={(taskId) => setLocateRequest({ taskId, nonce: Date.now() })}
             onStartFocus={(task) => setFocusTask(task)}
           />

@@ -191,6 +191,8 @@ export function ToggleSwitch({ label, checked, onChange }: ToggleSwitchProps) {
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-label={label}
+      title={label}
       className={`toggle${checked ? ' on' : ''}`}
       onClick={() => onChange(!checked)}
     >

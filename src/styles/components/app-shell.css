@@ -1,7 +1,12 @@
 /* ---------- App shell ---------- */
+/* 侧栏宽度用变量承载，收起状态与窄窗分档互不打架：
+   - 收起类只覆盖变量，不会被窄窗分档的媒体查询顶掉（specificity 更高）
+   - 窄窗时两侧栏随窗口一起让路，主区始终留有足够宽度，右侧面板永远可展开 */
 .app-shell {
+  --rail-w: 280px;
+  --panel-w: 320px;
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr) 320px;
+  grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--panel-w);
   grid-template-rows: 48px minmax(0, 1fr);
   grid-template-areas:
     "topbar topbar topbar"
@@ -13,13 +18,29 @@
 }
 
 .app-shell.sidebar-collapsed {
-  grid-template-columns: 0px minmax(0, 1fr) 320px;
+  --rail-w: 0px;
 }
 
 .app-shell.panel-collapsed {
-  grid-template-columns: 280px minmax(0, 1fr) 52px;
+  --panel-w: 52px;
 }
 
 .app-shell.both-collapsed {
-  grid-template-columns: 0px minmax(0, 1fr) 52px;
+  --rail-w: 0px;
+  --panel-w: 52px;
+}
+
+/* 窄窗分档：窗口变窄时两栏逐级收窄，把宽度让给主区（头部另有容器查询兜底压缩）。
+   900px（Tauri minWidth）时主区仍有 480px，足够单行头部且不裁切。 */
+@media (max-width: 1300px) {
+  .app-shell { --rail-w: 250px; --panel-w: 278px; }
+}
+@media (max-width: 1180px) {
+  .app-shell { --rail-w: 236px; --panel-w: 264px; }
+}
+@media (max-width: 1060px) {
+  .app-shell { --rail-w: 210px; --panel-w: 248px; }
+}
+@media (max-width: 960px) {
+  .app-shell { --rail-w: 190px; --panel-w: 230px; }
 }

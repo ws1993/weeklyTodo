@@ -9,13 +9,8 @@
   padding:12px 14px;margin:14px 0;
 }
 
+/* 窄视口只隐藏顶栏次要信息；主布局列与头部压缩交给 .app-shell 弹性列 + .main 容器查询，
+   不再用 display:none 杀列，避免「面板展开无效 / 展开后挤压头部」的异常。 */
 @media (max-width:1080px){
-  .app-shell{
-    grid-template-columns:270px minmax(0,1fr);
-    grid-template-areas:
-      "topbar topbar"
-      "rail main";
-  }
-  .actions-pane{display:none}
   .today{display:none}
 }

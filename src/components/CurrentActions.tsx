@@ -7,6 +7,10 @@ import { GROUP_COLOR_PENDING, groupColorMap } from '../utils/groupColors';
 
 interface CurrentActionsProps {
   tasks: Task[];
+  /** 收起状态：由 App 统一持有，与顶栏按钮共享同一数据源。 */
+  collapsed: boolean;
+  /** 切换收起/展开。 */
+  onToggleCollapsed: () => void;
   /** 点击某行动时，在左侧任务树中定位并高亮。 */
   onLocate: (taskId: number) => void;
   /** 点击专注按钮时触发进入 Pomodoro 倒计时专注。 */
@@ -41,12 +45,11 @@ function buildLeafEntries(tasks: Task[]): LeafEntry[] {
   });
 }
 
-export function CurrentActions({ tasks, onLocate, onStartFocus }: CurrentActionsProps) {
+export function CurrentActions({ tasks, collapsed, onToggleCollapsed, onLocate, onStartFocus }: CurrentActionsProps) {
   const toggleTask = useAppStore((state) => state.toggleTask);
   const groupColors = useAppStore((state) => state.groupColors);
   const ensureGroupColor = useAppStore((state) => state.ensureGroupColor);
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
 
   // P0 最优先（数值最小），同级保持任务树原有顺序（Array#sort 稳定）。
   const entries = useMemo(
@@ -112,7 +115,7 @@ export function CurrentActions({ tasks, onLocate, onStartFocus }: CurrentActions
     return (
       <aside className="actions-pane collapsed">
         <div className="lane-head">
-          <button className="panel-collapse" title="展开面板" onClick={() => setCollapsed(false)}>
+          <button className="panel-collapse" title="展开面板" onClick={onToggleCollapsed}>
             <ChevronRightIcon size={15} />
           </button>
         </div>
@@ -129,7 +132,7 @@ export function CurrentActions({ tasks, onLocate, onStartFocus }: CurrentActions
         <span className="lane-glyph"><BoltIcon size={15} /></span>
         <span className="actions-pane-title">当前行动</span>
         <span className="lane-count">{entries.length}</span>
-        <button className="panel-collapse" title="收起面板" onClick={() => setCollapsed(true)}>
+        <button className="panel-collapse" title="收起面板" onClick={onToggleCollapsed}>
           <ChevronRightIcon size={15} />
         </button>
       </div>
